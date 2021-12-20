@@ -1,0 +1,81 @@
+
+@font-face {
+  font-family: Sora;
+  src: url(font/Sora-Thin.ttf);
+}
+
+* {
+  font-family: 'Sora';
+  font-style: normal;
+  font-size: 24px;
+}
+
+body {
+  background: #F9F1F0;
+}
+
+.words {
+  padding-left: 10px;
+  padding-right: 10px;
+  width: 500px;
+}
+
+.centering-box {
+  position: absolute;
+  top: calc(50% - 100px);
+  left: calc(50% - 250px);
+}
+
+.word {
+  border-width: 0px;
+  margin-bottom: 30px;
+  outline:1px solid black;
+}
+
+.word-box {
+  display:table;
+  vertical-align: middle;
+
+  height: 50px;
+}
+
+.word-box .field {
+  display:table-cell;
+  vertical-align:middle;
+
+  height: 50px; /* need it for Firefox */
+  width: 500px;
+
+  border-width: 0px;
+
+  padding: 0px;
+  padding-left: 15px;
+  padding-right: 15px;
+  margin: 0px;
+
+  box-sizing: border-box;
+  outline: none;
+}
+
+.input .field {
+  background: lightgrey;
+}
+
+.right-word .result .field {
+  background: lightgreen;
+  color: green;
+}
+
+.wrong-word .output .field {
+  background: #ffadad;
+  text-decoration: line-through;
+  color: red;
+}
+
+.wrong-word .result .field {
+  background: lightgreen;
+}
+
+.current .output .field {
+  background: white;
+}
