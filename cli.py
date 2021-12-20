@@ -64,10 +64,10 @@ if __name__ == '__main__':
             if learn.guess(word_given):
 
                 if current_word.is_complex:
-                    print(colored('Great :)', 'green'))
-                else:
                     print(colored('Great :)', 'green'), ' ',
                           colored(german, 'green', attrs=['bold']))
+                else:
+                    print(colored('Great :)', 'green'))
             else:
                 print(colored(f'! {german}', 'red', attrs=['bold']))
 
