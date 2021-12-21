@@ -11,8 +11,9 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-class Word(BaseModel):
+class WordOutput(BaseModel):
     word: str
+
 
 def json_word(word: Word):
     return {
@@ -36,5 +37,5 @@ def new_session():
     }
 
 @app.post("/word")
-def post_word(word: Word):
+def post_word(word: WordOutput):
     return {}
