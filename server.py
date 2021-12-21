@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import RedirectResponse
+from pydantic import BaseModel
 
 from learn import Vocabulary, LearnEngine, Word
 
@@ -10,12 +11,14 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+class Word(BaseModel):
+    word: str
+
 def json_word(word: Word):
     return {
         "input": word.word,
         "result": word.word_french
     }
-
 
 @app.get("/")
 def root():
@@ -32,6 +35,6 @@ def new_session():
         "word": json_word(current_word)
     }
 
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Optional[str] = None):
-    return {"item_id": item_id, "q": q}
+@app.post("/word")
+def post_word(word: Word):
+    return {}

@@ -2,22 +2,34 @@
 $(document).on('keypress',function(e) {
   if(e.which == 13) {
     var current_input = $(".current input");
+    var output = current_input.val();
 
-    if(current_input.val() === "die Haut") {
-      var new_node = $("#right-word").clone();
-    } else {
-      var new_node = $("#wrong-word").clone();
-    }
+    current_input.attr("readonly", "");
 
-    new_node.attr("style", "");
+    $.ajax({
+      url: "/word",
+      method: "POST",
+      contentType: 'application/json',
+      processData: false,
+      data: JSON.stringify({"word": output})
+    }).done(function() {
+      if(current_input.val() === "die Haut") {
+        var new_node = $("#right-word").clone();
+      } else {
+        var new_node = $("#wrong-word").clone();
+      }
 
-    $(".current").before(new_node);
+      new_node.attr("style", "");
 
-    current_input.val("");
+      $(".current").before(new_node);
 
-    // update the size of the words
-    var size = $(".words").css("height");
-    $(".centering-box").css("top", "calc(50% - " + size + ")");
+      current_input.val("");
+
+      // update the size of the words
+      var size = $(".words").css("height");
+      $(".centering-box").css("top", "calc(50% - " + size + ")");
+    });
+
   }
 });
 
