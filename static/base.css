@@ -14,3 +14,31 @@ body {
   background: #F9F1F0;
 }
 
+.center {
+  width: 900px;
+  margin-left: calc(50% - 450px);
+  margin-top: 50px;
+  padding: 20px;
+}
+
+.name {
+  display: inline-block;
+
+  width: 380px;
+}
+
+.percentage {
+  display: inline-block;
+  float: right;
+  text-align: right;
+  width: 100px;
+}
+
+.cell {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.vocabulary:not(:last-child) {
+  border-bottom: 1px solid #EAEAEA;
+}
