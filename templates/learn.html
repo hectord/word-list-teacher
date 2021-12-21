@@ -1,66 +1,56 @@
-<!DOCTYPE html>
-<html>
+{% extends "base.html" %}
 
-  <head>
-    <title>Learn</title>
+{% block title %}Learn{% endblock %}
 
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+{% block body %}
 
-    <link rel="stylesheet" href="/static/styles.css">
-    <script src="/static/script.js"></script>
+  <div class="centering-box">
 
-  </head>
-
-  <body>
-
-    <div class="centering-box">
-
-      <div class="words">
-        <div id="current-word" class="word current">
-          <div class="word-box input">
-            <span id="current-input" class="field"></span>
-          </div>
-          <div class="word-box output">
-            <input autofocus id="current-output" class="field" type="text" value=""/>
-          </div>
+    <div class="words">
+      <div id="current-word" class="word current">
+        <div class="word-box input">
+          <span id="current-input" class="field"></span>
+        </div>
+        <div class="word-box output">
+          <input autofocus id="current-output" class="field" type="text" value=""/>
         </div>
       </div>
-
     </div>
 
-    <!-- used to inform the user of a new word learned! -->
-    <div id="wrong-word" style="visibility: hidden;" class="word wrong-word">
-      <div class="word-box input">
-        <span class="field">
-          la peau
-        </span>
-      </div>
-      <div class="word-box output">
-        <span class="field">
-          die Haut
-        </span>
-      </div>
-      <div class="word-box result">
-        <span class="field">
-          die Haut
-        </span>
-      </div>
+  </div>
+
+  <!-- used to inform the user of a new word learned! -->
+  <div id="wrong-word" style="visibility: hidden;" class="word wrong-word">
+    <div class="word-box input">
+      <span class="field">
+        la peau
+      </span>
     </div>
-
-    <!-- used to inform the user of a wrong word -->
-    <div id="right-word" style="visibility: hidden;" class="word right-word">
-      <div class="word-box input">
-        <span class="field">
-          la peau
-        </span>
-      </div>
-      <div class="word-box result">
-        <span class="field">
-          die Haut
-        </span>
-      </div>
+    <div class="word-box output">
+      <span class="field">
+        die Haut
+      </span>
     </div>
+    <div class="word-box result">
+      <span class="field">
+        die Haut
+      </span>
+    </div>
+  </div>
 
-  </body>
+  <!-- used to inform the user of a wrong word -->
+  <div id="right-word" style="visibility: hidden;" class="word right-word">
+    <div class="word-box input">
+      <span class="field">
+        la peau
+      </span>
+    </div>
+    <div class="word-box result">
+      <span class="field">
+        die Haut
+      </span>
+    </div>
+  </div>
 
-</html>
+{% endblock %}
+
