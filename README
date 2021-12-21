@@ -7,3 +7,8 @@ How to do it?
 Long term goal
 * make it a platform (smartphone + web)
 * make statistics available to everybody (anonymized)
+
+FAQ
+
+How to start the server?
+> uvicorn server:app --reload
