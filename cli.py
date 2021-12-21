@@ -55,7 +55,7 @@ if __name__ == '__main__':
         while not learn.is_finished:
             current_word = learn.current_word
 
-            german, french = current_word.word, current_word.word_french
+            german, french = current_word.word_output, current_word.word_input
 
             print(f'> {french}')
             print(f'? ', end='')

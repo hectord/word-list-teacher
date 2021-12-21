@@ -22,21 +22,24 @@ def filter(word):
 
 @dataclass(frozen=True)
 class Word:
-    word: str
-    word_french: str
+    word_output: str
+    word_input: str
 
     @property
     def is_complex(self) -> bool:
-        return self.word != self.simplified
+        return self.word_output != self._simplified_word_output
 
     @property
-    def simplified(self) -> str:
-        simple_german = self.word.lower()
+    def _simplified_word_output(self) -> str:
+        simple_german = self.word_output.lower()
         return filter(simple_german)
+
+    def accepts(self, word_output: str) -> bool:
+        return self._simplified_word_output == word_output.lower()
 
     @property
     def line(self) -> str:
-        return f'{self.word};{self.word_french}'
+        return f'{self.word_output};{self.word_input}'
 
     @staticmethod
     def load(line: str):
@@ -47,8 +50,9 @@ class Word:
             error = f'invalid line "{line}" in {filename}'
             raise InvalidFileException(error)
 
-        word, word_french = tuple(word)
-        return Word(word=word, word_french=word_french)
+        word_output, word_input = tuple(word)
+        return Word(word_output=word_output,
+                    word_input=word_input)
 
 
 class Vocabulary:
@@ -129,12 +133,10 @@ class LearnEngine:
     def current_word(self) -> Optional[Word]:
         return self._current_word
 
-    def guess(self, word: str) -> bool:
+    def guess(self, word_output: str) -> bool:
         current_word = self.current_word
 
-        simple_german_simplified = current_word.simplified
-
-        if simple_german_simplified == word.lower():
+        if current_word.accepts(word_output):
             self._nok_words.remove(current_word)
             self._current_word = None
             self._pick_next_word()

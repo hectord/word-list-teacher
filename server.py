@@ -44,21 +44,21 @@ def new_session() -> WordInput:
 
     current_word = engine.current_word
 
-    return WordInput(word=current_word.word_french)
+    return WordInput(word=current_word.word_input)
 
 @app.post("/word")
 def post_word(word: WordOutput):
     current_word = engine.current_word
-    hint_word = current_word.word
+    hint_word = current_word.word_output
 
     success = engine.guess(word.word)
 
     next_word = None
     if engine.current_word is not None:
-        next_word = WordInput(word=engine.current_word.word_french)
+        next_word = WordInput(word=engine.current_word.word_input)
 
     return WordResult(success=success,
                       hint=hint_word,
-                      word_input=WordInput(word=current_word.word_french),
+                      word_input=WordInput(word=current_word.word_input),
                       word_output=word,
                       next_word=next_word)
