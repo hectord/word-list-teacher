@@ -2,6 +2,10 @@
 
 {% block title %}Learn{% endblock %}
 
+{% block header %}
+    <link rel="stylesheet" href="/static/learn.css">
+{% endblock %}
+
 {% block body %}
 
   <div class="centering-box">
@@ -12,7 +16,7 @@
           <span id="current-input" class="field"></span>
         </div>
         <div class="word-box output">
-          <input autofocus id="current-output" class="field" type="text" value=""/>
+          <input autocomplete="off" autofocus id="current-output" class="field" type="text" value=""/>
         </div>
       </div>
     </div>

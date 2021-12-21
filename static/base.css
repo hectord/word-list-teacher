@@ -1,0 +1,16 @@
+
+@font-face {
+  font-family: Sora;
+  src: url(font/Sora-Thin.ttf);
+}
+
+* {
+  font-family: 'Sora';
+  font-style: normal;
+  font-size: 24px;
+}
+
+body {
+  background: #F9F1F0;
+}
+
