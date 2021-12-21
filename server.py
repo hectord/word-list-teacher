@@ -42,10 +42,17 @@ class WordResult(BaseModel):
 
 @app.get("/")
 def root():
-    return RedirectResponse(url='/learn')
+    return RedirectResponse(url='/index')
+
+@app.get("/index")
+def index(request: Request):
+    return TEMPLATES.TemplateResponse(
+        "index.html",
+        {'request': request}
+    )
 
 @app.get("/learn")
-def root(request: Request):
+def learn(request: Request):
     return TEMPLATES.TemplateResponse(
         "learn.html",
         {'request': request}
