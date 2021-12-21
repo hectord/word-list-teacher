@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import re
-from typing import List, Dict, Tuple, Set, Generator
+from typing import List, Dict, Tuple, Set, Generator, Optional
 from collections import defaultdict
 from dataclasses import dataclass
 import random
@@ -126,7 +126,7 @@ class LearnEngine:
         return len(self._vocabulary) / attempts
 
     @property
-    def current_word(self) -> Word:
+    def current_word(self) -> Optional[Word]:
         return self._current_word
 
     def guess(self, word: str) -> bool:
