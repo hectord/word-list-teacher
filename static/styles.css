@@ -58,22 +58,24 @@ body {
 }
 
 .input .field {
-  background: lightgrey;
+  background: #EAEAEA;
+  border-bottom: 1px solid lightgrey;
 }
 
 .right-word .result .field {
-  background: lightgreen;
+  background: #E1F1E2;
   color: green;
 }
 
 .wrong-word .output .field {
-  background: #ffadad;
+  background: #FFE8E8;
+  border-bottom: 1px solid lightgrey;
   text-decoration: line-through;
   color: red;
 }
 
 .wrong-word .result .field {
-  background: lightgreen;
+  background: #E1F1E2;
 }
 
 .current .output .field {
