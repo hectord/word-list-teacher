@@ -1,11 +1,19 @@
 
 from typing import Optional
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
 from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
 from learn import Vocabulary, LearnEngine, Word
+
+
+BASE_PATH = Path(__file__).resolve().parent
+TEMPLATES = Jinja2Templates(directory=str(BASE_PATH / "templates"))
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -34,7 +42,14 @@ class WordResult(BaseModel):
 
 @app.get("/")
 def root():
-    return RedirectResponse(url='/static/learn.html')
+    return RedirectResponse(url='/learn')
+
+@app.get("/learn")
+def root(request: Request):
+    return TEMPLATES.TemplateResponse(
+        "learn.html",
+        {'request': request}
+    )
 
 @app.post("/new_session")
 def new_session() -> WordInput:
