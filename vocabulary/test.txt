@@ -1,3 +1,3 @@
-a;a
-b;b
-c;c
+de_a;fr_a
+de_b (bb);fr_b
+de_c;fr_c
