@@ -21,3 +21,14 @@ $(document).on('keypress',function(e) {
   }
 });
 
+$(document).ready(function() {
+
+  $.ajax({
+    url: "/new_session",
+    type: "POST"
+  }).done(function(data) {
+    var word = data.word;
+    $("#current-input").text(word.input);
+  });
+
+});
