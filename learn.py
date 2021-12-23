@@ -47,7 +47,7 @@ class Word:
         word = line.split(';')
 
         if len(word) != 2:
-            error = f'invalid line "{line}" in {filename}'
+            error = f'invalid line "{line}"'
             raise InvalidFileException(error)
 
         word_output, word_input = tuple(word)
@@ -80,7 +80,8 @@ class Vocabulary:
 
         with open(filename, 'r') as f:
             for line in f.readlines():
-                words.add(Word.load(line))
+                if line.strip():
+                    words.add(Word.load(line))
 
         return Vocabulary(words)
 
