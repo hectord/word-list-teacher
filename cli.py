@@ -18,6 +18,9 @@ def save_words(words: LearnEngine):
     if not words:
         return
 
+    for word in words:
+        print(f'{word.word_input:20} {word.word_output:20}')
+
     while True:
         print('Save wrong words?')
         print('filename: ', end='')
