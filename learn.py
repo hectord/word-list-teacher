@@ -24,10 +24,15 @@ def filter(word):
 class Word:
     word_output: str
     word_input: str
+    directive: Optional[str]
 
     @property
     def is_complex(self) -> bool:
         return self.word_output != self._simplified_word_output
+
+    @property
+    def is_name(self) -> Optional[str]:
+        return self.directive == '#name'
 
     @property
     def _simplified_word_output(self) -> str:
@@ -39,19 +44,32 @@ class Word:
 
     @property
     def line(self) -> str:
-        return f'{self.word_output};{self.word_input}'
+        word_line = f'{self.word_output};{self.word_input}'
+
+        if self.directive is not None:
+            word_line = f'{self.directive} {word_line}'
+
+        return word_line
 
     @staticmethod
     def load(line: str):
         line = line.strip()
-        word = line.split(';')
+        directive = None
+
+        if line.startswith('#') and ' ' in line:
+            i = line.index(' ')
+            directive = line[:i]
+            line = line[i:]
+
+        word = line.strip().split(';')
 
         if len(word) != 2:
             error = f'invalid line "{line}"'
             raise InvalidFileException(error)
 
         word_output, word_input = tuple(word)
-        return Word(word_output=word_output,
+        return Word(directive=directive,
+                    word_output=word_output,
                     word_input=word_input)
 
 
@@ -84,13 +102,17 @@ class Vocabulary:
     @staticmethod
     def load(filename: str):
         words = set()
+        name = None
 
         with open(filename, 'r') as f:
             for line in f.readlines():
                 if line.strip():
-                    words.add(Word.load(line))
+                    word = Word.load(line)
+                    if word.is_name:
+                        name = word
+                    words.add(word)
 
-        return Vocabulary(None, words)
+        return Vocabulary(name, words)
 
 
 class LearnEngine:

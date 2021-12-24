@@ -89,7 +89,7 @@ def vocabulary_name(path: str):
     try:
         vocabulary = Vocabulary.load(path)
 
-        return f'{vocabulary.name} ({len(vocabulary)} words)'
+        return f'{vocabulary.name.word_input} ({len(vocabulary)} words)'
     except IsADirectoryError:
         return colored('is a directory', 'red')
     except InvalidFileException as e:
