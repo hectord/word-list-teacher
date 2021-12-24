@@ -46,6 +46,7 @@ class WordResult(BaseModel):
 def root():
     return RedirectResponse(url='/index')
 
+
 @app.get("/index")
 def index(request: Request):
     vocabularies = []
@@ -60,6 +61,7 @@ def index(request: Request):
              'vocabularies':vocabularies
         }
     )
+
 
 @app.get("/learn")
 def learn(request: Request):
@@ -77,6 +79,7 @@ def new_session() -> WordInput:
     current_word = engine.current_word
 
     return WordInput(word=current_word.word_input)
+
 
 @app.post("/word")
 def post_word(word: WordOutput):

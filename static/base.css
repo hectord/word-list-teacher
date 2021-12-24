@@ -14,6 +14,10 @@ body {
   background: #F9F1F0;
 }
 
+.new-session {
+  text-decoration: none;
+}
+
 .center {
   width: 900px;
   margin-left: calc(50% - 450px);
