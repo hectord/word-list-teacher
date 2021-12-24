@@ -57,11 +57,18 @@ class Word:
 
 class Vocabulary:
 
-    def __init__(self, words: Set[Word] = None):
+    def __init__(self,
+                 name: Optional[Word] = None,
+                 words: Set[Word] = None):
+        self._name = name
         self._words = words or set()
 
     def add(self, other: 'Vocabulary'):
         self._words.update(other._words)
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def __iter__(self) -> Generator[Word, None, None]:
         for word in self._words:
@@ -83,7 +90,7 @@ class Vocabulary:
                 if line.strip():
                     words.add(Word.load(line))
 
-        return Vocabulary(words)
+        return Vocabulary(None, words)
 
 
 class LearnEngine:
@@ -118,7 +125,7 @@ class LearnEngine:
         for word, _ in word_count_list:
             words.add(word)
 
-        return Vocabulary(words)
+        return Vocabulary(None, words)
 
     @property
     def new_words_learned(self) -> int:
