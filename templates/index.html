@@ -9,9 +9,11 @@
 
     {% for vocabulary in vocabularies %}
       <div class="vocabulary">
-        <span class="name cell">{{ vocabulary.name.word_input }}</span>
-        <span class="name cell">{{ vocabulary.name.word_output }}</span>
-        <span class="percentage cell">100%</span>
+        <a href="/learn">
+          <span class="name cell">{{ vocabulary.name.word_input }}</span>
+          <span class="name cell">{{ vocabulary.name.word_output }}</span>
+          <span class="percentage cell">100%</span>
+        </a>
       </div>
     {% endfor %}
 
