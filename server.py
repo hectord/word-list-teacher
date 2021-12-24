@@ -15,6 +15,8 @@ from learn import Vocabulary, LearnEngine, Word
 BASE_PATH = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_PATH / "templates"))
 
+VOCABULARIES = BASE_PATH / 'vocabulary'
+
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 engine = None
@@ -46,9 +48,17 @@ def root():
 
 @app.get("/index")
 def index(request: Request):
+    vocabularies = []
+
+    for path in VOCABULARIES.iterdir():
+        vocabularies.append(Vocabulary.load(str(path)))
+
     return TEMPLATES.TemplateResponse(
         "index.html",
-        {'request': request}
+        {
+            'request': request,
+             'vocabularies':vocabularies
+        }
     )
 
 @app.get("/learn")
