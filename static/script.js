@@ -2,13 +2,6 @@
 
 $(document).ready(function() {
 
-  $.ajax({
-    url: "/new_session",
-    type: "POST"
-  }).done(function(data) {
-    $("#current-input").text(data.word);
-  });
-
   $("#current-output").keyup(function(e) {
 
     if($(this).attr('readonly'))

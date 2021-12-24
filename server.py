@@ -65,20 +65,20 @@ def index(request: Request):
 
 @app.get("/learn")
 def learn(request: Request):
-    return TEMPLATES.TemplateResponse(
-        "learn.html",
-        {'request': request}
-    )
-
-@app.post("/new_session")
-def new_session() -> WordInput:
     global engine
     new_voc = Vocabulary.load("vocabulary/test.txt")
     engine = LearnEngine(new_voc)
 
     current_word = engine.current_word
+    first_word = WordInput(word=current_word.word_input)
 
-    return WordInput(word=current_word.word_input)
+    return TEMPLATES.TemplateResponse(
+        "learn.html",
+        {
+            'request': request,
+            'first_word': first_word
+        }
+    )
 
 
 @app.post("/word")
