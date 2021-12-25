@@ -84,9 +84,12 @@ class Vocabulary:
     def add(self, other: 'Vocabulary'):
         self._words.update(other._words)
 
+    def __str__(self) -> str:
+        return self.name
+
     @property
     def name(self) -> str:
-        return self._name
+        return self._name.word_input
 
     def __iter__(self) -> Generator[Word, None, None]:
         for word in self._words:
