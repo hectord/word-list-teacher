@@ -10,15 +10,17 @@ from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
 from learn import Vocabulary, LearnEngine, Word
+from store import load_database
 
 
 BASE_PATH = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_PATH / "templates"))
 
-VOCABULARIES = BASE_PATH / 'vocabulary'
+VOCABULARIES = BASE_PATH / 'learn.db'
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 engine = None
 
 
@@ -49,10 +51,8 @@ def root():
 
 @app.get("/index")
 def index(request: Request):
-    vocabularies = []
-
-    for path in VOCABULARIES.iterdir():
-        vocabularies.append(Vocabulary.load(str(path)))
+    db = load_database(VOCABULARIES)
+    vocabularies = list(db.list_vocabularies())
 
     return TEMPLATES.TemplateResponse(
         "index.html",

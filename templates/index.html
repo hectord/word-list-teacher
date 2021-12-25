@@ -10,8 +10,8 @@
     {% for vocabulary in vocabularies %}
       <div class="vocabulary">
         <a class="new-session" href="/learn">
-          <span class="name cell">{{ vocabulary.name.word_input }}</span>
-          <span class="name cell">{{ vocabulary.name.word_output }}</span>
+          <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
+          <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
           <span class="percentage cell">100%</span>
         </a>
       </div>

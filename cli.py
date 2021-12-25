@@ -7,6 +7,7 @@ import argparse
 from termcolor import colored
 
 from learn import Word, InvalidFileException, Vocabulary, LearnEngine
+from store import load_database
 
 
 def say_goodbye():
@@ -99,10 +100,16 @@ def vocabulary_name(path: str):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     subparser = parser.add_subparsers(dest='cmd', required=True)
+
     list_subparser = subparser.add_parser('list')
     list_subparser.add_argument('files', help='vocs to list', nargs='+')
+
     learn_subparser = subparser.add_parser('learn')
     learn_subparser.add_argument('files', help='words to learn', nargs='+')
+
+    learn_subparser = subparser.add_parser('load')
+    learn_subparser.add_argument('database', help='database path', nargs=1)
+    learn_subparser.add_argument('files', help='words to load', nargs='+')
 
     args = parser.parse_args()
     files = args.files
@@ -121,5 +128,12 @@ if __name__ == '__main__':
             all_words.add(vocabulary)
 
         learn(set(files), all_words)
+    elif args.cmd == 'load':
+        database = args.database[0]
+        database = load_database(database)
+
+        for filename in files:
+            vocabulary = Vocabulary.load(filename)
+            database.create_vocabulary(vocabulary)
     else:
         assert False
