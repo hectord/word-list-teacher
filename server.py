@@ -52,7 +52,7 @@ def root():
 @app.get("/index")
 def index(request: Request):
     db = load_database(VOCABULARIES)
-    vocabularies = list(db.list_vocabularies())
+    vocabularies = db.list_vocabularies()
 
     return TEMPLATES.TemplateResponse(
         "index.html",

@@ -23,7 +23,7 @@ class TestStore(unittest.TestCase):
 
         db.create_vocabulary(new_voc)
 
-        vocs = db.list_vocabularies()
+        vocs = db.list_vocabularies().values()
         self.assertEqual(1, len(vocs))
         self.assertEqual({word1, word2},
                          next(iter(vocs)).words)

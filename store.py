@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from typing import Set
+from typing import Dict
 from datetime import date
 from peewee import *
 
@@ -36,8 +36,8 @@ class Database:
                           word_output=word.word_output,
                           directive=word.directive)
 
-    def list_vocabularies(self) -> Set[Vocabulary]:
-        vocs = set()
+    def list_vocabularies(self) -> Dict[int, Vocabulary]:
+        vocs = {}
 
         for voc in DbVocabulary.select():
             name = None
@@ -52,7 +52,7 @@ class Database:
                     name = new_word
                 words.add(new_word)
 
-            vocs.add(Vocabulary(name, words))
+            vocs[voc.id] = Vocabulary(name, words)
 
         return vocs
 

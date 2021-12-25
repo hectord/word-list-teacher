@@ -7,9 +7,9 @@
   <div class="center">
     <h1>Vocabulary</h1>
 
-    {% for vocabulary in vocabularies %}
+    {% for voc_id, vocabulary in vocabularies.items() %}
       <div class="vocabulary">
-        <a class="new-session" href="/learn">
+        <a class="new-session" href="/learn?id={{ voc_id }}">
           <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
           <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
           <span class="percentage cell">100%</span>
