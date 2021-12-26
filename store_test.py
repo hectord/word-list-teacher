@@ -45,12 +45,12 @@ class TestStore(unittest.TestCase):
         self._create_vocabulary()
         self._create_user()
 
-        self.assertIsNone(self.db.last_session(self.new_voc))
+        self.assertIsNone(self.db.last_session(self.user, self.new_voc))
 
         session_id = self.db.create_new_session(self.user, self.new_voc)
         self.assertIsNotNone(session_id)
 
-        session = self.db.last_session(self.new_voc)
+        session = self.db.last_session(self.user, self.new_voc)
         self.assertEqual(session_id, session.id)
 
         self.assertTrue((self.word1 == session.current_word) or

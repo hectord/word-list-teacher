@@ -75,7 +75,7 @@ def index(request: Request, user: DbUser = Depends(get_user)):
     session_by_vocabulary = {}
 
     for vocabulary in vocabularies.values():
-        session = db.last_session(vocabulary)
+        session = db.last_session(user, vocabulary)
         if session is not None:
             session_by_vocabulary[vocabulary] = session
 
@@ -88,6 +88,7 @@ def index(request: Request, user: DbUser = Depends(get_user)):
         }
     )
 
+
 @app.get("/new_session")
 def new_session(request: Request,
                 voc_id: int,
@@ -99,6 +100,7 @@ def new_session(request: Request,
     session_id = db.create_new_session(user, voc)
 
     return RedirectResponse(url=f'/learn?session_id={session_id}')
+
 
 @app.get("/learn")
 def learn(request: Request, session_id: int):

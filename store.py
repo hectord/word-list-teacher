@@ -89,7 +89,9 @@ class Database:
                                    vocabulary=voc.id)
         return new_session.id
 
-    def last_session(self, voc: Vocabulary) -> Optional[LearnEngine]:
+    def last_session(self,
+                     user: DbUser,
+                     voc: Vocabulary) -> Optional[LearnEngine]:
 
         if voc.id is None:
             return None
@@ -97,6 +99,7 @@ class Database:
         sessions = (DbVocabularySession
                     .select()
                     .join(DbSession)
+                    .where(DbSession.user == user)
                     .where(DbVocabularySession.vocabulary == voc.id)
                     .order_by(DbSession.id.desc())
                     .limit(1))
