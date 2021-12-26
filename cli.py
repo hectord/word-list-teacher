@@ -100,21 +100,23 @@ def vocabulary_name(path: str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    subparser = parser.add_subparsers(dest='cmd', required=True)
+    cmdparser = parser.add_subparsers(dest='cmd', required=True)
 
-    list_subparser = subparser.add_parser('list')
+    list_subparser = cmdparser.add_parser('list')
     list_subparser.add_argument('files', help='vocs to list', nargs='+')
 
-    learn_subparser = subparser.add_parser('learn')
+    learn_subparser = cmdparser.add_parser('learn')
     learn_subparser.add_argument('files', help='words to learn', nargs='+')
 
-    learn_subparser = subparser.add_parser('load')
-    learn_subparser.add_argument('database', help='database path', nargs=1)
-    learn_subparser.add_argument('files', help='words to load', nargs='+')
+    dbparser = cmdparser.add_parser('database')
+    dbparser.add_argument('database', help='database path', nargs=1)
+    db_subparser = dbparser.add_subparsers(dest='db_cmd', required=True)
 
-    learn_subparser = subparser.add_parser('create-user')
-    learn_subparser.add_argument('database', help='database path', nargs=1)
-    learn_subparser.add_argument('username', help='new username', nargs=1)
+    load_subparser = db_subparser.add_parser('load')
+    load_subparser.add_argument('files', help='words to load', nargs='+')
+
+    create_user_subparser = db_subparser.add_parser('create-user')
+    create_user_subparser.add_argument('username', help='new username', nargs=1)
 
     args = parser.parse_args()
 
@@ -134,7 +136,7 @@ if __name__ == '__main__':
             all_words.add(vocabulary)
 
         learn(set(files), all_words)
-    elif args.cmd == 'load':
+    elif args.db_cmd == 'load':
         files = args.files
         database = args.database[0]
         database = load_database(database)
@@ -142,7 +144,7 @@ if __name__ == '__main__':
         for filename in files:
             vocabulary = Vocabulary.load(filename)
             database.create_vocabulary(vocabulary)
-    elif args.cmd == 'create-user':
+    elif args.db_cmd == 'create-user':
         username = args.username[0]
 
         database = args.database[0]
