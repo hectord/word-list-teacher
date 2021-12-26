@@ -12,7 +12,7 @@ from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
 from learn import Vocabulary, LearnEngine, Word
-from store import load_database
+from store import load_database, DbUser, DbException
 
 
 BASE_PATH = Path(__file__).resolve().parent
@@ -47,16 +47,20 @@ class WordResult(BaseModel):
     next_word: Optional[WordInput]
 
 
-def get_current_username(creds: HTTPBasicCredentials = Depends(security)):
-    correct_username = secrets.compare_digest(creds.username, "stanleyjobson")
-    correct_password = secrets.compare_digest(creds.password, "swordfish")
-    if not (correct_username and correct_password):
+def get_user(creds: HTTPBasicCredentials = Depends(security)):
+    db = load_database(VOCABULARIES)
+    username = creds.username
+    password = creds.password
+
+    try:
+        user = db.get_user(username, password)
+    except DbException:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Basic"},
         )
-    return creds.username
+    return user
 
 
 @app.get("/")
@@ -65,7 +69,7 @@ def root():
 
 
 @app.get("/index")
-def index(request: Request, username: str = Depends(get_current_username)):
+def index(request: Request, user: DbUser = Depends(get_user)):
     db = load_database(VOCABULARIES)
     vocabularies = db.list_vocabularies()
 

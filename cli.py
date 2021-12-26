@@ -2,6 +2,7 @@
 
 import os.path
 from typing import Set
+import getpass
 
 import argparse
 from termcolor import colored
@@ -111,16 +112,21 @@ if __name__ == '__main__':
     learn_subparser.add_argument('database', help='database path', nargs=1)
     learn_subparser.add_argument('files', help='words to load', nargs='+')
 
+    learn_subparser = subparser.add_parser('create-user')
+    learn_subparser.add_argument('database', help='database path', nargs=1)
+    learn_subparser.add_argument('username', help='new username', nargs=1)
+
     args = parser.parse_args()
-    files = args.files
 
     if args.cmd == 'list':
+        files = args.files
 
         for path in sorted(files):
             filename = os.path.basename(path)
             print(f' - {filename}: {vocabulary_name(path)}')
 
     elif args.cmd == 'learn':
+        files = args.files
         all_words = Vocabulary()
 
         for filename in files:
@@ -129,11 +135,21 @@ if __name__ == '__main__':
 
         learn(set(files), all_words)
     elif args.cmd == 'load':
+        files = args.files
         database = args.database[0]
         database = load_database(database)
 
         for filename in files:
             vocabulary = Vocabulary.load(filename)
             database.create_vocabulary(vocabulary)
+    elif args.cmd == 'create-user':
+        username = args.username[0]
+
+        database = args.database[0]
+        database = load_database(database)
+
+        password = getpass.getpass()
+
+        database.create_user(username, password)
     else:
         assert False

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from security import check_password, get_hashed_password
 from typing import Dict
 from datetime import date
 from peewee import *
@@ -7,6 +8,18 @@ from peewee import *
 from learn import Vocabulary, Word
 
 db = SqliteDatabase(None)
+
+
+class DbException(Exception):
+    pass
+
+
+class DbUser(Model):
+    email = CharField()
+    password = CharField()
+
+    class Meta:
+        database = db
 
 
 class DbVocabulary(Model):
@@ -26,6 +39,26 @@ class DbWord(Model):
 
 
 class Database:
+
+    def get_user(self, email: str, password: str) -> DbUser:
+        users = list(DbUser.select().where(DbUser.email == email))
+
+        if not users or not check_password(password, users[0].password):
+            raise DbException('user not found')
+
+        return users[0]
+
+    def create_user(self, email: str, password: str) -> DbUser:
+        users = list(DbUser.select().where(DbUser.email == email))
+
+        if users:
+            raise DbException('user already exists')
+
+        hash_password = get_hashed_password(password)
+
+        new_user = DbUser.create(email=email,
+                                 password=hash_password)
+        return new_user
 
     def create_vocabulary(self, voc: Vocabulary):
         new_voc = DbVocabulary.create()
@@ -60,6 +93,6 @@ class Database:
 def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
-    db.create_tables([DbVocabulary, DbWord])
+    db.create_tables([DbVocabulary, DbWord, DbUser])
 
     return Database()
