@@ -44,7 +44,7 @@ def save_words(words: LearnEngine):
 
 
 def learn(files: Set[str], vocabulary: Vocabulary):
-    engine = LearnEngine(all_words)
+    engine = LearnEngine([], all_words)
 
     try:
 

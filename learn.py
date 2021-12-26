@@ -73,6 +73,12 @@ class Word:
                     word_input=word_input)
 
 
+@dataclass(frozen=True)
+class WordAttempt:
+    word: Word
+    typed_word_output: str
+
+
 class Vocabulary:
 
     def __init__(self,
@@ -120,7 +126,10 @@ class Vocabulary:
 
 class LearnEngine:
 
-    def __init__(self, vocabulary: Vocabulary):
+    def __init__(self,
+                 attempts: List[WordAttempt],
+                 vocabulary: Vocabulary):
+        self._attempts = attempts
         self._vocabulary = vocabulary
 
         self._error_count_by_word = defaultdict(int)
@@ -168,6 +177,10 @@ class LearnEngine:
 
     def guess(self, word_output: str) -> bool:
         current_word = self.current_word
+
+        attempt = WordAttempt(word=current_word,
+                              typed_word_output=word_output)
+        self._attempts.append(attempt)
 
         if current_word.accepts(word_output):
             self._nok_words.remove(current_word)
