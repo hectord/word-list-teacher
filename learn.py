@@ -75,6 +75,7 @@ class Word:
 
 @dataclass(frozen=True)
 class WordAttempt:
+    success: bool
     word: Word
     typed_word_output: str
 
@@ -191,22 +192,25 @@ class LearnEngine:
     def current_word(self) -> Optional[Word]:
         return self._current_word
 
-    def guess(self, word_output: str) -> bool:
+    def guess(self, word_output: str) -> WordAttempt:
         current_word = self.current_word
 
+        success = current_word.accepts(word_output)
+
         attempt = WordAttempt(word=current_word,
-                              typed_word_output=word_output)
+                              typed_word_output=word_output,
+                              success=success)
         self._attempts.append(attempt)
 
-        if current_word.accepts(word_output):
+        if success:
             self._nok_words.remove(current_word)
             self._current_word = None
             self._pick_next_word()
-            return True
         else:
             self._error_count_by_word[current_word] += 1
             self._pick_next_word()
-            return False
+
+        return attempt
 
     @property
     def is_finished(self) -> bool:

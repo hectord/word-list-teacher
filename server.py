@@ -127,13 +127,13 @@ def post_word(word: WordOutput):
     current_word = engine.current_word
     hint_word = current_word.word_output
 
-    success = engine.guess(word.word)
+    result = engine.guess(word.word)
 
     next_word = None
     if engine.current_word is not None:
         next_word = WordInput(word=engine.current_word.word_input)
 
-    return WordResult(success=success,
+    return WordResult(success=result.success,
                       hint=hint_word,
                       word_input=WordInput(word=current_word.word_input),
                       word_output=word,
