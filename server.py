@@ -1,8 +1,10 @@
 
 from typing import Optional
 from pathlib import Path
+import secrets
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -20,6 +22,7 @@ VOCABULARIES = BASE_PATH / 'learn.db'
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
+security = HTTPBasic()
 
 engine = None
 
@@ -44,13 +47,25 @@ class WordResult(BaseModel):
     next_word: Optional[WordInput]
 
 
+def get_current_username(creds: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(creds.username, "stanleyjobson")
+    correct_password = secrets.compare_digest(creds.password, "swordfish")
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return creds.username
+
+
 @app.get("/")
 def root():
     return RedirectResponse(url='/index')
 
 
 @app.get("/index")
-def index(request: Request):
+def index(request: Request, username: str = Depends(get_current_username)):
     db = load_database(VOCABULARIES)
     vocabularies = db.list_vocabularies()
 
@@ -58,7 +73,7 @@ def index(request: Request):
         "index.html",
         {
             'request': request,
-             'vocabularies':vocabularies
+            'vocabularies': vocabularies
         }
     )
 
