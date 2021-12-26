@@ -25,6 +25,7 @@ class DbUser(Model):
 class DbSession(Model):
     user = ForeignKeyField(DbUser, backref='sessions')
     creation = DateTimeField()
+    finished = BooleanField()
 
     class Meta:
         database = db
@@ -81,7 +82,8 @@ class Database:
                            voc: Vocabulary) -> int:
 
         new_session = DbSession.create(user=user.id,
-                                       creation=datetime.now())
+                                       creation=datetime.now(),
+                                       finished=False)
 
         DbVocabularySession.create(session=new_session,
                                    vocabulary=voc.id)
@@ -96,7 +98,7 @@ class Database:
                     .select()
                     .join(DbSession)
                     .where(DbVocabularySession.vocabulary == voc.id)
-                    .order_by(DbSession.id)
+                    .order_by(DbSession.id.desc())
                     .limit(1))
         sessions = list(sessions)
 
@@ -149,8 +151,8 @@ class Database:
         ret.set_id(voc)
         return ret
 
-    def get_vocabulary(self, id: int) -> Vocabulary:
-        voc = DbVocabulary.get(id)
+    def get_vocabulary(self, voc_id: int) -> Vocabulary:
+        voc = DbVocabulary.get(voc_id)
 
         return self._load_vocabulary(voc)
 

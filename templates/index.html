@@ -9,13 +9,21 @@
 
     {% for voc_id, vocabulary in vocabularies.items() %}
       <div class="vocabulary">
-        <a class="new-session" href="/learn?id={{ voc_id }}">
-          <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
-          <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
-          <span class="actions cell">resume</span>
-          <span class="actions cell">new</span>
-          <span class="percentage cell">100%</span>
-        </a>
+        <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
+        <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
+        <span class="actions cell">
+          {% if vocabulary in session_by_vocabulary %}
+            <a class="new-session" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">
+              resume
+            </a>
+          {% endif %}
+        </span>
+        <span class="actions cell">
+          <a class="new-session" href="/new_session?voc_id={{ voc_id }}">
+            new
+          </a>
+        </span>
+        <span class="percentage cell">100%</span>
       </div>
     {% endfor %}
 

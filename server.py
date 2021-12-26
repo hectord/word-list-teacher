@@ -72,24 +72,41 @@ def root():
 def index(request: Request, user: DbUser = Depends(get_user)):
     db = load_database(VOCABULARIES)
     vocabularies = db.list_vocabularies()
+    session_by_vocabulary = {}
+
+    for vocabulary in vocabularies.values():
+        session = db.last_session(vocabulary)
+        if session is not None:
+            session_by_vocabulary[vocabulary] = session
 
     return TEMPLATES.TemplateResponse(
         "index.html",
         {
             'request': request,
-            'vocabularies': vocabularies
+            'vocabularies': vocabularies,
+            'session_by_vocabulary': session_by_vocabulary
         }
     )
 
+@app.get("/new_session")
+def new_session(request: Request,
+                voc_id: int,
+                user: DbUser = Depends(get_user)):
+    db = load_database(VOCABULARIES)
+
+    voc = db.get_vocabulary(voc_id)
+
+    session_id = db.create_new_session(user, voc)
+
+    return RedirectResponse(url=f'/learn?session_id={session_id}')
 
 @app.get("/learn")
-def learn(request: Request, id: int):
+def learn(request: Request, session_id: int):
     global engine
 
     db = load_database(VOCABULARIES)
 
-    new_voc = db.get_vocabulary(id)
-    engine = LearnEngine([], new_voc)
+    engine = db.load_session(session_id)
 
     current_word = engine.current_word
     first_word = WordInput(word=current_word.word_input)
