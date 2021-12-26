@@ -12,6 +12,8 @@
         <a class="new-session" href="/learn?id={{ voc_id }}">
           <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
           <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
+          <span class="actions cell">resume</span>
+          <span class="actions cell">new</span>
           <span class="percentage cell">100%</span>
         </a>
       </div>
@@ -20,4 +22,3 @@
   </div>
 
 {% endblock %}
-

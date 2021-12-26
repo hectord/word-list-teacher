@@ -28,14 +28,19 @@ body {
 .name {
   display: inline-block;
 
-  width: 380px;
+  width: 250px;
+}
+
+.actions {
+  display: inline-block;
+  width: 150px;
 }
 
 .percentage {
   display: inline-block;
   float: right;
   text-align: right;
-  width: 100px;
+  width: 80px;
 }
 
 .cell {
