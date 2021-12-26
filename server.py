@@ -83,9 +83,12 @@ def index(request: Request, user: DbUser = Depends(get_user)):
 
 
 @app.get("/learn")
-def learn(request: Request):
+def learn(request: Request, id: int):
     global engine
-    new_voc = Vocabulary.load("vocabulary/test.txt")
+
+    db = load_database(VOCABULARIES)
+
+    new_voc = db.get_vocabulary(id)
     engine = LearnEngine([], new_voc)
 
     current_word = engine.current_word

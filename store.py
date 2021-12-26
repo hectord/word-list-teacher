@@ -69,23 +69,31 @@ class Database:
                           word_output=word.word_output,
                           directive=word.directive)
 
+    def _load_vocabulary(self, voc: DbVocabulary) -> Vocabulary:
+        name = None
+        words = set()
+
+        for word in voc.words:
+            new_word = Word(word_input=word.word_input,
+                            word_output=word.word_output,
+                            directive=word.directive)
+
+            if new_word.is_name:
+                name = new_word
+            words.add(new_word)
+
+        return Vocabulary(name, words)
+
+    def get_vocabulary(self, id: int) -> Vocabulary:
+        voc = DbVocabulary.get(id)
+
+        return self._load_vocabulary(voc)
+
     def list_vocabularies(self) -> Dict[int, Vocabulary]:
         vocs = {}
 
         for voc in DbVocabulary.select():
-            name = None
-            words = set()
-
-            for word in voc.words:
-                new_word = Word(word_input=word.word_input,
-                                word_output=word.word_output,
-                                directive=word.directive)
-
-                if new_word.is_name:
-                    name = new_word
-                words.add(new_word)
-
-            vocs[voc.id] = Vocabulary(name, words)
+            vocs[voc.id] = self._load_vocabulary(voc)
 
         return vocs
 

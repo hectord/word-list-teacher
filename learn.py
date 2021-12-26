@@ -91,11 +91,11 @@ class Vocabulary:
         self._words.update(other._words)
 
     def __str__(self) -> str:
-        return self.name
+        return self.name.word_input
 
     @property
-    def name(self) -> str:
-        return self._name.word_input
+    def name(self) -> Word:
+        return self._name
 
     def __iter__(self) -> Generator[Word, None, None]:
         for word in self._words:

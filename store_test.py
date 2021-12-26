@@ -28,6 +28,10 @@ class TestStore(unittest.TestCase):
         self.assertEqual({word1, word2},
                          next(iter(vocs)).words)
 
+        voc2 = db.get_vocabulary(1)
+        self.assertEqual({word1, word2},
+                         voc2.words)
+
     def test_user(self):
         db = load_database(':memory:')
 
