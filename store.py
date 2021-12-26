@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from security import check_password, get_hashed_password
-from typing import Dict
-from datetime import date
+from typing import Dict, Optional
+from datetime import date, datetime
 from peewee import *
 
-from learn import Vocabulary, Word
+from learn import Vocabulary, Word, LearnEngine
 
 db = SqliteDatabase(None)
 
@@ -22,7 +22,23 @@ class DbUser(Model):
         database = db
 
 
+class DbSession(Model):
+    user = ForeignKeyField(DbUser, backref='sessions')
+    creation = DateTimeField()
+
+    class Meta:
+        database = db
+
+
 class DbVocabulary(Model):
+
+    class Meta:
+        database = db
+
+
+class DbVocabularySession(Model):
+    session = ForeignKeyField(DbSession, backref='vocabularies')
+    vocabulary = ForeignKeyField(DbVocabulary, backref='sessions')
 
     class Meta:
         database = db
@@ -60,7 +76,51 @@ class Database:
                                  password=hash_password)
         return new_user
 
-    def create_vocabulary(self, voc: Vocabulary):
+    def create_new_session(self,
+                           user: DbUser,
+                           voc: Vocabulary) -> int:
+
+        new_session = DbSession.create(user=user.id,
+                                       creation=datetime.now())
+
+        DbVocabularySession.create(session=new_session,
+                                   vocabulary=voc.id)
+        return new_session.id
+
+    def last_session(self, voc: Vocabulary) -> Optional[LearnEngine]:
+
+        if voc.id is None:
+            return None
+
+        sessions = (DbVocabularySession
+                    .select()
+                    .join(DbSession)
+                    .where(DbVocabularySession.vocabulary == voc.id)
+                    .order_by(DbSession.id)
+                    .limit(1))
+        sessions = list(sessions)
+
+        if not sessions:
+            return None
+        session_to_load = sessions[0]
+
+        return self.load_session(session_to_load.id)
+
+    def load_session(self, session_id: int) -> LearnEngine:
+        v = Vocabulary(None, set())
+
+        for vocabulary in (DbVocabulary
+                           .select()
+                           .join(DbVocabularySession)
+                           .join(DbSession)
+                           .where(DbSession.id == session_id)):
+            v.add(self._load_vocabulary(vocabulary))
+
+        ret = LearnEngine([], v)
+        ret.set_id(session_id)
+        return ret
+
+    def create_vocabulary(self, voc: Vocabulary) -> int:
         new_voc = DbVocabulary.create()
 
         for word in voc.words:
@@ -68,6 +128,9 @@ class Database:
                           word_input=word.word_input,
                           word_output=word.word_output,
                           directive=word.directive)
+
+        voc.set_id(new_voc.id)
+        return new_voc.id
 
     def _load_vocabulary(self, voc: DbVocabulary) -> Vocabulary:
         name = None
@@ -82,7 +145,9 @@ class Database:
                 name = new_word
             words.add(new_word)
 
-        return Vocabulary(name, words)
+        ret = Vocabulary(name, words)
+        ret.set_id(voc)
+        return ret
 
     def get_vocabulary(self, id: int) -> Vocabulary:
         voc = DbVocabulary.get(id)
@@ -101,6 +166,7 @@ class Database:
 def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
-    db.create_tables([DbVocabulary, DbWord, DbUser])
+    db.create_tables([DbVocabulary, DbWord, DbUser,
+                      DbVocabularySession, DbSession])
 
     return Database()

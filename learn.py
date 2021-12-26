@@ -86,6 +86,14 @@ class Vocabulary:
                  words: Set[Word] = None):
         self._name = name
         self._words = words or set()
+        self._id = None
+
+    @property
+    def id(self) -> Optional[int]:
+        return self._id
+
+    def set_id(self, id: int):
+        self._id = id
 
     def add(self, other: 'Vocabulary'):
         self._words.update(other._words)
@@ -138,6 +146,14 @@ class LearnEngine:
 
         self._current_word = None
         self._pick_next_word()
+        self._id = None
+
+    @property
+    def id(self) -> int:
+        return self._id
+
+    def set_id(self, id: int):
+        self._id = id
 
     def _pick_next_word(self):
 
