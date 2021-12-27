@@ -33,14 +33,14 @@ body {
 
 .actions {
   display: inline-block;
-  width: 150px;
+  width: 130px;
 }
 
 .percentage {
   display: inline-block;
   float: right;
   text-align: right;
-  width: 80px;
+  width: 110px;
 }
 
 .cell {

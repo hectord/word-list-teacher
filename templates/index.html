@@ -7,7 +7,7 @@
   <div class="center">
     <h1>Vocabulary</h1>
 
-    {% for voc_id, vocabulary in vocabularies.items() %}
+    {% for voc_id, vocabulary in vocabularies %}
       <div class="vocabulary">
         <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
         <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
@@ -23,7 +23,10 @@
             new
           </a>
         </span>
-        <span class="percentage cell">100%</span>
+        <span class="percentage cell">
+          {{ '%.2f' % percentage_by_vocabulary[vocabulary] }}%
+        </span>
+
       </div>
     {% endfor %}
 

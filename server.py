@@ -72,18 +72,29 @@ def index(request: Request, user: DbUser = Depends(get_user)):
     db = load_database(VOCABULARIES)
     vocabularies = db.list_vocabularies()
     session_by_vocabulary = {}
+    percentage_by_vocabulary = {}
 
     for vocabulary in vocabularies.values():
         session = db.last_session(user, vocabulary)
         if session is not None and not session.is_finished:
             session_by_vocabulary[vocabulary] = session
 
+        finished_session = db.last_session(user, vocabulary,
+                                           finished=True)
+        percentage_by_vocabulary[vocabulary] = 0.0
+        if finished_session:
+            percentage_by_vocabulary[vocabulary] = finished_session.accuracy
+
+    vocabularies = list(vocabularies.items())
+    vocabularies.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
+
     return TEMPLATES.TemplateResponse(
         "index.html",
         {
             'request': request,
             'vocabularies': vocabularies,
-            'session_by_vocabulary': session_by_vocabulary
+            'session_by_vocabulary': session_by_vocabulary,
+            'percentage_by_vocabulary': percentage_by_vocabulary
         },
         headers={'Cache-Control': 'no-store'}
     )

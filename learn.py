@@ -199,9 +199,8 @@ class LearnEngine:
 
     @property
     def accuracy(self) -> float:
-        errors = sum(self._error_count_by_word.values())
-        attempts = len(self._vocabulary) + errors
-        return len(self._vocabulary) / attempts
+        word_in_error = len(self._error_count_by_word)
+        return 100.0 - word_in_error / len(self._vocabulary) * 100.0
 
     @property
     def current_word(self) -> Optional[Word]:

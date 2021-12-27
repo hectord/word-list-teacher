@@ -154,7 +154,8 @@ class Database:
 
     def last_session(self,
                      user: DbUser,
-                     voc: Vocabulary) -> Optional[LearnEngine]:
+                     voc: Vocabulary,
+                     finished: bool = None) -> Optional[LearnEngine]:
 
         if voc.id is None:
             return None
@@ -163,8 +164,12 @@ class Database:
                     .select()
                     .join(DbVocabularySession)
                     .where(DbSession.user == user)
-                    .where(DbVocabularySession.vocabulary == voc.id)
-                    .order_by(DbSession.id.desc()))
+                    .where(DbVocabularySession.vocabulary == voc.id))
+
+        if finished is not None:
+            sessions = sessions.where(DbSession.finished == finished)
+
+        sessions = sessions.order_by(DbSession.id.desc())
         sessions = list(sessions)
 
         if not sessions:
