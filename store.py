@@ -121,7 +121,6 @@ class Database:
         session_id = session.id
         word = word_attempt.word
 
-        # find the word ID
         db_word = self._get_word_id(session, word)
 
         DbWordAttempt.create(word=db_word.id,

@@ -1,5 +1,37 @@
 {% extends "base.html" %}
 
+{% macro word_ok(word_input, word_output) -%}
+  <div class="word-box input">
+    <span class="field">
+      {{ word_input }}
+    </span>
+  </div>
+  <div class="word-box result">
+    <span class="field">
+      {{ word_output }}
+    </span>
+  </div>
+{%- endmacro %}
+
+{% macro word_nok(word_input, word_output, word_result) -%}
+  <div class="word-box input">
+    <span class="field">
+      {{ word_input }}
+    </span>
+  </div>
+  <div class="word-box output">
+    <span class="field">
+      {{ word_output }}
+    </span>
+  </div>
+  <div class="word-box result">
+    <span class="field">
+      {{ word_result }}
+    </span>
+  </div>
+{%- endmacro %}
+
+
 {% block title %}Learn{% endblock %}
 
 {% block header %}
@@ -13,6 +45,22 @@
   <div class="centering-box">
 
     <div class="words">
+
+      {% for attempt in session.attempts %}
+        {% if attempt.success %}
+        <div class="word right-word">
+          {{ word_ok(attempt.word.word_input,
+                     attempt.word.word_output) }}
+        </div>
+        {% else %}
+          <div class="word wrong-word">
+            {{ word_nok(attempt.word.word_input,
+                        attempt.typed_word,
+                        attempt.word.word_output) }}
+          </div>
+        {% endif %}
+      {% endfor %}
+
       <div id="current-word" class="word current">
         <div class="word-box input">
           <span id="current-input" class="field">
@@ -20,7 +68,7 @@
           </span>
         </div>
         <div class="word-box output">
-          <input data-session-id="{{ session_id }}" autocomplete="off" autofocus id="current-output" class="field" type="text" value=""/>
+          <input data-session-id="{{ session.id }}" autocomplete="off" autofocus id="current-output" class="field" type="text" value=""/>
         </div>
       </div>
     </div>
@@ -29,36 +77,12 @@
 
   <!-- used to inform the user of a new word learned! -->
   <div id="wrong-word" style="visibility: hidden;" class="word wrong-word">
-    <div class="word-box input">
-      <span class="field">
-        la peau
-      </span>
-    </div>
-    <div class="word-box output">
-      <span class="field">
-        die Haut
-      </span>
-    </div>
-    <div class="word-box result">
-      <span class="field">
-        die Haut
-      </span>
-    </div>
+    {{ word_nok('', '', '') }}
   </div>
 
   <!-- used to inform the user of a wrong word -->
   <div id="right-word" style="visibility: hidden;" class="word right-word">
-    <div class="word-box input">
-      <span class="field">
-        la peau
-      </span>
-    </div>
-    <div class="word-box result">
-      <span class="field">
-        die Haut
-      </span>
-    </div>
+    {{ word_ok('', '') }}
   </div>
 
 {% endblock %}
-

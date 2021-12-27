@@ -113,7 +113,7 @@ def learn(request: Request, session_id: int):
         "learn.html",
         {
             'request': request,
-            'session_id': session_id,
+            'session': engine,
             'first_word': first_word
         }
     )

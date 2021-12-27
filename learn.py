@@ -139,7 +139,8 @@ class LearnEngine:
 
     def __init__(self,
                  attempts: List[WordAttempt],
-                 vocabulary: Vocabulary):
+                 vocabulary: Vocabulary,
+                 current_word: Word = None):
         self._attempts = attempts
         self._vocabulary = vocabulary
 
@@ -154,13 +155,18 @@ class LearnEngine:
             else:
                 self._error_count_by_word[word] += 1
 
-        self._current_word = None
-        self._pick_next_word()
+        self._current_word = current_word
+        if self._current_word is None:
+            self._pick_next_word()
         self._id = None
 
     @property
     def id(self) -> int:
         return self._id
+
+    @property
+    def attempts(self) -> List[WordAttempt]:
+        return self._attempts
 
     def set_id(self, id: int):
         self._id = id
