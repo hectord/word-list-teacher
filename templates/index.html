@@ -1,19 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Index{% endblock %}
+{% block title %}Learn{% endblock %}
 
 {% block body %}
 
   <div class="center">
-    <h1>Vocabulary</h1>
+    <h1>Learn</h1>
 
     {% for voc_id, vocabulary in vocabularies %}
       <div class="vocabulary">
-        <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
-        <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
+        <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
+          <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
+          <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
+        </a>
         <span class="actions cell">
           {% if vocabulary in session_by_vocabulary %}
-            <a class="new-session" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">
+            <a class="resume-session" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">
               resume
             </a>
           {% endif %}

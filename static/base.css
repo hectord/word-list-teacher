@@ -14,7 +14,7 @@ body {
   background: #F9F1F0;
 }
 
-.new-session {
+.new-session, .resume-session, .show-vocabulary {
   text-decoration: none;
 }
 
@@ -29,6 +29,11 @@ body {
   display: inline-block;
 
   width: 250px;
+}
+
+.voc-word {
+  display: inline-block;
+  width: 450px;
 }
 
 .actions {

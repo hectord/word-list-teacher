@@ -15,10 +15,12 @@ from learn import Vocabulary, LearnEngine, Word
 from store import load_database, DbUser, DbException
 
 
+
 BASE_PATH = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_PATH / "templates"))
 
 VOCABULARIES = BASE_PATH / 'learn.db'
+db = load_database(VOCABULARIES)
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -47,7 +49,6 @@ class WordResult(BaseModel):
 
 
 def get_user(creds: HTTPBasicCredentials = Depends(security)):
-    db = load_database(VOCABULARIES)
     username = creds.username
     password = creds.password
 
@@ -67,9 +68,23 @@ def root():
     return RedirectResponse(url='/index')
 
 
+@app.get("/vocabulary")
+async def index(request: Request,
+                id: int,
+                user: DbUser = Depends(get_user)):
+
+    voc = db.get_vocabulary(id)
+
+    return TEMPLATES.TemplateResponse(
+        "vocabulary.html",
+        {
+            'request': request,
+            'voc': voc
+        },
+    )
+
 @app.get("/index")
 async def index(request: Request, user: DbUser = Depends(get_user)):
-    db = load_database(VOCABULARIES)
     vocabularies = db.list_vocabularies()
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
@@ -104,7 +119,6 @@ async def index(request: Request, user: DbUser = Depends(get_user)):
 async def new_session(request: Request,
                       voc_id: int,
                       user: DbUser = Depends(get_user)):
-    db = load_database(VOCABULARIES)
 
     voc = db.get_vocabulary(voc_id)
 
@@ -117,7 +131,6 @@ async def new_session(request: Request,
 async def learn(request: Request,
                 response: Response,
                 session_id: int):
-    db = load_database(VOCABULARIES)
     engine = db.load_session(session_id)
 
     first_word = None
@@ -139,7 +152,6 @@ async def learn(request: Request,
 
 @app.post("/word")
 async def post_word(word: WordOutput):
-    db = load_database(VOCABULARIES)
     engine = db.load_session(word.session_id)
 
     current_word = engine.current_word

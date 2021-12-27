@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Vocabulary{% endblock %}
+
+{% block body %}
+
+  <div class="center">
+    <h1>Vocabulary</h1>
+
+    {% for word in voc.words %}
+      <div>
+        <span class="voc-word">{{ word.word_input }}</span><span class="voc-word">{{ word.word_output }}</span>
+      </div>
+    {% endfor %}
+
+  </div>
+
+{% endblock %}
