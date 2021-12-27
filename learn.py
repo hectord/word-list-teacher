@@ -86,9 +86,9 @@ class Vocabulary:
 
     def __init__(self,
                  name: Optional[Word] = None,
-                 words: Set[Word] = None):
+                 words: List[Word] = None):
         self._name = name
-        self._words = words or set()
+        self._words = words or []
         self._id = None
 
     @property
@@ -99,7 +99,7 @@ class Vocabulary:
         self._id = id
 
     def add(self, other: 'Vocabulary'):
-        self._words.update(other._words)
+        self._words.extend(other._words)
 
     def __str__(self) -> str:
         return self.name.word_input
@@ -116,12 +116,12 @@ class Vocabulary:
         return len(self._words)
 
     @property
-    def words(self) -> Set[Word]:
+    def words(self) -> List[Word]:
         return self._words.copy()
 
     @staticmethod
     def load(filename: str):
-        words = set()
+        words = []
         name = None
 
         with open(filename, 'r') as f:
@@ -130,7 +130,7 @@ class Vocabulary:
                     word = Word.load(line)
                     if word.is_name:
                         name = word
-                    words.add(word)
+                    words.append(word)
 
         return Vocabulary(name, words)
 

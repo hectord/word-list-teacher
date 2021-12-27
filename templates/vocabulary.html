@@ -8,8 +8,8 @@
     <h1>Vocabulary</h1>
 
     {% for word in voc.words %}
-      <div>
-        <span class="voc-word">{{ word.word_input }}</span><span class="voc-word">{{ word.word_output }}</span>
+      <div class="vocabulary">
+        <span class="cell voc-word">{{ word.word_output }}</span><span class="cell voc-word">{{ word.word_input }}</span>
       </div>
     {% endfor %}
 

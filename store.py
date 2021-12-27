@@ -233,7 +233,7 @@ class Database:
 
     def _load_vocabulary(self, voc: DbVocabulary) -> Vocabulary:
         name = None
-        words = set()
+        words = []
 
         for word in voc.words:
             new_word = self._create_word_from(word)
@@ -241,7 +241,7 @@ class Database:
             if new_word.is_name:
                 name = new_word
 
-            words.add(new_word)
+            words.append(new_word)
 
         ret = Vocabulary(name, words)
         ret.set_id(voc)
