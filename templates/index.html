@@ -10,25 +10,26 @@
     {% for voc_id, vocabulary in vocabularies %}
       <div class="vocabulary">
         <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
-          <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span>
-          <span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
+          <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span><span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
         </a>
-        <span class="actions cell">
+        <div>
+          <span class="percentage small-cell">
+            {{ '%.2f' % percentage_by_vocabulary[vocabulary] }}%
+          </span>
+          <a class="new-session" href="/new_session?voc_id={{ voc_id }}">
+            <span class="voc-action small-cell">
+              new
+            </span>
+          </a>
           {% if vocabulary in session_by_vocabulary %}
             <a class="resume-session" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">
-              resume
+              <span class="voc-action small-cell">
+                resume
+              </span>
             </a>
           {% endif %}
-        </span>
-        <span class="actions cell">
-          <a class="new-session" href="/new_session?voc_id={{ voc_id }}">
-            new
-          </a>
-        </span>
-        <span class="percentage cell">
-          {{ '%.2f' % percentage_by_vocabulary[vocabulary] }}%
-        </span>
 
+        </div>
       </div>
     {% endfor %}
 

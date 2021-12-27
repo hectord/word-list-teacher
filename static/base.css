@@ -31,25 +31,37 @@ body {
 
 .name {
   display: inline-block;
-
-  width: 250px;
+  width: 450px;
 }
 
 .voc-word {
   display: inline-block;
   width: 450px;
+  text-align: left;
 }
 
-.actions {
+.voc-action {
+  float: right;
   display: inline-block;
-  width: 130px;
+  width: 100px;
+  text-align: right;
+}
+
+.voc-action  a {
+  height: 10px;
 }
 
 .percentage {
-  display: inline-block;
   float: right;
+  display: inline-block;
+  width: 100px;
   text-align: right;
-  width: 110px;
+}
+
+.small-cell {
+  padding-top: 0px;
+  padding-bottom: 0px;
+  font-size: 15px;
 }
 
 .cell {
@@ -57,6 +69,15 @@ body {
   padding-bottom: 9px;
 }
 
+.vocabulary {
+  height: 80px;
+}
+
+
+.words-list:not(:last-child) {
+  border-bottom: 1px solid #E5E5E5;
+}
+
 .vocabulary:not(:last-child) {
-  border-bottom: 1px solid #EAEAEA;
+  border-bottom: 1px solid #E5E5E5;
 }
