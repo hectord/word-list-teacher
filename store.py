@@ -22,24 +22,7 @@ class DbUser(Model):
         database = db
 
 
-class DbSession(Model):
-    user = ForeignKeyField(DbUser, backref='sessions')
-    creation = DateTimeField()
-    finished = BooleanField()
-
-    class Meta:
-        database = db
-
-
 class DbVocabulary(Model):
-
-    class Meta:
-        database = db
-
-
-class DbVocabularySession(Model):
-    session = ForeignKeyField(DbSession, backref='vocabularies')
-    vocabulary = ForeignKeyField(DbVocabulary, backref='sessions')
 
     class Meta:
         database = db
@@ -50,6 +33,24 @@ class DbWord(Model):
     word_input = CharField()
     word_output = CharField()
     directive = CharField(null=True)
+
+    class Meta:
+        database = db
+
+
+class DbSession(Model):
+    user = ForeignKeyField(DbUser, backref='sessions')
+    current_word = ForeignKeyField(DbWord, null=True)
+    creation = DateTimeField()
+    finished = BooleanField()
+
+    class Meta:
+        database = db
+
+
+class DbVocabularySession(Model):
+    session = ForeignKeyField(DbSession, backref='vocabularies')
+    vocabulary = ForeignKeyField(DbVocabulary, backref='sessions')
 
     class Meta:
         database = db
@@ -121,6 +122,16 @@ class Database:
         session_id = session.id
         word = word_attempt.word
 
+        db_session = DbSession.get(session_id)
+
+        if session.current_word is None:
+            db_session.current_word = None
+        else:
+            current_word = session.current_word
+
+            db_session.current_word = self._get_word_id(session, current_word)
+        db_session.save()
+
         db_word = self._get_word_id(session, word)
 
         DbWordAttempt.create(word=db_word.id,
@@ -154,6 +165,8 @@ class Database:
     def load_session(self, session_id: int) -> LearnEngine:
         v = Vocabulary(None, set())
 
+        db_session = DbSession.get(session_id)
+
         for vocabulary in (DbVocabulary
                            .select()
                            .join(DbVocabularySession)
@@ -177,7 +190,11 @@ class Database:
 
             attempts.append(attempt)
 
-        ret = LearnEngine(attempts, v)
+        current_word = None
+        if db_session.current_word is not None:
+            current_word = self._create_word_from(db_session.current_word)
+
+        ret = LearnEngine(attempts, v, current_word=current_word)
         ret.set_id(session_id)
         return ret
 
