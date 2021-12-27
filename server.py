@@ -68,7 +68,7 @@ def root():
 
 
 @app.get("/index")
-def index(request: Request, user: DbUser = Depends(get_user)):
+async def index(request: Request, user: DbUser = Depends(get_user)):
     db = load_database(VOCABULARIES)
     vocabularies = db.list_vocabularies()
     session_by_vocabulary = {}
@@ -101,9 +101,9 @@ def index(request: Request, user: DbUser = Depends(get_user)):
 
 
 @app.get("/new_session")
-def new_session(request: Request,
-                voc_id: int,
-                user: DbUser = Depends(get_user)):
+async def new_session(request: Request,
+                      voc_id: int,
+                      user: DbUser = Depends(get_user)):
     db = load_database(VOCABULARIES)
 
     voc = db.get_vocabulary(voc_id)
@@ -114,9 +114,9 @@ def new_session(request: Request,
 
 
 @app.get("/learn")
-def learn(request: Request,
-          response: Response,
-          session_id: int):
+async def learn(request: Request,
+                response: Response,
+                session_id: int):
     db = load_database(VOCABULARIES)
     engine = db.load_session(session_id)
 
@@ -138,7 +138,7 @@ def learn(request: Request,
 
 
 @app.post("/word")
-def post_word(word: WordOutput):
+async def post_word(word: WordOutput):
     db = load_database(VOCABULARIES)
     engine = db.load_session(word.session_id)
 

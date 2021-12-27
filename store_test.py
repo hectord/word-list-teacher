@@ -53,14 +53,34 @@ class TestStore(unittest.TestCase):
         session = self.db.last_session(self.user, self.new_voc)
         self.assertEqual(session_id.id, session.id)
 
+        first_word = session.current_word
+
         self.assertTrue((self.word1 == session.current_word) or
                         (self.word2 == session.current_word))
 
-        word_attempt = session.guess('ok')
-
+        word_attempt = session.guess(session.current_word.word_output)
         self.db.add_word(session, word_attempt)
 
         db_session = self.db.load_session(session.id)
+        self.assertNotEqual(first_word, db_session.current_word)
+        self.assertFalse(db_session.is_finished)
+
+        self.assertIsNone(self.db.last_session(self.user, self.new_voc,
+                                               finished=True))
+        self.assertIsNotNone(self.db.last_session(self.user, self.new_voc,
+                                                  finished=False))
+
+        word_attempt = session.guess(session.current_word.word_output)
+        self.db.add_word(session, word_attempt)
+
+        db_session = self.db.load_session(session.id)
+        self.assertTrue(db_session.is_finished)
+        self.assertEqual(100.0, db_session.accuracy)
+
+        self.assertIsNone(self.db.last_session(self.user, self.new_voc,
+                                               finished=False))
+        self.assertIsNotNone(self.db.last_session(self.user, self.new_voc,
+                                                  finished=True))
 
     def test_user(self):
         self._create_user()
