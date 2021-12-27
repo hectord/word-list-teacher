@@ -56,6 +56,12 @@ class TestStore(unittest.TestCase):
         self.assertTrue((self.word1 == session.current_word) or
                         (self.word2 == session.current_word))
 
+        word_attempt = session.guess('ok')
+
+        self.db.add_word(session, word_attempt)
+
+        db_session = self.db.load_session(session.id)
+
     def test_user(self):
         self._create_user()
         self.assertIsNotNone(self.user)

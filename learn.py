@@ -4,6 +4,7 @@ import re
 from typing import List, Dict, Tuple, Set, Generator, Optional
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 import random
 
 
@@ -77,7 +78,8 @@ class Word:
 class WordAttempt:
     success: bool
     word: Word
-    typed_word_output: str
+    typed_word: str
+    time: datetime
 
 
 class Vocabulary:
@@ -142,8 +144,15 @@ class LearnEngine:
         self._vocabulary = vocabulary
 
         self._error_count_by_word = defaultdict(int)
+
         self._nok_words = vocabulary.words
-        self._error_by_word = {}
+        for attempt in attempts:
+            word = attempt.word
+
+            if attempt.success:
+                self._nok_words.remove(word)
+            else:
+                self._error_count_by_word[word] += 1
 
         self._current_word = None
         self._pick_next_word()
@@ -198,8 +207,9 @@ class LearnEngine:
         success = current_word.accepts(word_output)
 
         attempt = WordAttempt(word=current_word,
-                              typed_word_output=word_output,
-                              success=success)
+                              typed_word=word_output,
+                              success=success,
+                              time=datetime.now())
         self._attempts.append(attempt)
 
         if success:

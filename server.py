@@ -24,8 +24,6 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 security = HTTPBasic()
 
-engine = None
-
 
 class WordInput(BaseModel):
     word: str
@@ -33,6 +31,7 @@ class WordInput(BaseModel):
 
 class WordOutput(BaseModel):
     word: str
+    session_id: int
 
 
 class WordResult(BaseModel):
@@ -104,10 +103,7 @@ def new_session(request: Request,
 
 @app.get("/learn")
 def learn(request: Request, session_id: int):
-    global engine
-
     db = load_database(VOCABULARIES)
-
     engine = db.load_session(session_id)
 
     current_word = engine.current_word
@@ -117,6 +113,7 @@ def learn(request: Request, session_id: int):
         "learn.html",
         {
             'request': request,
+            'session_id': session_id,
             'first_word': first_word
         }
     )
@@ -124,10 +121,16 @@ def learn(request: Request, session_id: int):
 
 @app.post("/word")
 def post_word(word: WordOutput):
+    db = load_database(VOCABULARIES)
+    engine = db.load_session(word.session_id)
+
     current_word = engine.current_word
     hint_word = current_word.word_output
 
     result = engine.guess(word.word)
+
+    db = load_database(VOCABULARIES)
+    db.add_word(engine, result)
 
     next_word = None
     if engine.current_word is not None:

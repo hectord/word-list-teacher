@@ -5,7 +5,7 @@ from typing import Dict, Optional
 from datetime import date, datetime
 from peewee import *
 
-from learn import Vocabulary, Word, LearnEngine
+from learn import Vocabulary, Word, LearnEngine, WordAttempt
 
 db = SqliteDatabase(None)
 
@@ -55,6 +55,17 @@ class DbWord(Model):
         database = db
 
 
+class DbWordAttempt(Model):
+    word = ForeignKeyField(DbWord, backref='attempts')
+    session = ForeignKeyField(DbSession, backref='attempts')
+    typed_word = CharField()
+    success = BooleanField()
+    time = DateTimeField()
+
+    class Meta:
+        database = db
+
+
 class Database:
 
     def get_user(self, email: str, password: str) -> DbUser:
@@ -89,6 +100,36 @@ class Database:
                                    vocabulary=voc.id)
         return new_session.id
 
+    def _get_word_id(self,
+                     session: LearnEngine,
+                     word: WordAttempt) -> Optional[DbWord]:
+
+        for row in (DbWord.select()
+                    .join(DbVocabulary)
+                    .join(DbVocabularySession)
+                    .join(DbSession)
+                    .where(DbSession.id == session.id)
+                    .where(DbWord.word_input == word.word_input)
+                    .where(DbWord.word_output == word.word_output)):
+            return row
+
+        return None
+
+    def add_word(self,
+                 session: LearnEngine,
+                 word_attempt: WordAttempt):
+        session_id = session.id
+        word = word_attempt.word
+
+        # find the word ID
+        db_word = self._get_word_id(session, word)
+
+        DbWordAttempt.create(word=db_word.id,
+                             typed_word=word_attempt.typed_word,
+                             session=session_id,
+                             time=datetime.now(),
+                             success=word_attempt.success)
+
     def last_session(self,
                      user: DbUser,
                      voc: Vocabulary) -> Optional[LearnEngine]:
@@ -121,7 +162,23 @@ class Database:
                            .where(DbSession.id == session_id)):
             v.add(self._load_vocabulary(vocabulary))
 
-        ret = LearnEngine([], v)
+        attempts = []
+
+        for attempt in (DbWordAttempt
+                        .select()
+                        .where(DbWordAttempt.session == session_id)
+                        .order_by(DbWordAttempt.id.asc())):
+
+            word = self._create_word_from(attempt.word)
+
+            attempt = WordAttempt(word=word,
+                                  typed_word=attempt.typed_word,
+                                  success=attempt.success,
+                                  time=attempt.time)
+
+            attempts.append(attempt)
+
+        ret = LearnEngine(attempts, v)
         ret.set_id(session_id)
         return ret
 
@@ -137,17 +194,21 @@ class Database:
         voc.set_id(new_voc.id)
         return new_voc.id
 
+    def _create_word_from(self, word: DbWord) -> Word:
+        return Word(word_input=word.word_input,
+                    word_output=word.word_output,
+                    directive=word.directive)
+
     def _load_vocabulary(self, voc: DbVocabulary) -> Vocabulary:
         name = None
         words = set()
 
         for word in voc.words:
-            new_word = Word(word_input=word.word_input,
-                            word_output=word.word_output,
-                            directive=word.directive)
+            new_word = self._create_word_from(word)
 
             if new_word.is_name:
                 name = new_word
+
             words.add(new_word)
 
         ret = Vocabulary(name, words)
@@ -172,6 +233,7 @@ def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
     db.create_tables([DbVocabulary, DbWord, DbUser,
-                      DbVocabularySession, DbSession])
+                      DbVocabularySession, DbSession,
+                      DbWordAttempt])
 
     return Database()

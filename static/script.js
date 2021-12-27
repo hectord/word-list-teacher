@@ -11,6 +11,7 @@ $(document).ready(function() {
       var current_input = $("#current-input");
       var current_output = $("#current-output");
       var output = current_output.val();
+      var session_id = $("#current-output").data("session-id");
 
       current_output.attr("readonly", true);
 
@@ -19,7 +20,10 @@ $(document).ready(function() {
         method: "POST",
         contentType: 'application/json',
         processData: false,
-        data: JSON.stringify({"word": output})
+        data: JSON.stringify({
+          "word": output,
+          "session_id": session_id
+        })
       }).done(function(result) {
 
         if(result.success) {
