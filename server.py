@@ -3,7 +3,7 @@ from typing import Optional
 from pathlib import Path
 import secrets
 
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -75,7 +75,7 @@ def index(request: Request, user: DbUser = Depends(get_user)):
 
     for vocabulary in vocabularies.values():
         session = db.last_session(user, vocabulary)
-        if session is not None:
+        if session is not None and not session.is_finished:
             session_by_vocabulary[vocabulary] = session
 
     return TEMPLATES.TemplateResponse(
@@ -84,7 +84,8 @@ def index(request: Request, user: DbUser = Depends(get_user)):
             'request': request,
             'vocabularies': vocabularies,
             'session_by_vocabulary': session_by_vocabulary
-        }
+        },
+        headers={'Cache-Control': 'no-store'}
     )
 
 
@@ -96,27 +97,33 @@ def new_session(request: Request,
 
     voc = db.get_vocabulary(voc_id)
 
-    session_id = db.create_new_session(user, voc)
+    session = db.create_new_session(user, voc)
 
-    return RedirectResponse(url=f'/learn?session_id={session_id}')
+    return RedirectResponse(url=f'/learn?session_id={session.id}')
 
 
 @app.get("/learn")
-def learn(request: Request, session_id: int):
+def learn(request: Request,
+          response: Response,
+          session_id: int):
     db = load_database(VOCABULARIES)
     engine = db.load_session(session_id)
 
-    current_word = engine.current_word
-    first_word = WordInput(word=current_word.word_input)
+    first_word = None
+    if engine.current_word is not None:
+        first_word = WordInput(word=engine.current_word.word_input)
 
-    return TEMPLATES.TemplateResponse(
+    ret = TEMPLATES.TemplateResponse(
         "learn.html",
         {
             'request': request,
             'session': engine,
             'first_word': first_word
-        }
+        },
+        headers={'Cache-Control': 'no-store'}
     )
+
+    return ret
 
 
 @app.post("/word")
@@ -129,7 +136,6 @@ def post_word(word: WordOutput):
 
     result = engine.guess(word.word)
 
-    db = load_database(VOCABULARIES)
     db.add_word(engine, result)
 
     next_word = None

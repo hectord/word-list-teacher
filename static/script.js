@@ -1,6 +1,12 @@
 
+function update_height() {
+  // update the size of the words
+  var size = $(".words").css("height");
+  $(".centering-box").css("top", "calc(50% - " + size + ")");
+}
 
 $(document).ready(function() {
+  update_height();
 
   $("#current-output").keyup(function(e) {
 
@@ -48,8 +54,7 @@ $(document).ready(function() {
         }
 
         // update the size of the words
-        var size = $(".words").css("height");
-        $(".centering-box").css("top", "calc(50% - " + size + ")");
+        update_height();
       });
     }
   });

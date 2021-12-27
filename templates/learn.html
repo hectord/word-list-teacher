@@ -38,6 +38,7 @@
     <link rel="stylesheet" href="/static/learn.css">
 
     <script src="/static/script.js"></script>
+
 {% endblock %}
 
 {% block body %}
@@ -61,16 +62,18 @@
         {% endif %}
       {% endfor %}
 
-      <div id="current-word" class="word current">
-        <div class="word-box input">
-          <span id="current-input" class="field">
-            {{ first_word.word }}
-          </span>
+      {% if first_word %}
+        <div id="current-word" class="word current">
+          <div class="word-box input">
+            <span id="current-input" class="field">
+              {{ first_word.word }}
+            </span>
+          </div>
+          <div class="word-box output">
+            <input data-session-id="{{ session.id }}" autocomplete="off" autofocus id="current-output" class="field" type="text" value=""/>
+          </div>
         </div>
-        <div class="word-box output">
-          <input data-session-id="{{ session.id }}" autocomplete="off" autofocus id="current-output" class="field" type="text" value=""/>
-        </div>
-      </div>
+      {% endif %}
     </div>
 
   </div>

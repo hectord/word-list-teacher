@@ -51,7 +51,7 @@ class TestStore(unittest.TestCase):
         self.assertIsNotNone(session_id)
 
         session = self.db.last_session(self.user, self.new_voc)
-        self.assertEqual(session_id, session.id)
+        self.assertEqual(session_id.id, session.id)
 
         self.assertTrue((self.word1 == session.current_word) or
                         (self.word2 == session.current_word))

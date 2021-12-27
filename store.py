@@ -91,19 +91,30 @@ class Database:
 
     def create_new_session(self,
                            user: DbUser,
-                           voc: Vocabulary) -> int:
+                           voc: Vocabulary) -> LearnEngine:
 
-        new_session = DbSession.create(user=user.id,
+        new_session = LearnEngine([], voc)
+
+        new_db_session = DbSession.create(user=user.id,
                                        creation=datetime.now(),
                                        finished=False)
+        new_session.set_id(new_db_session.id)
 
-        DbVocabularySession.create(session=new_session,
+        DbVocabularySession.create(session=new_db_session,
                                    vocabulary=voc.id)
-        return new_session.id
 
-    def _get_word_id(self,
+        current_db_word = self._get_db_word(new_session,
+                                            new_session.current_word)
+
+        db_session = DbSession.get(new_db_session.id)
+        db_session.current_word = current_db_word
+        db_session.save()
+
+        return new_session
+
+    def _get_db_word(self,
                      session: LearnEngine,
-                     word: WordAttempt) -> Optional[DbWord]:
+                     word: Word) -> Optional[DbWord]:
 
         for row in (DbWord.select()
                     .join(DbVocabulary)
@@ -128,11 +139,12 @@ class Database:
             db_session.current_word = None
         else:
             current_word = session.current_word
+            db_session.current_word = self._get_db_word(session, current_word)
 
-            db_session.current_word = self._get_word_id(session, current_word)
+        db_session.finished = session.is_finished
         db_session.save()
 
-        db_word = self._get_word_id(session, word)
+        db_word = self._get_db_word(session, word)
 
         DbWordAttempt.create(word=db_word.id,
                              typed_word=word_attempt.typed_word,
@@ -147,13 +159,12 @@ class Database:
         if voc.id is None:
             return None
 
-        sessions = (DbVocabularySession
+        sessions = (DbSession
                     .select()
-                    .join(DbSession)
+                    .join(DbVocabularySession)
                     .where(DbSession.user == user)
                     .where(DbVocabularySession.vocabulary == voc.id)
-                    .order_by(DbSession.id.desc())
-                    .limit(1))
+                    .order_by(DbSession.id.desc()))
         sessions = list(sessions)
 
         if not sessions:
