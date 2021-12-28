@@ -1,17 +1,26 @@
 # -*- coding: utf-8 -*-
 
 from security import check_password, get_hashed_password
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 from datetime import date, datetime
 from peewee import *
 
 from learn import Vocabulary, Word, LearnEngine, WordAttempt
+from learn import Language
 
 db = SqliteDatabase(None)
 
 
 class DbException(Exception):
     pass
+
+
+class DbLanguage(Model):
+    code = CharField(primary_key=True)
+    name = CharField()
+
+    class Meta:
+        database = db
 
 
 class DbUser(Model):
@@ -22,7 +31,17 @@ class DbUser(Model):
         database = db
 
 
+class DbSpeak(Model):
+    language = ForeignKeyField(DbLanguage, backref='spoken_by')
+    user = ForeignKeyField(DbUser, backref='speaks')
+
+    class Meta:
+        database = db
+
+
 class DbVocabulary(Model):
+    input_language = ForeignKeyField(DbLanguage)
+    output_language = ForeignKeyField(DbLanguage)
 
     class Meta:
         database = db
@@ -69,6 +88,12 @@ class DbWordAttempt(Model):
 
 class Database:
 
+    def create_language(self, language: Language):
+        code = language.code
+        name = language.name
+
+        DbLanguage.create(code=code, name=name)
+
     def get_user(self, email: str, password: str) -> DbUser:
         users = list(DbUser.select().where(DbUser.email == email))
 
@@ -77,7 +102,10 @@ class Database:
 
         return users[0]
 
-    def create_user(self, email: str, password: str) -> DbUser:
+    def create_user(self,
+                    email: str,
+                    password: str,
+                    languages: Set[Language]) -> DbUser:
         users = list(DbUser.select().where(DbUser.email == email))
 
         if users:
@@ -87,6 +115,10 @@ class Database:
 
         new_user = DbUser.create(email=email,
                                  password=hash_password)
+
+        for language in languages:
+            pass
+
         return new_user
 
     def create_new_session(self,
@@ -215,7 +247,11 @@ class Database:
         return ret
 
     def create_vocabulary(self, voc: Vocabulary) -> int:
-        new_voc = DbVocabulary.create()
+        from_language = DbLanguage.get(code=voc.from_language)
+        to_language = DbLanguage.get(code=voc.to_language)
+
+        new_voc = DbVocabulary.create(input_language=from_language,
+                                      output_language=to_language)
 
         for word in voc.words:
             DbWord.create(vocabulary=new_voc,
@@ -243,7 +279,10 @@ class Database:
 
             words.append(new_word)
 
-        ret = Vocabulary(name, words)
+        from_language = voc.input_language.code
+        to_language = voc.output_language.code
+
+        ret = Vocabulary(name, words, from_language, to_language)
         ret.set_id(voc)
         return ret
 
@@ -266,6 +305,6 @@ def load_database(name: str) -> Database:
     db.connect()
     db.create_tables([DbVocabulary, DbWord, DbUser,
                       DbVocabularySession, DbSession,
-                      DbWordAttempt])
+                      DbWordAttempt, DbLanguage, DbSpeak])
 
     return Database()

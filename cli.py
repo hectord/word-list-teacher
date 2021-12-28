@@ -3,11 +3,13 @@
 import os.path
 from typing import Set
 import getpass
+import sys
 
 import argparse
 from termcolor import colored
 
 from learn import Word, InvalidFileException, Vocabulary, LearnEngine
+from learn import Language
 from store import load_database
 
 
@@ -113,10 +115,15 @@ if __name__ == '__main__':
     db_subparser = dbparser.add_subparsers(dest='db_cmd', required=True)
 
     load_subparser = db_subparser.add_parser('load')
+    load_subparser.add_argument('language-from', help='language from', nargs=1)
+    load_subparser.add_argument('language-to', help='language to', nargs=1)
     load_subparser.add_argument('files', help='words to load', nargs='+')
 
     create_user_subparser = db_subparser.add_parser('create-user')
     create_user_subparser.add_argument('username', help='new username', nargs=1)
+    create_user_subparser.add_argument('--speaks', help='language spoken', nargs='+')
+
+    db_subparser.add_parser('init')
 
     args = parser.parse_args()
 
@@ -144,6 +151,7 @@ if __name__ == '__main__':
         for filename in files:
             vocabulary = Vocabulary.load(filename)
             database.create_vocabulary(vocabulary)
+
     elif args.db_cmd == 'create-user':
         username = args.username[0]
 
@@ -152,6 +160,22 @@ if __name__ == '__main__':
 
         password = getpass.getpass()
 
-        database.create_user(username, password)
+        languages = set()
+        for language_code in args.speaks:
+            language = Language.from_code(language_code)
+
+            if language is None:
+                print("invalid code", file=sys.stdout)
+                sys.exit(-1)
+            languages.add(language)
+
+        database.create_user(username, password, languages)
+
+    elif args.db_cmd == 'init':
+        database = args.database[0]
+        database = load_database(database)
+
+        for language in Language:
+            database.create_language(language)
     else:
         assert False

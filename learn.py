@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from enum import Enum
 import re
 from typing import List, Dict, Tuple, Set, Generator, Optional
 from collections import defaultdict
@@ -10,6 +11,39 @@ import random
 
 class InvalidFileException(Exception):
     pass
+
+
+class Language(Enum):
+    FRENCH = 1
+    ENGLISH = 2
+    CHINESE = 3
+    GERMAN = 4
+
+    @staticmethod
+    def from_code(code: str) -> Optional['Language']:
+        for language in Language:
+            if language.code == code:
+                return language
+
+        return None
+
+    @property
+    def code(self) -> str:
+        return {
+            Language.FRENCH: 'fr',
+            Language.ENGLISH: 'en',
+            Language.CHINESE: 'cn',
+            Language.GERMAN: 'de'
+        }.get(self)
+
+    @property
+    def name(self) -> str:
+        return {
+            Language.FRENCH: 'French',
+            Language.ENGLISH: 'English',
+            Language.CHINESE: 'Chinese',
+            Language.GERMAN: 'German'
+        }.get(self)
 
 
 def filter(word):
@@ -53,14 +87,8 @@ class Word:
         return word_line
 
     @staticmethod
-    def load(line: str):
+    def load(line: str, directive: str = None):
         line = line.strip()
-        directive = None
-
-        if line.startswith('#') and ' ' in line:
-            i = line.index(' ')
-            directive = line[:i]
-            line = line[i:]
 
         word = line.strip().split(';')
 
@@ -86,14 +114,26 @@ class Vocabulary:
 
     def __init__(self,
                  name: Optional[Word] = None,
-                 words: List[Word] = None):
+                 words: List[Word] = None,
+                 from_language: str = None,
+                 to_language: str = None):
         self._name = name
         self._words = words or []
         self._id = None
+        self._from_language = from_language
+        self._to_language = to_language
 
     @property
     def id(self) -> Optional[int]:
         return self._id
+
+    @property
+    def from_language(self) -> Optional[str]:
+        return self._from_language
+
+    @property
+    def to_language(self) -> Optional[str]:
+        return self._to_language
 
     def set_id(self, id: int):
         self._id = id
@@ -120,19 +160,54 @@ class Vocabulary:
         return self._words.copy()
 
     @staticmethod
+    def _directive(line: str) -> Optional[str]:
+
+        if not line.startswith('#'):
+            return None
+
+        if ' ' not in line:
+            return line
+        else:
+            i = line.index(' ')
+            return line[:i]
+
+    @staticmethod
+    def _after_directive(line: str) -> Optional[str]:
+        i = line.index(' ')
+        return line[i:].strip()
+
+    @staticmethod
     def load(filename: str):
         words = []
         name = None
+        from_language = None
+        to_language = None
 
         with open(filename, 'r') as f:
             for line in f.readlines():
-                if line.strip():
-                    word = Word.load(line)
-                    if word.is_name:
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                directive = Vocabulary._directive(line)
+
+                if directive == '#from':
+                    from_language = Vocabulary._after_directive(line)
+                elif directive == '#to':
+                    to_language = Vocabulary._after_directive(line)
+                else:
+                    if directive == '#name':
+                        line = Vocabulary._after_directive(line)
+
+                    word = Word.load(line, directive)
+                    if directive == '#name':
                         name = word
                     words.append(word)
 
-        return Vocabulary(name, words)
+        return Vocabulary(name, words,
+                          from_language,
+                          to_language)
 
 
 class LearnEngine:
@@ -191,7 +266,9 @@ class LearnEngine:
         for word, _ in word_count_list:
             words.add(word)
 
-        return Vocabulary(None, words)
+        return Vocabulary(None, words,
+                          self._from_language,
+                          self._to_language)
 
     @property
     def new_words_learned(self) -> int:
