@@ -5,32 +5,43 @@
 {% block body %}
 
   <div class="center">
-    <h1>Learn</h1>
 
-    {% for voc_id, vocabulary in vocabularies %}
-      <div class="vocabulary">
-        <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
-          <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span><span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
+    <div class="languages-categories">
+      {% for (language_input, language_output), vocabularies in vocabularies_by_languages.items() %}
+        <a href="#{{ language_input.code }}_{{ language_output.code }}" class="languages-category">
+          {{ language_input.name }} ➔ {{ language_output.name }}
         </a>
-        <div>
-          <span class="percentage small-cell">
-            {{ '%.2f' % percentage_by_vocabulary[vocabulary] }}%
-          </span>
-          <a class="new-session" href="/new_session?voc_id={{ voc_id }}">
-            <span class="voc-action small-cell">
-              new
-            </span>
-          </a>
-          {% if vocabulary in session_by_vocabulary %}
-            <a class="resume-session" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">
-              <span class="voc-action small-cell">
-                resume
-              </span>
-            </a>
-          {% endif %}
+      {% endfor %}
+    </div>
 
-        </div>
-      </div>
+    {% for (language_input, language_output), vocabularies in vocabularies_by_languages.items() %}
+      <section id="{{ language_input.code }}_{{ language_output.code }}">
+        {% for voc_id, vocabulary in vocabularies %}
+          <div class="vocabulary">
+            <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
+              <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span><span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
+            </a>
+            <div>
+              <span class="percentage small-cell">
+                {{ '%.2f' % percentage_by_vocabulary[vocabulary] }}%
+              </span>
+              <a class="new-session" href="/new_session?voc_id={{ voc_id }}">
+                <span class="voc-action small-cell">
+                  new
+                </span>
+              </a>
+              {% if vocabulary in session_by_vocabulary %}
+                <a class="resume-session" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">
+                  <span class="voc-action small-cell">
+                    resume
+                  </span>
+                </a>
+              {% endif %}
+
+            </div>
+          </div>
+        {% endfor %}
+      </section>
     {% endfor %}
 
   </div>

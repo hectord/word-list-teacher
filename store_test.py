@@ -25,14 +25,15 @@ class TestStore(unittest.TestCase):
         self.words = [self.word1, self.word2]
 
         self.new_voc = Vocabulary(self.word1, self.words,
-                                  from_language='fr',
-                                  to_language='de')
+                                  input_language='fr',
+                                  output_language='de')
 
         voc_id = self.db.create_vocabulary(self.new_voc)
         self.assertEqual(1, voc_id)
 
     def _create_user(self):
-        self.user = self.db.create_user('test@hotmail.com', 'abc', set())
+        sample_language = {Language.FRENCH, Language.CHINESE}
+        self.user = self.db.create_user('test@hotmail.com', 'abc', sample_language)
 
     def test_voc(self):
         self._create_vocabulary()

@@ -6,7 +6,7 @@ from datetime import date, datetime
 from peewee import *
 
 from learn import Vocabulary, Word, LearnEngine, WordAttempt
-from learn import Language
+from learn import Language, User
 
 db = SqliteDatabase(None)
 
@@ -100,7 +100,13 @@ class Database:
         if not users or not check_password(password, users[0].password):
             raise DbException('user not found')
 
-        return users[0]
+        db_user = users[0]
+        languages = set()
+
+        for speak in DbSpeak.select().where(DbSpeak.user == db_user):
+            languages.add(Language.from_code(speak.language.code))
+
+        return User(email=email, password=password, languages_spoken=languages)
 
     def create_user(self,
                     email: str,
@@ -117,17 +123,21 @@ class Database:
                                  password=hash_password)
 
         for language in languages:
-            pass
+            language = DbLanguage.get(code=language.code)
+            DbSpeak.create(language=language, user=new_user)
 
         return new_user
 
-    def create_new_session(self,
-                           user: DbUser,
-                           voc: Vocabulary) -> LearnEngine:
+    def _get_db_user(self, user: User) -> DbUser:
+        return DbUser.get(email=user.email)
 
+    def create_new_session(self,
+                           user: User,
+                           voc: Vocabulary) -> LearnEngine:
+        db_user = self._get_db_user(user)
         new_session = LearnEngine([], voc)
 
-        new_db_session = DbSession.create(user=user.id,
+        new_db_session = DbSession.create(user=db_user.id,
                                        creation=datetime.now(),
                                        finished=False)
         new_session.set_id(new_db_session.id)
@@ -185,9 +195,10 @@ class Database:
                              success=word_attempt.success)
 
     def last_session(self,
-                     user: DbUser,
+                     user: User,
                      voc: Vocabulary,
                      finished: bool = None) -> Optional[LearnEngine]:
+        db_user = self._get_db_user(user)
 
         if voc.id is None:
             return None
@@ -195,7 +206,7 @@ class Database:
         sessions = (DbSession
                     .select()
                     .join(DbVocabularySession)
-                    .where(DbSession.user == user)
+                    .where(DbSession.user == db_user)
                     .where(DbVocabularySession.vocabulary == voc.id))
 
         if finished is not None:
@@ -247,11 +258,11 @@ class Database:
         return ret
 
     def create_vocabulary(self, voc: Vocabulary) -> int:
-        from_language = DbLanguage.get(code=voc.from_language)
-        to_language = DbLanguage.get(code=voc.to_language)
+        input_language = DbLanguage.get(code=voc.input_language)
+        output_language = DbLanguage.get(code=voc.output_language)
 
-        new_voc = DbVocabulary.create(input_language=from_language,
-                                      output_language=to_language)
+        new_voc = DbVocabulary.create(input_language=input_language,
+                                      output_language=output_language)
 
         for word in voc.words:
             DbWord.create(vocabulary=new_voc,
@@ -279,10 +290,10 @@ class Database:
 
             words.append(new_word)
 
-        from_language = voc.input_language.code
-        to_language = voc.output_language.code
+        input_language = voc.input_language.code
+        output_language = voc.output_language.code
 
-        ret = Vocabulary(name, words, from_language, to_language)
+        ret = Vocabulary(name, words, input_language, output_language)
         ret.set_id(voc)
         return ret
 

@@ -2,6 +2,7 @@
 from typing import Optional
 from pathlib import Path
 import secrets
+from collections import defaultdict
 
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -11,8 +12,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
-from learn import Vocabulary, LearnEngine, Word
-from store import load_database, DbUser, DbException
+from learn import Vocabulary, LearnEngine, Word, Language, User
+from store import load_database, DbException
 
 
 
@@ -48,7 +49,7 @@ class WordResult(BaseModel):
     next_word: Optional[WordInput]
 
 
-def get_user(creds: HTTPBasicCredentials = Depends(security)):
+def get_user(creds: HTTPBasicCredentials = Depends(security)) -> User:
     username = creds.username
     password = creds.password
 
@@ -60,6 +61,7 @@ def get_user(creds: HTTPBasicCredentials = Depends(security)):
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Basic"},
         )
+
     return user
 
 
@@ -67,11 +69,10 @@ def get_user(creds: HTTPBasicCredentials = Depends(security)):
 def root():
     return RedirectResponse(url='/index')
 
-
 @app.get("/vocabulary")
 async def index(request: Request,
                 id: int,
-                user: DbUser = Depends(get_user)):
+                user: User = Depends(get_user)):
 
     voc = db.get_vocabulary(id)
 
@@ -84,12 +85,24 @@ async def index(request: Request,
     )
 
 @app.get("/index")
-async def index(request: Request, user: DbUser = Depends(get_user)):
+async def index(request: Request, user: User = Depends(get_user)):
     vocabularies = db.list_vocabularies()
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
+    vocabularies_by_languages = defaultdict(list)
 
-    for vocabulary in vocabularies.values():
+    for voc_id, vocabulary in vocabularies.items():
+        input_language = Language.from_code(vocabulary.input_language)
+        output_language = Language.from_code(vocabulary.output_language)
+
+        know_input = input_language in user.languages_spoken
+        know_output = output_language in user.languages_spoken
+
+        if know_input == know_output:
+            continue
+
+        inout = (input_language, output_language)
+
         session = db.last_session(user, vocabulary)
         if session is not None and not session.is_finished:
             session_by_vocabulary[vocabulary] = session
@@ -100,6 +113,8 @@ async def index(request: Request, user: DbUser = Depends(get_user)):
         if finished_session:
             percentage_by_vocabulary[vocabulary] = finished_session.accuracy
 
+        vocabularies_by_languages[inout].append((voc_id, vocabulary))
+
     vocabularies = list(vocabularies.items())
     vocabularies.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
 
@@ -107,7 +122,7 @@ async def index(request: Request, user: DbUser = Depends(get_user)):
         "index.html",
         {
             'request': request,
-            'vocabularies': vocabularies,
+            'vocabularies_by_languages': vocabularies_by_languages,
             'session_by_vocabulary': session_by_vocabulary,
             'percentage_by_vocabulary': percentage_by_vocabulary
         },
@@ -118,7 +133,7 @@ async def index(request: Request, user: DbUser = Depends(get_user)):
 @app.get("/new_session")
 async def new_session(request: Request,
                       voc_id: int,
-                      user: DbUser = Depends(get_user)):
+                      user: User = Depends(get_user)):
 
     voc = db.get_vocabulary(voc_id)
 

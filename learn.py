@@ -46,6 +46,13 @@ class Language(Enum):
         }.get(self)
 
 
+@dataclass(frozen=True)
+class User:
+    email: str
+    password: str
+    languages_spoken: Set[Language]
+
+
 def filter(word):
     word = word.replace('|', '').replace('*', '')
 
@@ -115,25 +122,25 @@ class Vocabulary:
     def __init__(self,
                  name: Optional[Word] = None,
                  words: List[Word] = None,
-                 from_language: str = None,
-                 to_language: str = None):
+                 input_language: str = None,
+                 output_language: str = None):
         self._name = name
         self._words = words or []
         self._id = None
-        self._from_language = from_language
-        self._to_language = to_language
+        self._input_language = input_language
+        self._output_language = output_language
 
     @property
     def id(self) -> Optional[int]:
         return self._id
 
     @property
-    def from_language(self) -> Optional[str]:
-        return self._from_language
+    def input_language(self) -> Optional[str]:
+        return self._input_language
 
     @property
-    def to_language(self) -> Optional[str]:
-        return self._to_language
+    def output_language(self) -> Optional[str]:
+        return self._output_language
 
     def set_id(self, id: int):
         self._id = id
@@ -192,10 +199,10 @@ class Vocabulary:
 
                 directive = Vocabulary._directive(line)
 
-                if directive == '#from':
-                    from_language = Vocabulary._after_directive(line)
-                elif directive == '#to':
-                    to_language = Vocabulary._after_directive(line)
+                if directive == '#input':
+                    input_language = Vocabulary._after_directive(line)
+                elif directive == '#output':
+                    output_language = Vocabulary._after_directive(line)
                 else:
                     if directive == '#name':
                         line = Vocabulary._after_directive(line)
@@ -206,8 +213,8 @@ class Vocabulary:
                     words.append(word)
 
         return Vocabulary(name, words,
-                          from_language,
-                          to_language)
+                          input_language,
+                          output_language)
 
 
 class LearnEngine:

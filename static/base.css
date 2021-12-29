@@ -73,6 +73,20 @@ body {
   height: 80px;
 }
 
+.languages-categories {
+  margin-bottom: 20px;
+}
+
+.languages-category {
+  text-decoration: none;
+  margin-right: 10px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  background: lightgrey;
+}
+
 
 .words-list:not(:last-child) {
   border-bottom: 1px solid #E5E5E5;
@@ -81,3 +95,7 @@ body {
 .vocabulary:not(:last-child) {
   border-bottom: 1px solid #E5E5E5;
 }
+
+section:target { display: block; }
+section { display: none; }
+
