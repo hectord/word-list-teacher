@@ -69,6 +69,15 @@ def get_user(creds: HTTPBasicCredentials = Depends(security)) -> User:
 def root():
     return RedirectResponse(url='/index')
 
+@app.get("/logout")
+def root():
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Incorrect email or password",
+        headers={"WWW-Authenticate": "Basic"},
+    )
+
+
 @app.get("/vocabulary")
 async def index(request: Request,
                 id: int,
