@@ -52,7 +52,6 @@ body {
 }
 
 .voc-action {
-  float: right;
   display: inline-block;
   width: 100px;
   text-align: right;
@@ -63,9 +62,8 @@ body {
 }
 
 .percentage {
-  float: right;
   display: inline-block;
-  width: 100px;
+  width: 500px;
   text-align: right;
 }
 
@@ -78,10 +76,6 @@ body {
 .cell {
   padding-top: 9px;
   padding-bottom: 9px;
-}
-
-.vocabulary {
-  height: 80px;
 }
 
 .languages-categories {
