@@ -1,8 +1,7 @@
 
 function update_height() {
-  // update the size of the words
   var size = $(".words").css("height");
-  $(".centering-box").css("top", "calc(50% - " + size + ")");
+  $(".centering-box").css("top", "calc(100% - " + size + ")");
 }
 
 $(document).ready(function() {

@@ -1,27 +1,68 @@
 
+
+@media (min-resolution: 200dpi) {
+  .centering-box {
+    left: 10%;
+    width: 80%;
+  }
+
+  .word {
+    margin-bottom: 50px;
+  }
+
+  .word-box {
+    height: 90px;
+  }
+
+  .word-box .field {
+    padding: 0px;
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+}
+
+@media (max-resolution: 200dpi) {
+  .centering-box {
+    left: calc(50% - 250px);
+    width: 500px;
+  }
+
+  .word {
+    margin-bottom: 30px;
+  }
+
+  .word-box {
+    height: 50px;
+  }
+
+  .word-box .field {
+    padding: 0px;
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+}
+
 .words {
-  padding-left: 10px;
-  padding-right: 10px;
-  width: 500px;
+  width: 100%;
 }
 
 .centering-box {
   position: absolute;
-  top: calc(50% - 100px);
-  left: calc(50% - 250px);
 }
 
 .word {
-  border-width: 0px;
-  margin-bottom: 30px;
   outline:1px solid black;
+}
+
+#current-output {
+  height: 100%;
 }
 
 .word-box {
   display:table;
   vertical-align: middle;
 
-  height: 50px;
+  width: 100%;
 }
 
 .word-box .field {
@@ -29,13 +70,9 @@
   vertical-align:middle;
 
   height: 50px; /* need it for Firefox */
-  width: 500px;
+  width: 100%;
 
   border-width: 0px;
-
-  padding: 0px;
-  padding-left: 15px;
-  padding-right: 15px;
   margin: 0px;
 
   box-sizing: border-box;

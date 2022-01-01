@@ -4,10 +4,21 @@
   src: url(font/Sora-Thin.ttf);
 }
 
+@media (min-resolution: 200dpi) {
+  * {
+    font-size: 50px;
+  }
+}
+
+@media (max-resolution: 200dpi) {
+  * {
+    font-size: 23px;
+  }
+}
+
 * {
   font-family: 'Sora';
   font-style: normal;
-  font-size: 23px;
 }
 
 h1 {
