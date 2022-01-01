@@ -2,6 +2,8 @@
 
 import unittest
 
+from typing import Set
+
 from store import load_database, DbException
 from learn import Vocabulary, Word, Language
 
@@ -16,11 +18,11 @@ class TestStore(unittest.TestCase):
 
     def _create_vocabulary(self):
 
-        self.word1 = Word(word_input='de_1',
-                          word_output='fr_1',
+        self.word1 = Word(word_input='fr_1',
+                          word_output='de_1',
                           directive=None)
-        self.word2 = Word(word_input='de_2',
-                          word_output='fr_2',
+        self.word2 = Word(word_input='fr_2',
+                          word_output='de_2',
                           directive=None)
         self.words = [self.word1, self.word2]
 
@@ -31,20 +33,23 @@ class TestStore(unittest.TestCase):
         voc_id = self.db.create_vocabulary(self.new_voc)
         self.assertEqual(1, voc_id)
 
-    def _create_user(self):
-        sample_language = {Language.FRENCH, Language.CHINESE}
-        self.user = self.db.create_user('test@hotmail.com', 'abc', sample_language)
+    def _create_user(self, languages: Set[Language] = None):
+        if languages is None:
+            languages = {Language.FRENCH, Language.CHINESE}
+        self.user = self.db.create_user('test@hotmail.com', 'abc',
+                                        languages)
 
     def test_voc(self):
         self._create_vocabulary()
+        self._create_user()
 
-        vocs = self.db.list_vocabularies().values()
+        vocs = self.db.list_vocabularies(self.user).values()
         self.assertEqual(1, len(vocs))
 
         self.assertEqual([self.word1, self.word2],
                          next(iter(vocs)).words)
 
-        voc2 = self.db.get_vocabulary(1)
+        voc2 = self.db.get_vocabulary(self.user, 1)
         self.assertEqual([self.word1, self.word2],
                          voc2.words)
 
@@ -104,3 +109,87 @@ class TestStore(unittest.TestCase):
 
         other_user = self.db.get_user('test@hotmail.com', 'abc')
         self.assertEqual('test@hotmail.com', other_user.email)
+
+
+    def test_normal_vocabulary(self):
+        self._create_vocabulary()
+        self._create_user({Language.FRENCH})
+
+        vocs = self.db.list_vocabularies(self.user)
+
+        self.assertEqual(1, len(vocs))
+        first_voc = next(iter(vocs.values()))
+        self.assertFalse(first_voc.is_flipped)
+
+        first_voc = self.db.get_vocabulary(self.user, first_voc.id)
+
+        self.assertFalse(first_voc.is_flipped)
+        self.assertEqual('fr', first_voc.input_language)
+        self.assertEqual('de', first_voc.output_language)
+
+        self.assertEqual([self.word1, self.word2],
+                          first_voc.words)
+
+        new_session = self.db.create_new_session(self.user, first_voc)
+        self.assertFalse(new_session.is_flipped)
+
+        self.assertIn(new_session.current_word,
+                      {self.word1, self.word2})
+
+        session_fetched = self.db.last_session(self.user, first_voc)
+
+        self.assertIn(session_fetched.current_word,
+                      {self.word1, self.word2})
+
+        session_fetched2 = self.db.load_session(session_fetched.id)
+        self.assertIn(session_fetched2.current_word,
+                      {self.word1, self.word2})
+
+        current_word = session_fetched.current_word
+        attempt = session_fetched.guess(current_word.word_input)
+
+        self.db.add_word(session_fetched, attempt)
+
+    def test_flipped_vocabulary(self):
+        self._create_vocabulary()
+        self._create_user({Language.GERMAN})
+
+        vocs = self.db.list_vocabularies(self.user)
+
+        self.assertEqual(1, len(vocs))
+        first_voc = next(iter(vocs.values()))
+
+        first_voc = self.db.get_vocabulary(self.user, first_voc.id)
+
+        self.assertTrue(first_voc.is_flipped)
+        self.assertEqual('de', first_voc.input_language)
+        self.assertEqual('fr', first_voc.output_language)
+
+        self.assertEqual([self.word1.flip(), self.word2.flip()],
+                          first_voc.words)
+
+        new_session = self.db.create_new_session(self.user, first_voc)
+
+        self.assertIn(new_session.current_word,
+                      {self.word1.flip(), self.word2.flip()})
+        self.assertTrue(new_session.is_flipped)
+
+        self.assertTrue(first_voc.is_flipped)
+        session_fetched = self.db.last_session(self.user, first_voc)
+        self.assertTrue(session_fetched.is_flipped)
+
+        self.assertIn(session_fetched.current_word,
+                      {self.word1.flip(), self.word2.flip()})
+
+        session_fetched2 = self.db.load_session(session_fetched.id)
+        self.assertIn(session_fetched2.current_word,
+                      {self.word1.flip(), self.word2.flip()})
+
+        current_word = session_fetched.current_word
+        attempt = session_fetched.guess(current_word.word_input)
+
+        self.db.add_word(session_fetched, attempt)
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=3)

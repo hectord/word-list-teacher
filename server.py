@@ -83,7 +83,7 @@ async def index(request: Request,
                 id: int,
                 user: User = Depends(get_user)):
 
-    voc = db.get_vocabulary(id)
+    voc = db.get_vocabulary(user, id)
 
     return TEMPLATES.TemplateResponse(
         "vocabulary.html",
@@ -95,7 +95,7 @@ async def index(request: Request,
 
 @app.get("/index")
 async def index(request: Request, user: User = Depends(get_user)):
-    vocabularies = db.list_vocabularies()
+    vocabularies = db.list_vocabularies(user)
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
     vocabularies_by_languages = defaultdict(list)
@@ -103,12 +103,6 @@ async def index(request: Request, user: User = Depends(get_user)):
     for voc_id, vocabulary in vocabularies.items():
         input_language = Language.from_code(vocabulary.input_language)
         output_language = Language.from_code(vocabulary.output_language)
-
-        know_input = input_language in user.languages_spoken
-        know_output = output_language in user.languages_spoken
-
-        if know_input == know_output:
-            continue
 
         inout = (input_language, output_language)
 
@@ -144,7 +138,7 @@ async def new_session(request: Request,
                       voc_id: int,
                       user: User = Depends(get_user)):
 
-    voc = db.get_vocabulary(voc_id)
+    voc = db.get_vocabulary(user, voc_id)
 
     session = db.create_new_session(user, voc)
 

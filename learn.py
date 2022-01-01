@@ -68,6 +68,11 @@ class Word:
     word_input: str
     directive: Optional[str]
 
+    def flip(self) -> 'Word':
+        return Word(word_output=self.word_input,
+                    word_input=self.word_output,
+                    directive=self.directive)
+
     @property
     def is_complex(self) -> bool:
         return self.word_output != self._simplified_word_output
@@ -123,12 +128,32 @@ class Vocabulary:
                  name: Optional[Word] = None,
                  words: List[Word] = None,
                  input_language: str = None,
-                 output_language: str = None):
+                 output_language: str = None,
+                 flipped: bool = False):
         self._name = name
         self._words = words or []
         self._id = None
+        self._flipped = flipped
         self._input_language = input_language
         self._output_language = output_language
+
+    @property
+    def is_flipped(self) -> bool:
+        return self._flipped
+
+    def flip(self) -> 'Vocabulary':
+        name = None if self._name is None else self._name.flip()
+        words = []
+
+        for word in self._words:
+            words.append(word.flip())
+
+        voc = Vocabulary(name, words,
+                         self.output_language,
+                         self.input_language,
+                         not self.is_flipped)
+        voc.set_id(self._id)
+        return voc
 
     @property
     def id(self) -> Optional[int]:
@@ -149,7 +174,10 @@ class Vocabulary:
         self._words.extend(other._words)
 
     def __str__(self) -> str:
-        return self.name.word_input
+        if self.name is None:
+            return 'unknown'
+        else:
+            return self.name.word_input
 
     @property
     def name(self) -> Word:
@@ -240,7 +268,12 @@ class LearnEngine:
         self._current_word = current_word
         if self._current_word is None:
             self._pick_next_word()
+        assert self._current_word is None or self._current_word in self._nok_words
         self._id = None
+
+    @property
+    def is_flipped(self) -> bool:
+        return self._vocabulary.is_flipped
 
     @property
     def id(self) -> int:
