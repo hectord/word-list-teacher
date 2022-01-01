@@ -115,8 +115,6 @@ if __name__ == '__main__':
     db_subparser = dbparser.add_subparsers(dest='db_cmd', required=True)
 
     load_subparser = db_subparser.add_parser('load')
-    load_subparser.add_argument('language-from', help='language from', nargs=1)
-    load_subparser.add_argument('language-to', help='language to', nargs=1)
     load_subparser.add_argument('files', help='words to load', nargs='+')
 
     create_user_subparser = db_subparser.add_parser('create-user')
