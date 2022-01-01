@@ -1,7 +1,7 @@
 
 function update_height() {
-  var size = $(".words").css("height");
-  $(".centering-box").css("top", "calc(100% - " + size + ")");
+  var size = $(".words").height() + 100;
+  $(".centering-box").css("top", "calc(100% - " + size + "px)");
 }
 
 $(document).ready(function() {
@@ -17,8 +17,6 @@ $(document).ready(function() {
       var current_output = $("#current-output");
       var output = current_output.val();
       var session_id = $("#current-output").data("session-id");
-
-      current_output.attr("readonly", true);
 
       $.ajax({
         url: "/word",
@@ -47,7 +45,6 @@ $(document).ready(function() {
         if(result.next_word) {
           current_input.text(result.next_word.word)
           current_output.val("");
-          current_output.attr("readonly", false);
         } else {
           $("#current-word").hide();
         }

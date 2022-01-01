@@ -2,8 +2,10 @@
 
 @media (min-resolution: 200dpi) {
   .centering-box {
-    left: 10%;
-    width: 80%;
+    left: 0px;
+    right: 0px;
+    margin-left: 20px;
+    margin-right: 20px;
   }
 
   .word {
@@ -11,6 +13,10 @@
   }
 
   .word-box {
+    height: 90px;
+  }
+
+  #current-output {
     height: 90px;
   }
 
@@ -35,6 +41,10 @@
     height: 50px;
   }
 
+  #current-output {
+    height: 50px;
+  }
+
   .word-box .field {
     padding: 0px;
     padding-left: 15px;
@@ -52,10 +62,6 @@
 
 .word {
   outline:1px solid black;
-}
-
-#current-output {
-  height: 100%;
 }
 
 .word-box {
