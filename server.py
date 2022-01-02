@@ -118,8 +118,8 @@ async def index(request: Request, user: User = Depends(get_user)):
 
         vocabularies_by_languages[inout].append((voc_id, vocabulary))
 
-    vocabularies = list(vocabularies.items())
-    vocabularies.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
+    for vocabularies in vocabularies_by_languages.values():
+        vocabularies.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
 
     return TEMPLATES.TemplateResponse(
         "index.html",
