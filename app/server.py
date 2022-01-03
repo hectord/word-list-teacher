@@ -1,4 +1,6 @@
+# -*- coding: utf-8 -*-
 
+import os
 from typing import Optional
 from pathlib import Path
 import secrets
@@ -20,7 +22,9 @@ from store import load_database, DbException
 BASE_PATH = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_PATH / "templates"))
 
-VOCABULARIES = BASE_PATH / 'learn.db'
+DATADIR = Path(os.environ.get('DATADIR', BASE_PATH))
+
+VOCABULARIES = DATADIR / 'learn.db'
 db = load_database(VOCABULARIES)
 
 app = FastAPI()
