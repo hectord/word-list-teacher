@@ -1,0 +1,14 @@
+version: 2
+jobs:
+    build:
+        working_directory: ~/circleci-python
+        docker:
+            - image: circleci/python:3.9.2
+        steps:
+            - checkout
+            - run:
+                command: |
+                    sudo pip install -r requirements.txt
+            - run:
+                command: |
+                    python -m unittest *_test.py
