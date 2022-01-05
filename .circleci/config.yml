@@ -11,4 +11,4 @@ jobs:
                     sudo pip install -r requirements.txt
             - run:
                 command: |
-                    python -m unittest *_test.py
+                    PYTHONPATH=app python -m unittest app/*_test.py
