@@ -121,6 +121,8 @@ if __name__ == '__main__':
     create_user_subparser.add_argument('username', help='new username', nargs=1)
     create_user_subparser.add_argument('--speaks', help='language spoken', nargs='+')
 
+    list_subparser = db_subparser.add_parser('list')
+
     db_subparser.add_parser('init')
 
     args = parser.parse_args()
@@ -175,5 +177,12 @@ if __name__ == '__main__':
 
         for language in Language:
             database.create_language(language)
+    elif args.db_cmd == 'list':
+        database = args.database[0]
+        database = load_database(database)
+
+        for voc_id, voc in database.list_vocabularies_for(None).items():
+            print(voc_id, voc)
+
     else:
         assert False

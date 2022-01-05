@@ -349,27 +349,32 @@ class Database:
 
         return VocabularyStats(voc, ret)
 
-    def list_vocabularies(self, user: User) -> Dict[int, Vocabulary]:
+    def list_vocabularies_for(self, languages: Optional[Set[Language]]) -> Dict[int, Vocabulary]:
         vocs = {}
 
         for voc in DbVocabulary.select():
-            input_language = Language.from_code(voc.input_language.code)
-            output_language = Language.from_code(voc.output_language.code)
 
-            know_input = input_language in user.languages_spoken
-            know_output = output_language in user.languages_spoken
+            if languages is not None:
+                input_language = Language.from_code(voc.input_language.code)
+                output_language = Language.from_code(voc.output_language.code)
 
-            if know_input == know_output:
-                continue
+                know_input = input_language in languages
+                know_output = output_language in languages
+
+                if know_input == know_output:
+                    continue
 
             voc = self._load_vocabulary(voc)
 
-            if know_output:
+            if languages is not None and know_output:
                 voc = voc.flip()
 
             vocs[voc.id] = voc
 
         return vocs
+
+    def list_vocabularies(self, user: User) -> Dict[int, Vocabulary]:
+        return self.list_vocabularies_for(user.languages_spoken)
 
 
 def load_database(name: str) -> Database:

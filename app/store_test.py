@@ -208,6 +208,17 @@ class TestStore(unittest.TestCase):
 
         self.db.add_word(session_fetched, attempt)
 
+    def test_list_vocabulary(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        vocs = self.db.list_vocabularies_for(None)
+
+        self.assertEqual({1}, vocs.keys())
+        voc = next(iter(vocs.values()))
+
+        self.assertEqual(self.new_voc.words, voc.words)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)
