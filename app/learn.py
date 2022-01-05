@@ -245,6 +245,18 @@ class Vocabulary:
                           output_language)
 
 
+class VocabularyStats:
+
+    def __init__(self,
+                 v: Vocabulary,
+                 errors_prob_by_word: Dict[Word, int]):
+        self._v = v
+        self._errors_prob_by_word = errors_prob_by_word
+
+    def errors_prob_for(self, w: Word):
+        return self._errors_prob_by_word.get(w, 0.0)
+
+
 class LearnEngine:
 
     def __init__(self,

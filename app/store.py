@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from collections import defaultdict
 from security import check_password, get_hashed_password
 from typing import Dict, Optional, Set
 from datetime import date, datetime
 from peewee import *
 
 from learn import Vocabulary, Word, LearnEngine, WordAttempt
-from learn import Language, User
+from learn import Language, User, VocabularyStats
 
 db = SqliteDatabase(None)
 
@@ -317,6 +318,36 @@ class Database:
         vocs = self.list_vocabularies(user)
 
         return vocs[voc_id]
+
+    def vocabulary_stats(self, voc: Vocabulary) -> Optional[VocabularyStats]:
+        voc_id = voc.id
+
+        success_by_word_id = defaultdict(int)
+        error_by_word_id = defaultdict(int)
+
+        for attempt in (DbWordAttempt
+                        .select()
+                        .join(DbWord)
+                        .join(DbVocabulary)
+                        .where(DbVocabulary.id == voc_id)):
+
+            word = self._create_word_from(attempt.word)
+
+            if attempt.success:
+                success_by_word_id[word] += 1
+            else:
+                error_by_word_id[word] += 1
+
+        all_words = set(error_by_word_id) | set(success_by_word_id)
+        ret = {}
+
+        for word in all_words:
+            success = success_by_word_id[word]
+            error = error_by_word_id[word]
+
+            ret[word] = error / (error + success) * 100
+
+        return VocabularyStats(voc, ret)
 
     def list_vocabularies(self, user: User) -> Dict[int, Vocabulary]:
         vocs = {}

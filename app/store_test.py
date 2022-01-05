@@ -94,6 +94,24 @@ class TestStore(unittest.TestCase):
         self.assertIsNotNone(self.db.last_session(self.user, self.new_voc,
                                                   finished=True))
 
+    def test_vocabulary_stats(self):
+        self._create_user()
+        self._create_vocabulary()
+
+        new_session = self.db.create_new_session(self.user, self.new_voc)
+
+        word = new_session.current_word
+        attempt = new_session.guess('bla')
+
+        self.db.add_word(new_session, attempt)
+
+        other_word = new_session.current_word
+
+        stats = self.db.vocabulary_stats(self.new_voc)
+
+        self.assertEqual(100.0, stats.errors_prob_for(word))
+        self.assertEqual(0.0, stats.errors_prob_for(other_word))
+
     def test_user(self):
         self._create_user()
         self.assertIsNotNone(self.user)
