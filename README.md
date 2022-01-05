@@ -24,4 +24,5 @@ Long term goal
 ### How do I create a Docker container?
 
 > docker build . -t myimage
+
 > docker run -it -v $PWD/data:/data -p 8000:80 myimage
