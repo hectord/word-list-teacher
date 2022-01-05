@@ -47,13 +47,13 @@ body {
 
 .voc-word {
   display: inline-block;
-  width: 425px;
+  width: 400px;
   text-align: left;
 }
 
 .voc-percentage {
   display: inline-block;
-  width: 50px;
+  width: 100px;
   text-align: right;
 }
 
