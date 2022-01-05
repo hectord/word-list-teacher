@@ -9,7 +9,13 @@
 
     {% for word in voc.words %}
       <div class="words-list">
-        <span class="cell voc-word">{{ word.word_output }}</span><span class="cell voc-word">{{ word.word_input }}</span>
+        <span class="cell voc-word">{{ word.word_output }}</span><span class="cell voc-word">{{ word.word_input }}</span><span class="voc-percentage
+
+        {% if stats.errors_prob_for(word) > 40.0 %}
+          voc-word-unknown
+        {% endif %}
+
+        ">{{ '%.2f%%' % stats.errors_prob_for(word) }}</span>
       </div>
     {% endfor %}
 

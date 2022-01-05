@@ -47,8 +47,18 @@ body {
 
 .voc-word {
   display: inline-block;
-  width: 450px;
+  width: 425px;
   text-align: left;
+}
+
+.voc-percentage {
+  display: inline-block;
+  width: 50px;
+  text-align: right;
+}
+
+.voc-word-unknown {
+  color: red;
 }
 
 .voc-action {

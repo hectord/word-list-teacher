@@ -88,12 +88,14 @@ async def index(request: Request,
                 user: User = Depends(get_user)):
 
     voc = db.get_vocabulary(user, id)
+    stats = db.vocabulary_stats(voc)
 
     return TEMPLATES.TemplateResponse(
         "vocabulary.html",
         {
             'request': request,
-            'voc': voc
+            'voc': voc,
+            'stats': stats
         },
     )
 
