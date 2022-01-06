@@ -257,7 +257,7 @@ class VocabularyStats:
         return self._errors_prob_by_word.get(w, 0.0)
 
 
-class LearnEngine:
+class Session:
 
     def __init__(self,
                  attempts: List[WordAttempt],

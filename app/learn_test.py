@@ -2,7 +2,7 @@
 
 import unittest
 
-from learn import Word, Vocabulary, LearnEngine
+from learn import Word, Vocabulary, Session
 
 
 class LearnTest(unittest.TestCase):
@@ -21,7 +21,7 @@ class LearnTest(unittest.TestCase):
 
     def test_learn_vocabulary(self):
 
-        words = LearnEngine([], self.voc, self.word1)
+        words = Session([], self.voc, self.word1)
 
         self.assertEqual(self.word1, words.current_word)
 

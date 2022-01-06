@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
-from learn import Vocabulary, LearnEngine, Word, Language, User
+from learn import Vocabulary, Session, Word, Language, User
 from store import load_database, DbException
 
 
@@ -155,17 +155,17 @@ async def new_session(request: Request,
 async def learn(request: Request,
                 response: Response,
                 session_id: int):
-    engine = db.load_session(session_id)
+    session = db.load_session(session_id)
 
     first_word = None
-    if engine.current_word is not None:
-        first_word = WordInput(word=engine.current_word.word_input)
+    if session.current_word is not None:
+        first_word = WordInput(word=session.current_word.word_input)
 
     ret = TEMPLATES.TemplateResponse(
         "learn.html",
         {
             'request': request,
-            'session': engine,
+            'session': session,
             'first_word': first_word
         },
         headers={'Cache-Control': 'no-store'}
@@ -176,18 +176,18 @@ async def learn(request: Request,
 
 @app.post("/word")
 async def post_word(word: WordOutput):
-    engine = db.load_session(word.session_id)
+    session = db.load_session(word.session_id)
 
-    current_word = engine.current_word
+    current_word = session.current_word
     hint_word = current_word.word_output
 
-    result = engine.guess(word.word)
+    result = session.guess(word.word)
 
-    db.add_word(engine, result)
+    db.add_word(session, result)
 
     next_word = None
-    if engine.current_word is not None:
-        next_word = WordInput(word=engine.current_word.word_input)
+    if session.current_word is not None:
+        next_word = WordInput(word=session.current_word.word_input)
 
     return WordResult(success=result.success,
                       hint=hint_word,

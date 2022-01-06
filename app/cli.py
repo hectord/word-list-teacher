@@ -8,7 +8,7 @@ import sys
 import argparse
 from termcolor import colored
 
-from learn import Word, InvalidFileException, Vocabulary, LearnEngine
+from learn import Word, InvalidFileException, Vocabulary, Session
 from learn import Language
 from store import load_database
 
@@ -19,7 +19,7 @@ def say_goodbye():
     print('Bye')
 
 
-def save_words(words: LearnEngine):
+def save_words(words: Session):
     words = words.vocabulary_left
 
     if not words:
@@ -46,12 +46,12 @@ def save_words(words: LearnEngine):
 
 
 def learn(files: Set[str], vocabulary: Vocabulary):
-    engine = LearnEngine([], all_words)
+    session = Session([], all_words)
 
     try:
 
-        while not engine.is_finished:
-            current_word = engine.current_word
+        while not session.is_finished:
+            current_word = session.current_word
 
             german, french = current_word.word_output, current_word.word_input
 
@@ -59,7 +59,7 @@ def learn(files: Set[str], vocabulary: Vocabulary):
             print(f'? ', end='')
             word_given = input()
 
-            if engine.guess(word_given):
+            if session.guess(word_given):
 
                 if current_word.is_complex:
                     print(colored('Great :)', 'green'), ' ',
@@ -72,16 +72,16 @@ def learn(files: Set[str], vocabulary: Vocabulary):
             print()
 
         print()
-        print("new words learned =", engine.new_words_learned)
-        print("accuracy =", engine.accuracy)
+        print("new words learned =", session.new_words_learned)
+        print("accuracy =", session.accuracy)
         print("filename =", ' '.join(sorted(files)))
         print()
 
-        save_words(engine)
+        save_words(session)
     except KeyboardInterrupt:
         print()
         print()
-        save_words(engine)
+        save_words(session)
         say_goodbye()
     except EOFError:
         say_goodbye()

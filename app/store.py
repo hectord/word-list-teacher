@@ -6,7 +6,7 @@ from typing import Dict, Optional, Set
 from datetime import date, datetime
 from peewee import *
 
-from learn import Vocabulary, Word, LearnEngine, WordAttempt
+from learn import Vocabulary, Word, Session, WordAttempt
 from learn import Language, User, VocabularyStats
 
 db = SqliteDatabase(None)
@@ -135,9 +135,9 @@ class Database:
 
     def create_new_session(self,
                            user: User,
-                           voc: Vocabulary) -> LearnEngine:
+                           voc: Vocabulary) -> Session:
         db_user = self._get_db_user(user)
-        new_session = LearnEngine([], voc)
+        new_session = Session([], voc)
 
         new_db_session = DbSession.create(user=db_user.id,
                                           creation=datetime.now(),
@@ -155,7 +155,7 @@ class Database:
         return new_session
 
     def _get_db_word(self,
-                     session: LearnEngine,
+                     session: Session,
                      word: Word) -> Optional[DbWord]:
 
         word_input, word_output = word.word_input, word.word_output
@@ -176,7 +176,7 @@ class Database:
         return None
 
     def add_word(self,
-                 session: LearnEngine,
+                 session: Session,
                  word_attempt: WordAttempt):
         session_id = session.id
         word = word_attempt.word
@@ -203,7 +203,7 @@ class Database:
     def last_session(self,
                      user: User,
                      voc: Vocabulary,
-                     finished: bool = None) -> Optional[LearnEngine]:
+                     finished: bool = None) -> Optional[Session]:
         db_user = self._get_db_user(user)
 
         if voc.id is None:
@@ -227,7 +227,7 @@ class Database:
 
         return self.load_session(session_to_load.id)
 
-    def load_session(self, session_id: int) -> LearnEngine:
+    def load_session(self, session_id: int) -> Session:
         v = Vocabulary(None, set())
 
         db_session = DbSession.get(session_id)
@@ -270,7 +270,7 @@ class Database:
             if flipped:
                 current_word = current_word.flip()
 
-        ret = LearnEngine(attempts, v, current_word=current_word)
+        ret = Session(attempts, v, current_word=current_word)
         ret.set_id(session_id)
         return ret
 
