@@ -16,7 +16,8 @@ $(document).ready(function() {
       var current_input = $("#current-input");
       var current_output = $("#current-output");
       var output = current_output.val();
-      var session_id = $("#current-output").data("session-id");
+      var session_id = current_output.data("session-id");
+      var current_word_id = current_output.data("current-word-id");
 
       $.ajax({
         url: "/word",
@@ -25,7 +26,8 @@ $(document).ready(function() {
         processData: false,
         data: JSON.stringify({
           "word": output,
-          "session_id": session_id
+          "session_id": session_id,
+          "word_id": current_word_id
         })
       }).done(function(result) {
 
@@ -44,6 +46,8 @@ $(document).ready(function() {
 
         if(result.next_word) {
           current_input.text(result.next_word.word)
+          current_input.text(result.next_word.word)
+          current_output.data("current-word-id", result.next_word.word_id);
           current_output.val("");
         } else {
           $("#current-word").hide();

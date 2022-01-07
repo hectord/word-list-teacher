@@ -33,12 +33,14 @@ security = HTTPBasic()
 
 
 class WordInput(BaseModel):
+    word_id: int
     word: str
 
 
 class WordOutput(BaseModel):
     word: str
     session_id: int
+    word_id: int
 
 
 class WordResult(BaseModel):
@@ -158,15 +160,19 @@ async def learn(request: Request,
     session = db.load_session(session_id)
 
     first_word = None
+    first_word_id = None
     if session.current_word is not None:
-        first_word = WordInput(word=session.current_word.word_input)
+        current_word = session.current_word
+        vocabulary = session.vocabulary
+        first_word = WordInput(word=current_word.word_input,
+                               word_id=vocabulary.word_id(current_word))
 
     ret = TEMPLATES.TemplateResponse(
         "learn.html",
         {
             'request': request,
             'session': session,
-            'first_word': first_word
+            'first_word': first_word,
         },
         headers={'Cache-Control': 'no-store'}
     )
@@ -175,22 +181,30 @@ async def learn(request: Request,
 
 
 @app.post("/word")
-async def post_word(word: WordOutput):
-    session = db.load_session(word.session_id)
+async def post_word(word_output: WordOutput):
+    session = db.load_session(word_output.session_id)
+    vocabulary = session.vocabulary
 
-    current_word = session.current_word
+    current_word = vocabulary.word(word_output.word_id)
     hint_word = current_word.word_output
 
-    result = session.guess(word.word)
+    result = session.guess(current_word, word_output.word)
 
-    db.add_word(session, result)
+    success = False
+    if result is not None:
+        db.add_word(session, result)
+        success = result.success
 
-    next_word = None
+    next_word_input = None
     if session.current_word is not None:
-        next_word = WordInput(word=session.current_word.word_input)
+        next_word = session.current_word
+        vocabulary = session.vocabulary
+        next_word_input = WordInput(word=next_word.word_input,
+                                    word_id=vocabulary.word_id(next_word))
 
-    return WordResult(success=result.success,
+    return WordResult(success=success,
                       hint=hint_word,
-                      word_input=WordInput(word=current_word.word_input),
-                      word_output=word,
-                      next_word=next_word)
+                      word_input=WordInput(word=current_word.word_input,
+                                           word_id=word_output.word_id),
+                      word_output=word_output,
+                      next_word=next_word_input)

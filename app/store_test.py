@@ -70,7 +70,8 @@ class TestStore(unittest.TestCase):
         self.assertTrue((self.word1 == session.current_word) or
                         (self.word2 == session.current_word))
 
-        word_attempt = session.guess(session.current_word.word_output)
+        word_attempt = session.guess(session.current_word,
+                                     session.current_word.word_output)
         self.db.add_word(session, word_attempt)
 
         db_session = self.db.load_session(session.id)
@@ -82,7 +83,8 @@ class TestStore(unittest.TestCase):
         self.assertIsNotNone(self.db.last_session(self.user, self.new_voc,
                                                   finished=False))
 
-        word_attempt = session.guess(session.current_word.word_output)
+        word_attempt = session.guess(session.current_word,
+                                     session.current_word.word_output)
         self.db.add_word(session, word_attempt)
 
         db_session = self.db.load_session(session.id)
@@ -101,7 +103,7 @@ class TestStore(unittest.TestCase):
         new_session = self.db.create_new_session(self.user, self.new_voc)
 
         word = new_session.current_word
-        attempt = new_session.guess('bla')
+        attempt = new_session.guess(word, 'bla')
 
         self.db.add_word(new_session, attempt)
 
@@ -164,7 +166,7 @@ class TestStore(unittest.TestCase):
                       {self.word1, self.word2})
 
         current_word = session_fetched.current_word
-        attempt = session_fetched.guess(current_word.word_input)
+        attempt = session_fetched.guess(current_word, current_word.word_input)
 
         self.db.add_word(session_fetched, attempt)
 
@@ -204,7 +206,7 @@ class TestStore(unittest.TestCase):
                       {self.word1.flip(), self.word2.flip()})
 
         current_word = session_fetched.current_word
-        attempt = session_fetched.guess(current_word.word_input)
+        attempt = session_fetched.guess(current_word, current_word.word_input)
 
         self.db.add_word(session_fetched, attempt)
 

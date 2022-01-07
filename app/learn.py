@@ -133,6 +133,7 @@ class Vocabulary:
         self._name = name
         self._words = words or []
         self._id = None
+        self._word_ids = {}
         self._flipped = flipped
         self._input_language = input_language
         self._output_language = output_language
@@ -170,8 +171,21 @@ class Vocabulary:
     def set_id(self, id: int):
         self._id = id
 
+    def set_word_id(self, word: Word, word_id: int):
+        self._word_ids[word] = word_id
+
+    def word_id(self, word: Word) -> Optional[int]:
+        return self._word_ids.get(word)
+
+    def word(self, word_id: int) -> Optional[Word]:
+        for this_word, this_word_id in self._word_ids.items():
+            if word_id == this_word_id:
+                return this_word
+        return None
+
     def add(self, other: 'Vocabulary'):
         self._words.extend(other._words)
+        self._word_ids.update(other._word_ids)
 
     def __str__(self) -> str:
         if self.name is None:
@@ -284,6 +298,10 @@ class Session:
         self._id = None
 
     @property
+    def vocabulary(self) -> Vocabulary:
+        return self._vocabulary
+
+    @property
     def is_flipped(self) -> bool:
         return self._vocabulary.is_flipped
 
@@ -337,8 +355,15 @@ class Session:
     def current_word(self) -> Optional[Word]:
         return self._current_word
 
-    def guess(self, word_output: str) -> WordAttempt:
+    def guess(self, word: Word, word_output: str) -> Optional[WordAttempt]:
+
         current_word = self.current_word
+        if word != self._current_word:
+            if word in self._nok_words:
+                current_word = word
+            else:
+                return None
+
 
         success = current_word.accepts(word_output)
 
