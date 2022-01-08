@@ -53,7 +53,8 @@ class User:
     languages_spoken: Set[Language]
 
 
-def filter(word):
+def word_filter(word):
+    word = word.lower()
     word = word.replace('|', '').replace('*', '')
 
     if '(' in word:
@@ -82,9 +83,18 @@ class Word:
         return self.directive == '#name'
 
     @property
+    def key(self) -> str:
+        """
+        :return: key which group words with same inputs
+
+        A word is considered as "right" if it matches any
+         word with the same key in a vocabulary.
+        """
+        return word_filter(self.word_input)
+
+    @property
     def _simplified_word_output(self) -> str:
-        simple_german = self.word_output.lower()
-        return filter(simple_german)
+        return word_filter(self.word_output)
 
     def accepts(self, word_output: str) -> bool:
         return self._simplified_word_output == word_output.lower()
@@ -132,6 +142,11 @@ class Vocabulary:
                  flipped: bool = False):
         self._name = name
         self._words = words or []
+
+        self._similar_words = defaultdict(set)
+        for word in self._words:
+            self._similar_words[word.key].add(word)
+
         self._id = None
         self._word_ids = {}
         self._flipped = flipped
@@ -141,6 +156,9 @@ class Vocabulary:
     @property
     def is_flipped(self) -> bool:
         return self._flipped
+
+    def similar_words(self, word: Word) -> Set[Word]:
+        return self._similar_words[word.key]
 
     def flip(self) -> 'Vocabulary':
         name = None if self._name is None else self._name.flip()
@@ -186,6 +204,9 @@ class Vocabulary:
     def add(self, other: 'Vocabulary'):
         self._words.extend(other._words)
         self._word_ids.update(other._word_ids)
+
+        for key, words in other._similar_words.items():
+            self._similar_words[key].update(words)
 
     def __str__(self) -> str:
         if self.name is None:
@@ -337,8 +358,8 @@ class Session:
             words.add(word)
 
         return Vocabulary(None, words,
-                          self._from_language,
-                          self._to_language)
+                          self.vocabulary.input_language,
+                          self.vocabulary.output_language)
 
     @property
     def new_words_learned(self) -> int:
@@ -364,8 +385,13 @@ class Session:
             else:
                 return None
 
-
-        success = current_word.accepts(word_output)
+        # find a word which matches
+        for word in self.vocabulary.similar_words(current_word):
+            if word.accepts(word_output):
+                success = True
+                break
+        else:
+            success = False
 
         attempt = WordAttempt(word=current_word,
                               typed_word=word_output,

@@ -18,7 +18,6 @@ class LearnTest(unittest.TestCase):
         words = [self.word1, self.word2]
         self.voc = Vocabulary(self.word1, words, 'fr', 'de')
 
-
     def test_learn_vocabulary(self):
 
         words = Session([], self.voc, self.word1)
@@ -66,6 +65,34 @@ class LearnTest(unittest.TestCase):
 
         words.guess(self.word1, self.word1.word_output)
         self.assertIsNone(words.guess(self.word1, self.word1.word_output))
+
+    def test_manage_words_with_same_input(self):
+        word1 = Word(word_output='word1_output',
+                     word_input='word1_input',
+                     directive='name')
+        voc1 = Vocabulary(word1, [word1], 'fr', 'de')
+
+        word2 = Word(word_output='word2_output',
+                     word_input='word1_input',
+                     directive=None)
+        voc2 = Vocabulary(word2, [word2], 'fr', 'de')
+        voc1.add(voc2)
+
+
+        words = Session([], voc1, word1)
+
+        ret = words.guess(word1, word2.word_output)
+        self.assertTrue(ret.success)
+        self.assertEqual("word2_output", ret.typed_word)
+        self.assertEqual(word1, ret.word)
+
+        ret = words.guess(word2, word2.word_output)
+        self.assertTrue(ret.success)
+        self.assertEqual("word2_output", ret.typed_word)
+        self.assertEqual(word2, ret.word)
+
+        self.assertTrue(words.is_finished)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)
