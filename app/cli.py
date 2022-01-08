@@ -59,7 +59,10 @@ def learn(files: Set[str], vocabulary: Vocabulary):
             print(f'? ', end='')
             word_given = input()
 
-            if session.guess(word_given):
+            attempts = session.guess(current_word, word_given)
+
+            if attempts.success:
+                current_word = attempts.word
 
                 if current_word.is_complex:
                     print(colored('Great :)', 'green'), ' ',
