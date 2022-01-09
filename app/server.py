@@ -192,7 +192,7 @@ async def post_word(word_output: WordOutput):
 
     success = False
     if result is not None:
-        db.add_word(session, result)
+        db.add_word_attempt(session, result)
         success = result.success
 
     next_word_input = None

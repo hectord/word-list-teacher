@@ -131,6 +131,11 @@ if __name__ == '__main__':
     remove_vocabulary_subparser = db_subparser.add_parser('remove-vocabulary')
     remove_vocabulary_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
+    add_word_subparser = db_subparser.add_parser('add-word')
+    add_word_subparser.add_argument('voc-id', nargs=1, type=int)
+    add_word_subparser.add_argument('word-input', nargs=1)
+    add_word_subparser.add_argument('word-output', nargs=1)
+
     db_subparser.add_parser('init')
 
     args = parser.parse_args()
@@ -221,6 +226,26 @@ if __name__ == '__main__':
             sys.exit(1)
 
         database.remove_vocabulary(voc)
+
+    elif args.db_cmd == 'add-word':
+        database = args.database[0]
+        database = load_database(database)
+
+        args = vars(args)
+        voc_id = args['voc-id'][0]
+        word_input = args['word-input'][0]
+        word_output = args['word-output'][0]
+
+        voc = database.get_vocabulary(None, voc_id)
+
+        if voc is None:
+            print("no vocabulary found", file=sys.stderr)
+            sys.exit(1)
+
+        word = Word(word_input=word_input,
+                    word_output=word_output,
+                    directive=None)
+        database.add_word(voc, word)
 
     else:
         assert False

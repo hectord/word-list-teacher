@@ -177,9 +177,9 @@ class Database:
         assert False
         return None
 
-    def add_word(self,
-                 session: Session,
-                 word_attempt: WordAttempt):
+    def add_word_attempt(self,
+                         session: Session,
+                         word_attempt: WordAttempt):
         session_id = session.id
         word = word_attempt.word
 
@@ -284,10 +284,7 @@ class Database:
                                       output_language=output_language)
 
         for word in voc.words:
-            DbWord.create(vocabulary=new_voc,
-                          word_input=word.word_input,
-                          word_output=word.word_output,
-                          directive=word.directive)
+            self._create_db_word(new_voc, word)
 
         voc.set_id(new_voc.id)
         return new_voc.id
@@ -406,6 +403,17 @@ class Database:
         DbVocabularySession.delete().where(DbVocabularySession.vocabulary == voc_id).execute()
 
         DbVocabulary.delete().where(DbVocabulary.id == voc_id).execute()
+
+    def _create_db_word(self, voc: DbVocabulary, word: Word):
+        DbWord.create(vocabulary=voc,
+                      word_input=word.word_input,
+                      word_output=word.word_output,
+                      directive=word.directive)
+
+    def add_word(self, voc: Vocabulary, word: Word):
+        db_voc = DbVocabulary.get(voc.id)
+
+        self._create_db_word(db_voc, word)
 
 
 def load_database(name: str) -> Database:

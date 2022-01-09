@@ -72,7 +72,7 @@ class TestStore(unittest.TestCase):
 
         word_attempt = session.guess(session.current_word,
                                      session.current_word.word_output)
-        self.db.add_word(session, word_attempt)
+        self.db.add_word_attempt(session, word_attempt)
 
         db_session = self.db.load_session(session.id)
         self.assertNotEqual(first_word, db_session.current_word)
@@ -85,7 +85,7 @@ class TestStore(unittest.TestCase):
 
         word_attempt = session.guess(session.current_word,
                                      session.current_word.word_output)
-        self.db.add_word(session, word_attempt)
+        self.db.add_word_attempt(session, word_attempt)
 
         db_session = self.db.load_session(session.id)
         self.assertTrue(db_session.is_finished)
@@ -105,7 +105,7 @@ class TestStore(unittest.TestCase):
         word = new_session.current_word
         attempt = new_session.guess(word, 'bla')
 
-        self.db.add_word(new_session, attempt)
+        self.db.add_word_attempt(new_session, attempt)
 
         other_word = new_session.current_word
 
@@ -168,7 +168,7 @@ class TestStore(unittest.TestCase):
         current_word = session_fetched.current_word
         attempt = session_fetched.guess(current_word, current_word.word_input)
 
-        self.db.add_word(session_fetched, attempt)
+        self.db.add_word_attempt(session_fetched, attempt)
 
     def test_flipped_vocabulary(self):
         self._create_vocabulary()
@@ -208,7 +208,7 @@ class TestStore(unittest.TestCase):
         current_word = session_fetched.current_word
         attempt = session_fetched.guess(current_word, current_word.word_input)
 
-        self.db.add_word(session_fetched, attempt)
+        self.db.add_word_attempt(session_fetched, attempt)
 
     def test_list_vocabulary(self):
         self._create_vocabulary()
@@ -246,7 +246,7 @@ class TestStore(unittest.TestCase):
         session = self.db.last_session(self.user, new_voc)
 
         word_attempt = session.guess(word2, word2.word_output)
-        self.db.add_word(session, word_attempt)
+        self.db.add_word_attempt(session, word_attempt)
 
         self.assertTrue(word_attempt.success)
         self.db.last_session(self.user, new_voc)
@@ -262,6 +262,17 @@ class TestStore(unittest.TestCase):
         self.db.remove_vocabulary(self.new_voc)
 
         self.assertEqual({}, self.db.list_vocabularies(None))
+
+    def test_add_word(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        self.word3 = Word(word_input='fr_3',
+                          word_output='de_3',
+                          directive=None)
+
+
+        self.db.add_word(self.new_voc, self.word3)
 
 
 if __name__ == '__main__':
