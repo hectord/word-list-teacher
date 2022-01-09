@@ -124,7 +124,9 @@ if __name__ == '__main__':
     create_user_subparser.add_argument('username', help='new username', nargs=1)
     create_user_subparser.add_argument('--speaks', help='language spoken', nargs='+')
 
-    list_subparser = db_subparser.add_parser('list')
+    db_subparser.add_parser('list-vocabularies')
+    list_words_subparser = db_subparser.add_parser('list-words')
+    list_words_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
     db_subparser.add_parser('init')
 
@@ -180,12 +182,27 @@ if __name__ == '__main__':
 
         for language in Language:
             database.create_language(language)
-    elif args.db_cmd == 'list':
+    elif args.db_cmd == 'list-vocabularies':
         database = args.database[0]
         database = load_database(database)
 
         for voc_id, voc in database.list_vocabularies_for(None).items():
             print(voc_id, voc)
+    elif args.db_cmd == 'list-words':
+        database = args.database[0]
+        database = load_database(database)
+
+        voc_id = vars(args)['voc-id'][0]
+
+        voc = database.get_vocabulary(None, voc_id)
+
+        if voc is None:
+            print("no vocabulary found", file=sys.stderr)
+            sys.exit(1)
+
+        for word in voc.words:
+            word_id = voc.word_id(word)
+            print('%4d %30s %30s' % (word_id, word.word_output, word.word_input))
 
     else:
         assert False

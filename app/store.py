@@ -320,10 +320,10 @@ class Database:
 
         return ret
 
-    def get_vocabulary(self, user: User, voc_id: int) -> Vocabulary:
+    def get_vocabulary(self, user: Optional[User], voc_id: int) -> Optional[Vocabulary]:
         vocs = self.list_vocabularies(user)
 
-        return vocs[voc_id]
+        return vocs.get(voc_id)
 
     def vocabulary_stats(self, voc: Vocabulary) -> Optional[VocabularyStats]:
         voc_id = voc.id
@@ -380,7 +380,12 @@ class Database:
         return vocs
 
     def list_vocabularies(self, user: User) -> Dict[int, Vocabulary]:
-        return self.list_vocabularies_for(user.languages_spoken)
+        languages_spoken = None
+
+        if user is not None:
+            languages_spoken = user.languages_spoken
+
+        return self.list_vocabularies_for(languages_spoken)
 
 
 def load_database(name: str) -> Database:

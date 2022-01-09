@@ -221,6 +221,10 @@ class TestStore(unittest.TestCase):
 
         self.assertEqual(self.new_voc.words, voc.words)
 
+        self.assertIsNone(self.db.get_vocabulary(None, 2))
+        self.assertEqual([self.word1, self.word2],
+                         self.db.get_vocabulary(None, 1).words)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)
