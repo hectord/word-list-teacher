@@ -251,6 +251,18 @@ class TestStore(unittest.TestCase):
         self.assertTrue(word_attempt.success)
         self.db.last_session(self.user, new_voc)
 
+    def test_remove_vocabulary(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        self.db.create_new_session(self.user, self.new_voc)
+        session = self.db.last_session(self.user, self.new_voc)
+        session.guess(self.word1, self.word1.word_output)
+
+        self.db.remove_vocabulary(self.new_voc)
+
+        self.assertEqual({}, self.db.list_vocabularies(None))
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)

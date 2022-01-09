@@ -117,8 +117,8 @@ if __name__ == '__main__':
     dbparser.add_argument('database', help='database path', nargs=1)
     db_subparser = dbparser.add_subparsers(dest='db_cmd', required=True)
 
-    load_subparser = db_subparser.add_parser('load')
-    load_subparser.add_argument('files', help='words to load', nargs='+')
+    add_vocabulary_subparser = db_subparser.add_parser('add-vocabulary')
+    add_vocabulary_subparser.add_argument('files', help='words to load', nargs='+')
 
     create_user_subparser = db_subparser.add_parser('create-user')
     create_user_subparser.add_argument('username', help='new username', nargs=1)
@@ -127,6 +127,9 @@ if __name__ == '__main__':
     db_subparser.add_parser('list-vocabularies')
     list_words_subparser = db_subparser.add_parser('list-words')
     list_words_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
+
+    remove_vocabulary_subparser = db_subparser.add_parser('remove-vocabulary')
+    remove_vocabulary_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
     db_subparser.add_parser('init')
 
@@ -148,7 +151,7 @@ if __name__ == '__main__':
             all_words.add(vocabulary)
 
         learn(set(files), all_words)
-    elif args.db_cmd == 'load':
+    elif args.db_cmd == 'add-vocabulary':
         files = args.files
         database = args.database[0]
         database = load_database(database)
@@ -203,6 +206,21 @@ if __name__ == '__main__':
         for word in voc.words:
             word_id = voc.word_id(word)
             print('%4d %30s %30s' % (word_id, word.word_output, word.word_input))
+
+    elif args.db_cmd == 'remove-vocabulary':
+        database = args.database[0]
+        database = load_database(database)
+
+        args = vars(args)
+        voc_id = args['voc-id'][0]
+
+        voc = database.get_vocabulary(None, voc_id)
+
+        if voc is None:
+            print("no vocabulary found", file=sys.stderr)
+            sys.exit(1)
+
+        database.remove_vocabulary(voc)
 
     else:
         assert False

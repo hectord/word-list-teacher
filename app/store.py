@@ -381,13 +381,31 @@ class Database:
 
         return vocs
 
-    def list_vocabularies(self, user: User) -> Dict[int, Vocabulary]:
+    def list_vocabularies(self, user: Optional[User]) -> Dict[int, Vocabulary]:
         languages_spoken = None
 
         if user is not None:
             languages_spoken = user.languages_spoken
 
         return self.list_vocabularies_for(languages_spoken)
+
+    def remove_vocabulary(self, voc: Vocabulary):
+        voc_id = voc.id
+
+        for db_word in (DbWord
+                        .select()
+                        .where(DbWord.vocabulary == voc_id)):
+            DbWordAttempt.delete().where(DbWordAttempt.word == db_word).execute()
+        DbWord.delete().where(DbWord.vocabulary == voc_id).execute()
+
+        # for now we expect that a session has only one vocabulary
+        for db_voc_session in (DbVocabularySession
+                               .select()
+                               .where(DbVocabularySession.vocabulary == voc_id)):
+            DbSession.delete().where(DbSession.id == db_voc_session.session.id).execute()
+        DbVocabularySession.delete().where(DbVocabularySession.vocabulary == voc_id).execute()
+
+        DbVocabulary.delete().where(DbVocabulary.id == voc_id).execute()
 
 
 def load_database(name: str) -> Database:
