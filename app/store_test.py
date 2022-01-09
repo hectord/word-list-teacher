@@ -225,6 +225,32 @@ class TestStore(unittest.TestCase):
         self.assertEqual([self.word1, self.word2],
                          self.db.get_vocabulary(None, 1).words)
 
+    def test_same_name_several_times(self):
+
+        word1 = Word(word_input='fr_1',
+                     word_output='de_1',
+                     directive=None)
+        word2 = Word(word_input='fr_1',
+                     word_output='de_1',
+                     directive='#name')
+        words = [word1, word2]
+
+        new_voc = Vocabulary(word1, words,
+                             input_language='fr',
+                             output_language='de')
+        self._create_user()
+
+        self.db.create_vocabulary(new_voc)
+
+        self.db.create_new_session(self.user, new_voc)
+        session = self.db.last_session(self.user, new_voc)
+
+        word_attempt = session.guess(word2, word2.word_output)
+        self.db.add_word(session, word_attempt)
+
+        self.assertTrue(word_attempt.success)
+        self.db.last_session(self.user, new_voc)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)

@@ -159,6 +159,7 @@ class Database:
                      word: Word) -> Optional[DbWord]:
 
         word_input, word_output = word.word_input, word.word_output
+        directive = word.directive
 
         if session.is_flipped:
             word_input, word_output = word_output, word_input
@@ -169,7 +170,8 @@ class Database:
                     .join(DbSession)
                     .where(DbSession.id == session.id)
                     .where(DbWord.word_input == word_input)
-                    .where(DbWord.word_output == word_output)):
+                    .where(DbWord.word_output == word_output)
+                    .where(DbWord.directive == directive)):
             return row
 
         assert False
