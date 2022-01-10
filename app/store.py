@@ -404,16 +404,39 @@ class Database:
 
         DbVocabulary.delete().where(DbVocabulary.id == voc_id).execute()
 
-    def _create_db_word(self, voc: DbVocabulary, word: Word):
-        DbWord.create(vocabulary=voc,
-                      word_input=word.word_input,
-                      word_output=word.word_output,
-                      directive=word.directive)
+    def _create_db_word(self, voc: DbVocabulary, word: Word) -> DbWord:
+        return DbWord.create(vocabulary=voc,
+                             word_input=word.word_input,
+                             word_output=word.word_output,
+                             directive=word.directive)
 
     def add_word(self, voc: Vocabulary, word: Word):
         db_voc = DbVocabulary.get(voc.id)
 
-        self._create_db_word(db_voc, word)
+        db_word = self._create_db_word(db_voc, word)
+
+        voc.add_word(word, db_word.id)
+
+    def update_word(self, voc: Vocabulary, word: Word,
+                    word_input: str = None,
+                    word_output: str = None,
+                    directive: str = None):
+
+        if word_input is None:
+            word_input = word.word_input
+
+        if word_output is None:
+            word_output = word.word_output
+
+        if directive is None:
+            directive = word.directive
+
+        word_id = voc.word_id(word)
+        assert word_id is not None
+
+        DbWord.update(word_input=word_input,
+                      word_output=word_output,
+                      directive=directive).where(DbWord.id == word_id).execute()
 
 
 def load_database(name: str) -> Database:

@@ -131,6 +131,13 @@ if __name__ == '__main__':
     remove_vocabulary_subparser = db_subparser.add_parser('remove-vocabulary')
     remove_vocabulary_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
+    remove_word_subparser = db_subparser.add_parser('update-word')
+    remove_word_subparser.add_argument('voc-id', nargs=1, type=int)
+    remove_word_subparser.add_argument('word-id', nargs=1, type=int)
+    remove_word_subparser.add_argument('--word-input', nargs='?')
+    remove_word_subparser.add_argument('--word-output', nargs='?')
+    remove_word_subparser.add_argument('--directive', nargs='?')
+
     add_word_subparser = db_subparser.add_parser('add-word')
     add_word_subparser.add_argument('voc-id', nargs=1, type=int)
     add_word_subparser.add_argument('word-input', nargs=1)
@@ -246,6 +253,34 @@ if __name__ == '__main__':
                     word_output=word_output,
                     directive=None)
         database.add_word(voc, word)
+
+    elif args.db_cmd == 'update-word':
+        database = args.database[0]
+        database = load_database(database)
+
+        args = vars(args)
+        voc_id = args['voc-id'][0]
+        word_id = args['word-id'][0]
+        word_input = args['word_input'] if args['word_input'] else None
+        word_output = args['word_output'] if args['word_output'] else None
+        directive = args['directive'] if args['directive'] else None
+
+        voc = database.get_vocabulary(None, voc_id)
+
+        if voc is None:
+            print("no vocabulary found", file=sys.stderr)
+            sys.exit(1)
+
+        word = voc.word(word_id)
+
+        if word is None:
+            print("no word found", file=sys.stderr)
+            sys.exit(1)
+
+        database.update_word(voc, word,
+                             word_input=word_input,
+                             word_output=word_output,
+                             directive=directive)
 
     else:
         assert False

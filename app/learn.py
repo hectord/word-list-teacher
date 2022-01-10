@@ -153,6 +153,11 @@ class Vocabulary:
         self._input_language = input_language
         self._output_language = output_language
 
+    def add_word(self, word: Word, word_id: int):
+        self._words.append(word)
+        self._word_ids[word] = word_id
+        self._similar_words[word.key].add(word)
+
     @property
     def is_flipped(self) -> bool:
         return self._flipped

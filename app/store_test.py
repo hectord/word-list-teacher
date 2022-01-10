@@ -271,8 +271,19 @@ class TestStore(unittest.TestCase):
                           word_output='de_3',
                           directive=None)
 
-
         self.db.add_word(self.new_voc, self.word3)
+
+        self.db.update_word(self.new_voc, self.word3,
+                            word_input='fr_4',
+                            word_output='de_4',
+                            directive='#name')
+
+        vocs = self.db.list_vocabularies(None)
+        new_word = Word(word_input='fr_4',
+                        word_output='de_4',
+                        directive='#name')
+
+        self.assertIn(new_word, vocs[self.new_voc.id].words)
 
 
 if __name__ == '__main__':
