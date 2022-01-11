@@ -141,21 +141,22 @@ class Vocabulary:
                  output_language: str = None,
                  flipped: bool = False):
         self._name = name
-        self._words = words or []
+        self._words = []
 
         self._similar_words = defaultdict(set)
-        for word in self._words:
-            self._similar_words[word.key].add(word)
-
         self._id = None
         self._word_ids = {}
         self._flipped = flipped
         self._input_language = input_language
         self._output_language = output_language
 
-    def add_word(self, word: Word, word_id: int):
+        for word in words or []:
+            self.add_word(word)
+
+    def add_word(self, word: Word, word_id: Optional[int] = None):
         self._words.append(word)
-        self._word_ids[word] = word_id
+        if word_id is not None:
+            self._word_ids[word] = word_id
         self._similar_words[word.key].add(word)
 
     @property

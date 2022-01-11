@@ -230,7 +230,7 @@ class Database:
         return self.load_session(session_to_load.id)
 
     def load_session(self, session_id: int) -> Session:
-        v = Vocabulary(None, set())
+        v = Vocabulary(None, [])
 
         db_session = DbSession.get(session_id)
         flipped = False
@@ -311,11 +311,11 @@ class Database:
         input_language = voc.input_language.code
         output_language = voc.output_language.code
 
-        ret = Vocabulary(name, words, input_language, output_language)
+        ret = Vocabulary(name, [], input_language, output_language)
         ret.set_id(voc.id)
 
         for word, word_id in word_ids.items():
-            ret.set_word_id(word, word_id)
+            ret.add_word(word, word_id)
 
         return ret
 
