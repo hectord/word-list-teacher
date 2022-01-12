@@ -1,6 +1,8 @@
 
 from collections import defaultdict
-from store import DbWordAttempt, load_database
+from store import DbWordAttempt, load_database, DbSession, DbUser
+
+USER = 'user'
 
 
 if __name__ == '__main__':
@@ -8,7 +10,12 @@ if __name__ == '__main__':
 
     attempts_by_word = defaultdict(list)
 
-    for a in DbWordAttempt.select().order_by(DbWordAttempt.time):
+    for a in (DbWordAttempt
+              .select()
+              .join(DbSession)
+              .join(DbUser)
+              .where(DbUser.email == USER)
+              .order_by(DbWordAttempt.time)):
         attempts_by_word[a.word].append(a)
 
     print(f'word count={len(attempts_by_word)}')
