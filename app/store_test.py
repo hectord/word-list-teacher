@@ -285,6 +285,28 @@ class TestStore(unittest.TestCase):
 
         self.assertIn(new_word, vocs[self.new_voc.id].words)
 
+    def test_save_same_words_twice(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        session_id = self.db.create_new_session(self.user, self.new_voc)
+        self.assertIsNotNone(session_id)
+
+        session = self.db.last_session(self.user, self.new_voc)
+        self.assertEqual(session_id.id, session.id)
+
+        first_word = session.current_word
+
+        word_attempt = session.guess(session.current_word,
+                                     session.current_word.word_output)
+
+        self.db.add_word_attempt(session, word_attempt)
+        self.db.add_word_attempt(session, word_attempt)
+
+        session2 = self.db.last_session(self.user, self.new_voc)
+
+        self.assertEqual(2, len(session2.attempts))
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)

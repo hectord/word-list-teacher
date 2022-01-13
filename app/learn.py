@@ -314,7 +314,8 @@ class Session:
             word = attempt.word
 
             if attempt.success:
-                self._nok_words.remove(word)
+                if word in self._nok_words:
+                    self._nok_words.remove(word)
             else:
                 self._error_count_by_word[word] += 1
 
