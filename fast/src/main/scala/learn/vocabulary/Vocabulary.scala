@@ -11,6 +11,23 @@ case class Word(
   output: String,
   directive: Option[String] = None)
 {
+  private def filter(value: String): (String, Option[String]) = {
+    val stringWithHint = raw"([^\(]*)\((.*)\)".r
+
+    value match {
+      case stringWithHint(string, hint) => (string.strip, Some(hint))
+      case string => (string, None)
+    }
+  }
+
+  def accepts(output: String): Boolean = {
+    output.filter(_ != '|').toLowerCase() == wordOutput
+  }
+
+  def wordInput: String = filter(input)._1
+  def wordOutput: String = filter(output)._1
+  def hintInput: Option[String] = filter(input)._2
+  def hintOutput: Option[String] = filter(output)._2
 }
 
 
@@ -31,18 +48,18 @@ case class Vocabulary(_words: Set[Word] = Set())
         if(splitLine.length != 2)
           throw new InvalidVocabulary(s"invalid $line")
 
-        val word_output = splitLine(0)
-        val word_input = splitLine(1)
+        val wordOutput = splitLine(0)
+        val wordInput = splitLine(1)
 
-        if(word_output(0) == '#') {
-          val (directive, new_word_output) = word_output.span(x => !x.isWhitespace)
+        if(wordOutput(0) == '#') {
+          val (directive, newWordOutput) = wordOutput.span(x => !x.isWhitespace)
 
-          List(new Word(word_input,
-                        new_word_output.trim(),
+          List(new Word(wordInput,
+                        newWordOutput.trim(),
                         Some(directive)))
         } else {
-          List(new Word(word_input,
-                        word_output))
+          List(new Word(wordInput,
+                        wordOutput))
         }
 
       }
