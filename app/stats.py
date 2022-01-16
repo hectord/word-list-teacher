@@ -1,12 +1,18 @@
+# -*- coding: utf-8 -*-
+
+import argparse
 
 from collections import defaultdict
 from store import DbWordAttempt, load_database, DbSession, DbUser
 
-USER = 'user'
-
 
 if __name__ == '__main__':
     load_database('learn.db')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('user', nargs='?')
+
+    args = parser.parse_args()
 
     attempts_by_word = defaultdict(list)
 
@@ -14,7 +20,7 @@ if __name__ == '__main__':
               .select()
               .join(DbSession)
               .join(DbUser)
-              .where(DbUser.email == USER)
+              .where(DbUser.email == args.user)
               .order_by(DbWordAttempt.time)):
         attempts_by_word[a.word].append(a)
 
