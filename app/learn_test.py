@@ -93,6 +93,22 @@ class LearnTest(unittest.TestCase):
 
         self.assertTrue(words.is_finished)
 
+    def test_filter_word(self):
+        word = Word(word_output='abc (1)',
+                    word_input='def (2)',
+                    directive=None)
+
+        self.assertTrue(word.accepts('abc'))
+        self.assertEqual('abc (1)', word.word_output)
+        self.assertEqual('def (2)', word.word_input)
+
+        complex_word = Word(word_output='die (other) Umweltverschmutzung (-en) (1)',
+                            word_input='def (2)',
+                            directive=None)
+
+        self.assertTrue(complex_word.accepts('die Umweltverschmutzung'))
+        self.assertEqual('abc (1)', word.word_output)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)

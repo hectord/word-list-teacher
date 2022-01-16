@@ -53,12 +53,16 @@ class User:
     languages_spoken: Set[Language]
 
 
+
+
 def word_filter(word):
+    REMOVE_PARENTHESIS = re.compile('\s*\([^)]*\)\s*')
+
     word = word.lower()
     word = word.replace('|', '').replace('*', '')
 
-    if '(' in word:
-        word = re.sub('\s*\([^)]*\)$', '', word)
+    while REMOVE_PARENTHESIS.sub(' ', word) != word:
+        word = REMOVE_PARENTHESIS.sub(' ', word)
 
     return word.strip()
 
