@@ -303,6 +303,7 @@ class VocabularyStats:
 
 
 class Session:
+    SKIP_LAST_WORDS_COUNT = 4
 
     def __init__(self,
                  attempts: List[WordAttempt],
@@ -352,9 +353,15 @@ class Session:
 
         if self._nok_words:
             possible_words = list(self._nok_words)
-            if (self._current_word is not None and
-                    possible_words != [self._current_word]):
-                possible_words.remove(self._current_word)
+
+            for attempt in self._attempts[:-self.SKIP_LAST_WORDS_COUNT:-1]:
+
+                if len(possible_words) == 1:
+                    break
+
+                if attempt.word in possible_words:
+                    possible_words.remove(attempt.word)
+
             self._current_word = random.choice(possible_words)
         else:
             self._current_word = None
