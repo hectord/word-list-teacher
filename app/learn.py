@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from enum import Enum
+from typing import TextIO
 import re
 from typing import List, Dict, Tuple, Set, Generator, Optional
 from collections import defaultdict
@@ -257,33 +258,32 @@ class Vocabulary:
         return line[i:].strip()
 
     @staticmethod
-    def load(filename: str):
+    def load(file_input: TextIO):
         words = []
         name = None
-        from_language = None
-        to_language = None
+        input_language = None
+        output_language = None
 
-        with open(filename, 'r') as f:
-            for line in f.readlines():
-                line = line.strip()
+        for line in file_input.readlines():
+            line = line.strip()
 
-                if not line:
-                    continue
+            if not line:
+                continue
 
-                directive = Vocabulary._directive(line)
+            directive = Vocabulary._directive(line)
 
-                if directive == '#input':
-                    input_language = Vocabulary._after_directive(line)
-                elif directive == '#output':
-                    output_language = Vocabulary._after_directive(line)
-                else:
-                    if directive == '#name':
-                        line = Vocabulary._after_directive(line)
+            if directive == '#input':
+                input_language = Vocabulary._after_directive(line)
+            elif directive == '#output':
+                output_language = Vocabulary._after_directive(line)
+            else:
+                if directive == '#name':
+                    line = Vocabulary._after_directive(line)
 
-                    word = Word.load(line, directive)
-                    if directive == '#name':
-                        name = word
-                    words.append(word)
+                word = Word.load(line, directive)
+                if directive == '#name':
+                    name = word
+                words.append(word)
 
         return Vocabulary(name, words,
                           input_language,

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from io import StringIO
 import unittest
 
 from learn import Word, Vocabulary, Session
@@ -108,6 +109,33 @@ class LearnTest(unittest.TestCase):
 
         self.assertTrue(complex_word.accepts('die Umweltverschmutzung'))
         self.assertEqual('abc (1)', word.word_output)
+
+    def test_load_vocabulary(self):
+        expected_word = Word(word_output='abc',
+                             word_input='def',
+                             directive=None)
+        voc = Vocabulary.load(StringIO('abc;def'))
+
+        self.assertEqual([expected_word],
+                         voc.words)
+        self.assertEqual(None, voc.input_language)
+        self.assertEqual(None, voc.output_language)
+
+    def test_load_vocabulary_with_language(self):
+        expected_word = Word(word_output='abc',
+                             word_input='def',
+                             directive=None)
+        voc_text = '''
+        #input fr
+        #output de
+        abc;def
+        '''
+
+        voc = Vocabulary.load(StringIO(voc_text))
+        self.assertEqual([expected_word],
+                         voc.words)
+        self.assertEqual('fr', voc.input_language)
+        self.assertEqual('de', voc.output_language)
 
 
 if __name__ == '__main__':
