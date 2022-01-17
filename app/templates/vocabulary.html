@@ -5,7 +5,10 @@
 {% block body %}
 
   <div class="center">
-    <h1>Vocabulary</h1>
+    <div class="title-bar">
+      <span class="title">Vocabulary</span><a href="/new_session?voc_id={{ voc_id }}"><span class="title-action">New</span></a>
+    </div>
+
 
     {% for word in voc.words %}
       <div class="words-list">

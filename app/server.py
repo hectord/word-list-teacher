@@ -97,7 +97,8 @@ async def index(request: Request,
         {
             'request': request,
             'voc': voc,
-            'stats': stats
+            'stats': stats,
+            'voc_id': id
         },
     )
 
