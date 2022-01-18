@@ -6,7 +6,7 @@
 
   <div class="center">
     <div class="title-bar">
-      <span class="title">Vocabulary</span><a href="/new_session?voc_id={{ voc_id }}"><span class="title-action">New</span></a>
+      <span class="title">Vocabulary</span><a href="/new_session?voc_id={{ voc_id }}"><span class="title-action">New</span></a>{% if unfinished_session %}<a href="/learn?session_id={{ unfinished_session.id }}"><span class="title-action">Resume</span></a>{% endif %}
     </div>
 
 

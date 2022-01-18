@@ -92,14 +92,21 @@ async def index(request: Request,
     voc = db.get_vocabulary(user, id)
     stats = db.vocabulary_stats(voc)
 
+    session = db.last_session(user, voc)
+    unfinished_session = None
+    if session is not None and not session.is_finished:
+        unfinished_session = session
+
     return TEMPLATES.TemplateResponse(
         "vocabulary.html",
         {
             'request': request,
             'voc': voc,
             'stats': stats,
-            'voc_id': id
+            'voc_id': id,
+            'unfinished_session': unfinished_session
         },
+        headers={'Cache-Control': 'no-store'}
     )
 
 @app.get("/index")
