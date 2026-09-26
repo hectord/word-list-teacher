@@ -159,7 +159,8 @@ if __name__ == '__main__':
         all_words = Vocabulary()
 
         for filename in files:
-            vocabulary = Vocabulary.load(filename)
+            with open(filename) as f:
+                vocabulary = Vocabulary.load(f)
             all_words.add(vocabulary)
 
         learn(set(files), all_words)
@@ -169,7 +170,8 @@ if __name__ == '__main__':
         database = load_database(database)
 
         for filename in files:
-            vocabulary = Vocabulary.load(filename)
+            with open(filename) as f:
+                vocabulary = Vocabulary.load(f)
             database.create_vocabulary(vocabulary)
 
     elif args.db_cmd == 'create-user':

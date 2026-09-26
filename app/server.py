@@ -98,9 +98,8 @@ async def index(request: Request,
         unfinished_session = session
 
     return TEMPLATES.TemplateResponse(
-        "vocabulary.html",
+        request, "vocabulary.html",
         {
-            'request': request,
             'voc': voc,
             'stats': stats,
             'voc_id': id,
@@ -138,9 +137,8 @@ async def index(request: Request, user: User = Depends(get_user)):
         vocabularies.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
 
     return TEMPLATES.TemplateResponse(
-        "index.html",
+        request, "index.html",
         {
-            'request': request,
             'vocabularies_by_languages': vocabularies_by_languages,
             'session_by_vocabulary': session_by_vocabulary,
             'percentage_by_vocabulary': percentage_by_vocabulary
@@ -176,9 +174,8 @@ async def learn(request: Request,
                                word_id=vocabulary.word_id(current_word))
 
     ret = TEMPLATES.TemplateResponse(
-        "learn.html",
+        request, "learn.html",
         {
-            'request': request,
             'session': session,
             'first_word': first_word,
         },
