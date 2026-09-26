@@ -1,6 +1,5 @@
 .git
 .github
-.circleci
 myenv
 .venv
 __pycache__
