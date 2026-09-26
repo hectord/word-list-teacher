@@ -128,6 +128,9 @@ if __name__ == '__main__':
     list_words_subparser = db_subparser.add_parser('list-words')
     list_words_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
+    list_sections_subparser = db_subparser.add_parser('list-sections')
+    list_sections_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
+
     remove_vocabulary_subparser = db_subparser.add_parser('remove-vocabulary')
     remove_vocabulary_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
@@ -205,6 +208,21 @@ if __name__ == '__main__':
 
         for voc_id, voc in database.list_vocabularies_for(None).items():
             print(voc_id, voc)
+    elif args.db_cmd == 'list-sections':
+        database = args.database[0]
+        database = load_database(database)
+
+        voc_id = vars(args)['voc-id'][0]
+
+        voc = database.get_vocabulary(None, voc_id)
+
+        if voc is None:
+            print("no vocabulary found", file=sys.stderr)
+            sys.exit(1)
+
+        for section in voc.sections:
+            print('%2d %s' % (len(section.vocabulary), section.name))
+
     elif args.db_cmd == 'list-words':
         database = args.database[0]
         database = load_database(database)

@@ -137,6 +137,12 @@ class WordAttempt:
     time: datetime
 
 
+@dataclass(frozen=True)
+class Section:
+    name: str
+    vocabulary: 'Vocabulary'
+
+
 class Vocabulary:
 
     def __init__(self,
@@ -144,9 +150,11 @@ class Vocabulary:
                  words: List[Word] = None,
                  input_language: str = None,
                  output_language: str = None,
-                 flipped: bool = False):
+                 flipped: bool = False,
+                 sections: List[Optional[str]] = None):
         self._name = name
         self._words = []
+        self._word_sections = []
 
         self._similar_words = defaultdict(set)
         self._id = None
@@ -155,11 +163,15 @@ class Vocabulary:
         self._input_language = input_language
         self._output_language = output_language
 
-        for word in words or []:
-            self.add_word(word)
+        for i, word in enumerate(words or []):
+            section = sections[i] if sections is not None else None
+            self.add_word(word, section=section)
 
-    def add_word(self, word: Word, word_id: Optional[int] = None):
+    def add_word(self, word: Word,
+                 word_id: Optional[int] = None,
+                 section: Optional[str] = None):
         self._words.append(word)
+        self._word_sections.append(section)
         if word_id is not None:
             self._word_ids[word] = word_id
         self._similar_words[word.key].add(word)
@@ -171,6 +183,55 @@ class Vocabulary:
     def similar_words(self, word: Word) -> Set[Word]:
         return self._similar_words[word.key]
 
+    def section_of(self, word: Word) -> Optional[str]:
+        try:
+            return self._word_sections[self._words.index(word)]
+        except ValueError:
+            return None
+
+    def section(self, name: str) -> Optional['Vocabulary']:
+        """Return a vocabulary restricted to one section (with word IDs)."""
+        words = []
+        sub_sections = []
+
+        for word, section in zip(self._words, self._word_sections):
+            if section == name:
+                words.append(word)
+                sub_sections.append(section)
+
+        if not words:
+            return None
+
+        voc = Vocabulary(self._name, words,
+                         self._input_language,
+                         self._output_language,
+                         self._flipped,
+                         sections=sub_sections)
+        voc.set_id(self._id)
+
+        for word in words:
+            word_id = self._word_ids.get(word)
+            if word_id is not None:
+                voc.set_word_id(word, word_id)
+
+        return voc
+
+    @property
+    def sections(self) -> List[Section]:
+        """Ordered list of non-empty sections (Section name + vocabulary)."""
+        result = []
+        seen = set()
+
+        for name in self._word_sections:
+            if name is None or name in seen:
+                continue
+            seen.add(name)
+            section_voc = self.section(name)
+            if section_voc is not None:
+                result.append(Section(name, section_voc))
+
+        return result
+
     def flip(self) -> 'Vocabulary':
         name = None if self._name is None else self._name.flip()
         words = []
@@ -181,7 +242,8 @@ class Vocabulary:
         voc = Vocabulary(name, words,
                          self.output_language,
                          self.input_language,
-                         not self.is_flipped)
+                         not self.is_flipped,
+                         sections=list(self._word_sections))
         voc.set_id(self._id)
 
         for word in self._words:
@@ -220,6 +282,7 @@ class Vocabulary:
 
     def add(self, other: 'Vocabulary'):
         self._words.extend(other._words)
+        self._word_sections.extend(other._word_sections)
         self._word_ids.update(other._word_ids)
 
         for key, words in other._similar_words.items():
@@ -266,9 +329,11 @@ class Vocabulary:
     @staticmethod
     def load(file_input: TextIO):
         words = []
+        word_sections = []
         name = None
         input_language = None
         output_language = None
+        current_section = None
 
         for line in file_input.readlines():
             line = line.strip()
@@ -282,6 +347,8 @@ class Vocabulary:
                 input_language = Vocabulary._after_directive(line)
             elif directive == '#output':
                 output_language = Vocabulary._after_directive(line)
+            elif directive == '#section':
+                current_section = Vocabulary._after_directive(line)
             else:
                 if directive == '#name':
                     line = Vocabulary._after_directive(line)
@@ -290,10 +357,12 @@ class Vocabulary:
                 if directive == '#name':
                     name = word
                 words.append(word)
+                word_sections.append(current_section)
 
         return Vocabulary(name, words,
                           input_language,
-                          output_language)
+                          output_language,
+                          sections=word_sections)
 
 
 class VocabularyStats:

@@ -96,10 +96,24 @@ async def index(request: Request,
     unknown_count = sum(
         1 for word in voc.words if stats.errors_prob_for(word) > 40.0)
 
-    session = db.last_session(user, voc)
+    sections = []
+    for section in voc.sections:
+        resume_session = db.last_session(user, voc, section=section.name)
+        resume = None
+        if resume_session is not None and not resume_session.is_finished:
+            resume = resume_session
+        sections.append({
+            'name': section.name,
+            'size': len(section.vocabulary),
+            'resume': resume,
+        })
+
+    whole_session = db.last_session(user, voc, section='')
     unfinished_session = None
-    if session is not None and not session.is_finished:
-        unfinished_session = session
+    if whole_session is not None and not whole_session.is_finished:
+        unfinished_session = whole_session
+
+    sections_by_index = [voc.section_of(word) for word in voc.words]
 
     return TEMPLATES.TemplateResponse(
         request, "vocabulary.html",
@@ -110,6 +124,8 @@ async def index(request: Request,
             'voc_id': id,
             'word_count': word_count,
             'unknown_count': unknown_count,
+            'sections': sections,
+            'sections_by_index': sections_by_index,
             'unfinished_session': unfinished_session
         },
         headers={'Cache-Control': 'no-store'}
@@ -162,11 +178,18 @@ async def index(request: Request, user: User = Depends(get_user)):
 @app.get("/new_session")
 async def new_session(request: Request,
                       voc_id: int,
+                      section: Optional[str] = None,
                       user: User = Depends(get_user)):
 
     voc = db.get_vocabulary(user, voc_id)
 
-    session = db.create_new_session(user, voc)
+    try:
+        session = db.create_new_session(user, voc, section=section)
+    except DbException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="section not found",
+        )
 
     return RedirectResponse(url=f'/learn?session_id={session.id}')
 

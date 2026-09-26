@@ -170,6 +170,90 @@ class TestStore(unittest.TestCase):
 
         self.db.add_word_attempt(session_fetched, attempt)
 
+    def _create_sectioned_vocabulary(self):
+        self.sec_words = [Word(word_input='en_1', word_output='fr_1',
+                               directive=None),
+                          Word(word_input='en_2', word_output='fr_2',
+                               directive=None),
+                          Word(word_input='en_3', word_output='fr_3',
+                               directive=None)]
+
+        self.sec_voc = Vocabulary(self.sec_words[0], self.sec_words,
+                                  input_language='en',
+                                  output_language='fr',
+                                  sections=['A', 'A', 'B'])
+
+        return self.db.create_vocabulary(self.sec_voc)
+
+    def test_section_persistence(self):
+        voc_id = self._create_sectioned_vocabulary()
+        self._create_user({Language.ENGLISH})
+
+        voc = self.db.get_vocabulary(self.user, voc_id)
+
+        self.assertEqual(['A', 'B'], [s.name for s in voc.sections])
+        self.assertEqual('A', voc.section_of(voc.words[0]))
+        self.assertEqual('B', voc.section_of(voc.words[2]))
+
+    def test_section_session(self):
+        voc_id = self._create_sectioned_vocabulary()
+        self._create_user({Language.ENGLISH})
+
+        voc = self.db.get_vocabulary(self.user, voc_id)
+
+        with self.assertRaises(DbException):
+            self.db.create_new_session(self.user, voc, section='Nope')
+
+        whole_session = self.db.create_new_session(self.user, voc)
+        section_session = self.db.create_new_session(self.user, voc,
+                                                     section='A')
+
+        self.assertEqual(3, len(whole_session.vocabulary))
+        self.assertEqual(2, len(section_session.vocabulary))
+        self.assertEqual(['A', 'A'],
+                         [voc.section_of(w) for w in section_session.vocabulary.words])
+
+        self.assertEqual(whole_session.id,
+                         self.db.last_session(self.user, voc, section='').id)
+        self.assertEqual(section_session.id,
+                         self.db.last_session(self.user, voc, section='A').id)
+
+        attempt = whole_session.guess(whole_session.current_word,
+                                      whole_session.current_word.word_output)
+        self.db.add_word_attempt(whole_session, attempt)
+        attempt = section_session.guess(section_session.current_word,
+                                        section_session.current_word.word_output)
+        self.db.add_word_attempt(section_session, attempt)
+
+        reloaded = self.db.load_session(section_session.id)
+        self.assertEqual(2, len(reloaded.vocabulary))
+        self.assertEqual(1, len(reloaded.attempts))
+        self.assertFalse(reloaded.is_finished)
+
+    def test_section_flipped(self):
+        voc_id = self._create_sectioned_vocabulary()
+        # user speaks French -> fr/en vocab is flipped
+        self._create_user({Language.FRENCH})
+
+        voc = self.db.get_vocabulary(self.user, voc_id)
+        self.assertTrue(voc.is_flipped)
+        self.assertEqual(['A', 'B'], [s.name for s in voc.sections])
+
+        section_session = self.db.create_new_session(self.user, voc,
+                                                     section='B')
+        self.assertTrue(section_session.is_flipped)
+        self.assertEqual(1, len(section_session.vocabulary))
+
+        attempt = section_session.guess(section_session.current_word,
+                                        section_session.current_word.word_output)
+        self.db.add_word_attempt(section_session, attempt)
+
+        reloaded = self.db.load_session(section_session.id)
+        self.assertTrue(reloaded.is_flipped)
+        self.assertEqual(1, len(reloaded.vocabulary))
+        self.assertEqual(1, len(reloaded.attempts))
+        self.assertTrue(reloaded.is_finished)
+
     def test_flipped_vocabulary(self):
         self._create_vocabulary()
         self._create_user({Language.GERMAN})
@@ -250,6 +334,37 @@ class TestStore(unittest.TestCase):
 
         self.assertTrue(word_attempt.success)
         self.db.last_session(self.user, new_voc)
+
+    def test_migration_adds_section_columns(self):
+        import os
+        import tempfile
+
+        import store as store_module
+
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        try:
+            raw = store_module.SqliteDatabase(path)
+            raw.execute_sql(
+                'CREATE TABLE dbword (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+                'vocabulary_id INTEGER NOT NULL, word_input VARCHAR(255) NOT NULL, '
+                'word_output VARCHAR(255) NOT NULL, directive VARCHAR(255))')
+            raw.execute_sql(
+                'CREATE TABLE dbvocabularysession (id INTEGER PRIMARY KEY AUTOINCREMENT, '
+                'session_id INTEGER NOT NULL, vocabulary_id INTEGER NOT NULL, '
+                'flipped INTEGER NOT NULL)')
+            raw.close()
+
+            load_database(path)
+
+            for table in ('dbword', 'dbvocabularysession'):
+                cursor = store_module.db.execute_sql(
+                    'PRAGMA table_info(%s)' % table)
+                columns = [row[1] for row in cursor.fetchall()]
+                self.assertIn('section', columns)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
 
     def test_remove_vocabulary(self):
         self._create_vocabulary()

@@ -53,6 +53,7 @@ class DbWord(Model):
     word_input = CharField()
     word_output = CharField()
     directive = CharField(null=True)
+    section = CharField(null=True)
 
     class Meta:
         database = db
@@ -72,6 +73,7 @@ class DbVocabularySession(Model):
     session = ForeignKeyField(DbSession, backref='vocabularies')
     vocabulary = ForeignKeyField(DbVocabulary, backref='sessions')
     flipped = BooleanField()
+    section = CharField(null=True)
 
     class Meta:
         database = db
@@ -135,20 +137,32 @@ class Database:
 
     def create_new_session(self,
                            user: User,
-                           voc: Vocabulary) -> Session:
+                           voc: Vocabulary,
+                           section: Optional[str] = None) -> Session:
+        scope_voc = voc
+        if section is not None:
+            section_voc = voc.section(section)
+            if section_voc is None:
+                raise DbException(f'section not found: {section}')
+            scope_voc = section_voc
+
         db_user = self._get_db_user(user)
-        new_session = Session([], voc)
+        new_session = Session([], scope_voc)
 
         new_db_session = DbSession.create(user=db_user.id,
                                           creation=datetime.now(),
-                                          finished=len(voc) == 0)
+                                          finished=len(scope_voc) == 0)
         new_session.set_id(new_db_session.id)
         DbVocabularySession.create(session=new_db_session,
-                                   vocabulary=voc.id,
-                                   flipped=voc.is_flipped)
-        current_db_word = self._get_db_word(new_session,
-                                            new_session.current_word)
+                                   vocabulary=scope_voc.id,
+                                   flipped=scope_voc.is_flipped,
+                                   section=section)
+
         db_session = DbSession.get(new_db_session.id)
+        current_db_word = None
+        if new_session.current_word is not None:
+            current_db_word = self._get_db_word(
+                new_session, new_session.current_word)
         db_session.current_word = current_db_word
         db_session.save()
 
@@ -164,14 +178,23 @@ class Database:
         if session.is_flipped:
             word_input, word_output = word_output, word_input
 
-        for row in (DbWord.select()
-                    .join(DbVocabulary)
-                    .join(DbVocabularySession)
-                    .join(DbSession)
-                    .where(DbSession.id == session.id)
-                    .where(DbWord.word_input == word_input)
-                    .where(DbWord.word_output == word_output)
-                    .where(DbWord.directive == directive)):
+        query = (DbWord.select()
+                 .join(DbVocabulary)
+                 .join(DbVocabularySession)
+                 .join(DbSession)
+                 .where(DbSession.id == session.id)
+                 .where(DbWord.word_input == word_input)
+                 .where(DbWord.word_output == word_output)
+                 .where(DbWord.directive == directive))
+
+        db_voc_session = (DbVocabularySession
+                          .select()
+                          .where(DbVocabularySession.session == session.id)
+                          .first())
+        if db_voc_session is not None and db_voc_session.section is not None:
+            query = query.where(DbWord.section == db_voc_session.section)
+
+        for row in query:
             return row
 
         assert False
@@ -205,7 +228,8 @@ class Database:
     def last_session(self,
                      user: User,
                      voc: Vocabulary,
-                     finished: bool = None) -> Optional[Session]:
+                     finished: bool = None,
+                     section: Optional[str] = None) -> Optional[Session]:
         db_user = self._get_db_user(user)
 
         if voc.id is None:
@@ -216,6 +240,12 @@ class Database:
                     .join(DbVocabularySession)
                     .where(DbSession.user == db_user)
                     .where(DbVocabularySession.vocabulary == voc.id))
+
+        if section == '':
+            # '' means: sessions whose scope is the whole vocabulary
+            sessions = sessions.where(DbVocabularySession.section.is_null())
+        elif section is not None:
+            sessions = sessions.where(DbVocabularySession.section == section)
 
         if finished is not None:
             sessions = sessions.where(DbSession.finished == finished)
@@ -234,6 +264,7 @@ class Database:
 
         db_session = DbSession.get(session_id)
         flipped = False
+        section = None
 
         for db_voc_session in (DbVocabularySession
                                .select()
@@ -242,10 +273,17 @@ class Database:
 
             if db_voc_session.flipped:
                 flipped = True
+            if db_voc_session.section is not None:
+                section = db_voc_session.section
             v.add(voc)
 
         if flipped:
             v = v.flip()
+
+        if section is not None:
+            section_voc = v.section(section)
+            if section_voc is not None:
+                v = section_voc
 
         attempts = []
 
@@ -284,7 +322,7 @@ class Database:
                                       output_language=output_language)
 
         for word in voc.words:
-            self._create_db_word(new_voc, word)
+            self._create_db_word(new_voc, word, voc.section_of(word))
 
         voc.set_id(new_voc.id)
         return new_voc.id
@@ -298,6 +336,7 @@ class Database:
         name = None
         words = []
         word_ids = {}
+        sections = []
 
         for word in voc.words:
             new_word = self._create_word_from(word)
@@ -307,15 +346,17 @@ class Database:
 
             word_ids[new_word] = word.id
             words.append(new_word)
+            sections.append(word.section)
 
         input_language = voc.input_language.code
         output_language = voc.output_language.code
 
-        ret = Vocabulary(name, [], input_language, output_language)
+        ret = Vocabulary(name, words, input_language, output_language,
+                         sections=sections)
         ret.set_id(voc.id)
 
         for word, word_id in word_ids.items():
-            ret.add_word(word, word_id)
+            ret.set_word_id(word, word_id)
 
         return ret
 
@@ -407,11 +448,13 @@ class Database:
 
         DbVocabulary.delete().where(DbVocabulary.id == voc_id).execute()
 
-    def _create_db_word(self, voc: DbVocabulary, word: Word) -> DbWord:
+    def _create_db_word(self, voc: DbVocabulary, word: Word,
+                        section: str = None) -> DbWord:
         return DbWord.create(vocabulary=voc,
                              word_input=word.word_input,
                              word_output=word.word_output,
-                             directive=word.directive)
+                             directive=word.directive,
+                             section=section)
 
     def add_word(self, voc: Vocabulary, word: Word):
         db_voc = DbVocabulary.get(voc.id)
@@ -442,11 +485,24 @@ class Database:
                       directive=directive).where(DbWord.id == word_id).execute()
 
 
+def _add_column_if_missing(table: str, column: str, definition: str):
+    cursor = db.execute_sql('PRAGMA table_info(%s)' % table)
+    columns = [row[1] for row in cursor.fetchall()]
+
+    if column not in columns:
+        db.execute_sql('ALTER TABLE %s ADD COLUMN %s %s'
+                       % (table, column, definition))
+
+
 def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
     db.create_tables([DbVocabulary, DbWord, DbUser,
                       DbVocabularySession, DbSession,
                       DbWordAttempt, DbLanguage, DbSpeak])
+
+    # migrate older databases which predate sections
+    _add_column_if_missing('dbword', 'section', 'varchar(255)')
+    _add_column_if_missing('dbvocabularysession', 'section', 'varchar(255)')
 
     return Database()

@@ -118,8 +118,54 @@ class LearnTest(unittest.TestCase):
 
         self.assertEqual([expected_word],
                          voc.words)
-        self.assertEqual(None, voc.input_language)
-        self.assertEqual(None, voc.output_language)
+
+    def _sectioned_vocabulary(self):
+        words = [Word(word_output=f'out_{i}',
+                      word_input=f'in_{i}',
+                      directive=None)
+                 for i in range(3)]
+        return Vocabulary(words[0], words, 'en', 'fr',
+                          sections=['A', 'A', 'B'])
+
+    def test_section_parsing(self):
+        content = ('#input en\n'
+                   '#output fr\n'
+                   '#section A\n'
+                   'en_1;fr_1\n'
+                   'en_2;fr_2\n'
+                   '#section B\n'
+                   'en_3;fr_3\n')
+        voc = Vocabulary.load(StringIO(content))
+
+        self.assertEqual(['A', 'B'], [s.name for s in voc.sections])
+        self.assertEqual(['en_1', 'en_2'],
+                         [w.word_output for w in voc.section('A').words])
+        self.assertEqual(['en_3'],
+                         [w.word_output for w in voc.section('B').words])
+        self.assertEqual('A', voc.section_of(voc.words[0]))
+        self.assertEqual('B', voc.section_of(voc.words[2]))
+        self.assertIsNone(voc.section('Nope'))
+
+    def test_section_keeps_word_ids(self):
+        voc = self._sectioned_vocabulary()
+
+        for i, word in enumerate(voc.words):
+            voc.set_word_id(word, i + 1)
+
+        section = voc.section('A')
+
+        self.assertEqual(2, len(section.words))
+        self.assertEqual({1, 2},
+                         {section.word_id(w) for w in section.words})
+        self.assertEqual(1, section.word_id(voc.words[0]))
+
+    def test_flip_keeps_sections(self):
+        voc = self._sectioned_vocabulary()
+        flipped = voc.flip()
+
+        self.assertEqual(['A', 'B'], [s.name for s in flipped.sections])
+        self.assertEqual('A', flipped.section_of(flipped.words[0]))
+        self.assertEqual(2, len(flipped.section('A').words))
 
     def test_load_vocabulary_with_language(self):
         expected_word = Word(word_output='abc',

@@ -187,6 +187,54 @@ a.signout:hover { text-decoration: underline; }
 
 .empty { color: #A08B7F; text-align: center; padding: 60px 0; }
 
+/* ---------- vocabulary page: sections ---------- */
+
+.sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #EDE3DB;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(80, 50, 30, 0.06);
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+.section-card:hover {
+  box-shadow: 0 6px 18px rgba(80, 50, 30, 0.10);
+  transform: translateY(-1px);
+}
+.section-card.all { border-color: #D9C6B8; background: #FDF8F4; }
+
+.section-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.section-name { font-size: 18px; color: #3B2F2A; }
+.section-count { font-size: 13px; color: #A08B7F; }
+
+.section-actions { display: flex; gap: 8px; }
+.section-actions .button { padding: 8px 16px; font-size: 14px; }
+
+.sec-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #F6EFEA;
+  color: #7A4B36;
+  font-size: 12px;
+  vertical-align: 2px;
+}
+
 /* ---------- vocabulary page: toolbar + word list ---------- */
 
 .toolbar {
