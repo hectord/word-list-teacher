@@ -3,6 +3,7 @@
 from enum import Enum
 from typing import TextIO
 import re
+import unicodedata
 from typing import List, Dict, Tuple, Set, Generator, Optional
 from collections import defaultdict
 from dataclasses import dataclass
@@ -56,16 +57,63 @@ class User:
 
 
 
-def word_filter(word):
-    REMOVE_PARENTHESIS = re.compile('\s*\([^)]*\)\s*')
+REMOVE_PARENTHESIS = re.compile(r'\s*\([^)]*\)\s*')
 
-    word = word.lower()
+APOSTROPHES = str.maketrans({
+    '\u2019': "'",   # ’
+    '\u2018': "'",   # ‘
+    '\u02bc': "'",   # ʼ
+    '\u2032': "'",   # ′
+})
+
+
+def _strip_accents(text: str) -> str:
+    decomposed = unicodedata.normalize('NFKD', text)
+    return ''.join(char for char in decomposed
+                   if not unicodedata.combining(char))
+
+
+def normalize(word: str, language: Optional[str] = None) -> str:
+    """
+    Normalize a word before comparing it with what the user typed.
+
+    Common rules: ignore case, leading/trailing spaces, apostrophe
+    variants, '*' and '|' markers, and parenthesised annotations
+    (e.g. the German plural "die Beschreibung (-en)").
+
+    Language specific rules (the language being typed):
+
+    * french - ignore accents and elision apostrophes with their
+      surrounding spaces ("avoir l’air" == "avoir l' air" == "avoir lair")
+    * german - accept "ss" for "ß" and "ae/oe/ue" for "ä/ö/ü",
+      so umlauts can be typed on a plain keyboard ("Groesse")
+    """
+    word = word.strip().lower()
+    word = word.translate(APOSTROPHES)
     word = word.replace('|', '').replace('*', '')
 
     while REMOVE_PARENTHESIS.sub(' ', word) != word:
         word = REMOVE_PARENTHESIS.sub(' ', word)
 
-    return word.strip()
+    word = re.sub(r'\s+', ' ', word).strip()
+
+    language = (language or '').lower()
+
+    if language == 'fr':
+        word = _strip_accents(word)
+        word = re.sub(r"\s*'\s*", '', word)
+    elif language == 'de':
+        word = (word.replace('ß', 'ss')
+                    .replace('ä', 'ae')
+                    .replace('ö', 'oe')
+                    .replace('ü', 'ue'))
+
+    # entries are often given with a trailing question mark / period
+    return word.rstrip('.,!?;:').strip()
+
+
+def word_filter(word):
+    return normalize(word)
 
 
 @dataclass(frozen=True)
@@ -101,8 +149,10 @@ class Word:
     def _simplified_word_output(self) -> str:
         return word_filter(self.word_output)
 
-    def accepts(self, word_output: str) -> bool:
-        return self._simplified_word_output == word_output.lower()
+    def accepts(self, word_output: str,
+                language: Optional[str] = None) -> bool:
+        return normalize(self.word_output, language) == \
+            normalize(word_output, language)
 
     @property
     def line(self) -> str:
@@ -286,6 +336,15 @@ class Vocabulary:
         return None
 
     def add(self, other: 'Vocabulary'):
+        # inherit the metadata when merging into an empty vocabulary
+        # (sessions are rebuilt from the database this way)
+        if self._input_language is None:
+            self._input_language = other._input_language
+        if self._output_language is None:
+            self._output_language = other._output_language
+        if self._id is None:
+            self._id = other._id
+
         self._words.extend(other._words)
         self._word_sections.extend(other._word_sections)
         self._word_ids.update(other._word_ids)
@@ -489,9 +548,11 @@ class Session:
             else:
                 return None
 
-        # find a word which matches
+        # find a word which matches (the answer is written in the
+        # vocabulary's output language, so use its comparison rules)
+        output_language = self.vocabulary.output_language
         for word in self.vocabulary.similar_words(current_word):
-            if word.accepts(word_output):
+            if word.accepts(word_output, output_language):
                 success = True
                 break
         else:

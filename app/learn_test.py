@@ -110,6 +110,58 @@ class LearnTest(unittest.TestCase):
         self.assertTrue(complex_word.accepts('die Umweltverschmutzung'))
         self.assertEqual('abc (1)', word.word_output)
 
+    def test_accepts_ignores_plural_and_spaces(self):
+        word = Word(word_output='die Beschreibung (-en)',
+                    word_input='description',
+                    directive=None)
+
+        self.assertTrue(word.accepts('die Beschreibung', 'de'))
+        self.assertTrue(word.accepts('  die Beschreibung  ', 'de'))
+        self.assertTrue(word.accepts('Die Beschreibung (-en)', 'de'))
+        self.assertFalse(word.accepts('die Erscheinung', 'de'))
+
+    def test_accepts_german_umlauts(self):
+        word = Word(word_output='die Größe (-n)',
+                    word_input='taille',
+                    directive=None)
+
+        self.assertTrue(word.accepts('die Größe', 'de'))
+        self.assertTrue(word.accepts('die Groesse', 'de'))
+        self.assertTrue(word.accepts('die groesse', 'de'))
+
+    def test_accepts_french_accents_and_apostrophes(self):
+        word = Word(word_output='être',
+                    word_input='sein',
+                    directive=None)
+        self.assertTrue(word.accepts('etre', 'fr'))
+        self.assertTrue(word.accepts('ÊTRE', 'fr'))
+
+        phrase = Word(word_output="avoir l'air",
+                      word_input='aussehen',
+                      directive=None)
+        self.assertTrue(phrase.accepts('avoir l’air', 'fr'))
+        self.assertTrue(phrase.accepts("avoir l' air", 'fr'))
+        self.assertTrue(phrase.accepts('avoir lair', 'fr'))
+        self.assertFalse(phrase.accepts('avoir', 'fr'))
+
+    def test_add_inherits_languages(self):
+        # sessions are rebuilt by merging into an empty vocabulary
+        merged = Vocabulary(None, [])
+        merged.add(self.voc)
+
+        self.assertEqual('fr', merged.input_language)
+        self.assertEqual('de', merged.output_language)
+
+    def test_guess_uses_output_language(self):
+        word = Word(word_output='die Beschreibung (-en)',
+                    word_input='description',
+                    directive=None)
+        vocabulary = Vocabulary(None, [word], 'fr', 'de')
+        session = Session([], vocabulary, word)
+
+        attempt = session.guess(word, 'die Beschreibung ')
+        self.assertTrue(attempt.success)
+
     def test_load_vocabulary(self):
         expected_word = Word(word_output='abc',
                              word_input='def',
