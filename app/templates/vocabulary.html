@@ -3,7 +3,7 @@
 {% block title %}Vocabulary{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=3">
+    <link rel="stylesheet" href="/static/pages.css?v=4">
     <script src="/static/vocabulary.js?v=3"></script>
 {% endblock %}
 
@@ -14,6 +14,7 @@
       <a class="back" href="/index">&larr; All vocabularies</a>
       <h1>{{ voc.name.word_input if voc.name else 'Vocabulary' }}</h1>
       <span class="subtitle">{{ voc.input_language or '?' }} → {{ voc.output_language or '?' }}</span>
+      <a class="nav-link" href="/scoreboard">Scoreboard</a>
     </div>
     <div class="voc-actions">
       <a class="button new" href="/new_session?voc_id={{ voc_id }}">New session</a>

@@ -2,9 +2,11 @@
 
 from collections import defaultdict
 from security import check_password, get_hashed_password
-from typing import Dict, Optional, Set
 from datetime import date, datetime
 from peewee import *
+
+# note: import typing after peewee (peewee shadows its own ``Tuple`` helper)
+from typing import Dict, List, Optional, Set, Tuple
 
 from learn import Vocabulary, Word, Session, WordAttempt
 from learn import Language, User, VocabularyStats
@@ -426,6 +428,36 @@ class Database:
             counts[vocabulary_id] += 1
 
         return dict(counts)
+
+    def known_word_counts_by_user(self) -> Dict[int, Dict[int, int]]:
+        """User id -> (vocabulary id -> words guessed correctly at least once)."""
+        known = defaultdict(lambda: defaultdict(int))
+        seen = set()
+
+        rows = (DbWordAttempt
+                .select(DbWordAttempt.word_id, DbWord.vocabulary_id,
+                        DbSession.user_id)
+                .join(DbWord)
+                .join(DbVocabulary)
+                .switch(DbWordAttempt)
+                .join(DbSession)
+                .where(DbWordAttempt.success == True)
+                .tuples())
+
+        for word_id, vocabulary_id, user_id in rows:
+            key = (user_id, word_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            known[user_id][vocabulary_id] += 1
+
+        return {user_id: dict(counts)
+                for user_id, counts in known.items()}
+
+    def list_users(self) -> List[Tuple[int, str]]:
+        """All users as (id, email) pairs."""
+        return [(db_user.id, db_user.email)
+                for db_user in DbUser.select().order_by(DbUser.id)]
 
     def list_vocabularies_for(self, languages: Optional[Set[Language]]) -> Dict[int, Vocabulary]:
         vocs = {}

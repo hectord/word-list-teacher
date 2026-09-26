@@ -196,6 +196,50 @@ async def index(request: Request, user: User = Depends(get_user)):
     )
 
 
+@app.get("/scoreboard")
+async def scoreboard(request: Request,
+                     user: User = Depends(get_user)):
+
+    vocabularies = db.list_vocabularies_for(None)
+    voc_sizes = {voc_id: len(voc) for voc_id, voc in vocabularies.items()}
+    total_words = sum(voc_sizes.values())
+
+    known_by_user = db.known_word_counts_by_user()
+
+    entries = []
+    for user_id, email in db.list_users():
+        per_vocabulary = known_by_user.get(user_id, {})
+        known = sum(per_vocabulary.get(voc_id, 0)
+                    for voc_id in voc_sizes)
+        percentage = (100 * known // total_words) if total_words else 0
+        entries.append({
+            'email': email,
+            'known': known,
+            'total': total_words,
+            'percentage': percentage,
+            'is_me': email == user.email,
+        })
+
+    entries.sort(key=lambda e: (e['percentage'], e['known']),
+                 reverse=True)
+
+    # bars are relative to the best user so they are readable at any scale
+    best = entries[0]['known'] if entries else 0
+    for entry in entries:
+        entry['bar_percentage'] = \
+            (100 * entry['known'] // best) if best else 0
+
+    return TEMPLATES.TemplateResponse(
+        request, "scoreboard.html",
+        {
+            'user': user,
+            'entries': entries,
+            'total_words': total_words,
+        },
+        headers={'Cache-Control': 'no-store'}
+    )
+
+
 @app.get("/new_session")
 async def new_session(request: Request,
                       voc_id: int,

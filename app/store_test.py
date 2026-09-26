@@ -377,6 +377,32 @@ class TestStore(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_known_word_counts_by_user(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        other = self.db.create_user('other@x.com', 'abc',
+                                    {Language.FRENCH})
+
+        def practice(user):
+            session = self.db.create_new_session(user, self.new_voc)
+            word = session.current_word
+            attempt = session.guess(word, word.word_output)
+            self.db.add_word_attempt(session, attempt)
+
+        practice(self.user)
+        practice(other)
+
+        users = self.db.list_users()
+        self.assertEqual(2, len(users))
+        user_ids = {email: user_id for user_id, email in users}
+        self.assertEqual({'test@hotmail.com', 'other@x.com'},
+                         set(user_ids))
+
+        counts = self.db.known_word_counts_by_user()
+        self.assertEqual(1, sum(counts[user_ids['test@hotmail.com']].values()))
+        self.assertEqual(1, sum(counts[user_ids['other@x.com']].values()))
+
     def test_migration_adds_section_columns(self):
         import os
         import tempfile

@@ -1,0 +1,67 @@
+/* Scoreboard page (/scoreboard) */
+
+.scoreboard-list {
+  background: #fff;
+  border: 1px solid #EDE3DB;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(80, 50, 30, 0.06);
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 180px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 24px;
+  border-bottom: 1px solid #F3EBE5;
+}
+.score-row:nth-child(even) { background: #FBF8F5; }
+.score-row:last-child { border-bottom: none; }
+
+.score-row.head {
+  background: #F6EFEA;
+  border-bottom: 1px solid #E8DBD2;
+  padding: 10px 24px;
+}
+.score-row.head .col {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #B4A398;
+}
+
+.score-row.me { background: #FDF3EE; }
+
+.col.rank { font-size: 16px; font-weight: 700; color: #A08B7F; }
+.col.rank.rank-1 { color: #C9962B; }
+.col.rank.rank-2 { color: #9A9A9A; }
+.col.rank.rank-3 { color: #B07A4A; }
+
+.col.user {
+  font-weight: 600;
+  color: #3B2F2A;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.col.pct { text-align: right; color: #6B5D55; font-size: 14px; }
+.col.bar .bar { width: 100%; }
+
+.badge-you {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #C75B39;
+  color: #fff;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  vertical-align: 1px;
+}
+
+@media (max-width: 700px) {
+  .score-row { grid-template-columns: 40px 1fr 150px; }
+  .col.bar { grid-column: 2 / -1; }
+}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Scoreboard{% endblock %}
+
+{% block header %}
+    <link rel="stylesheet" href="/static/pages.css?v=4">
+    <link rel="stylesheet" href="/static/scoreboard.css?v=4">
+{% endblock %}
+
+{% block body %}
+
+  <header class="page-header">
+    <div class="brand-line">
+      <a class="back" href="/index">&larr; All vocabularies</a>
+      <h1>Scoreboard</h1>
+      <span class="subtitle">overall progress of all users</span>
+    </div>
+    <div class="user-box">
+      <span class="user">{{ user.email }}</span>
+      <a class="signout" href="/logout">sign&nbsp;out</a>
+    </div>
+  </header>
+
+  <div class="center">
+
+    <div class="overall">
+      <div class="overall-info">
+        <span class="overall-title">{{ entries | length }} user(s)</span>
+        <span class="progress-stats">{{ total_words }} words in total</span>
+      </div>
+    </div>
+
+    <div class="scoreboard-list">
+      <div class="score-row head">
+        <span class="col rank">#</span>
+        <span class="col user">user</span>
+        <span class="col pct">words known</span>
+        <span class="col bar">progress</span>
+      </div>
+
+      {% for entry in entries %}
+        <div class="score-row{% if entry.is_me %} me{% endif %}">
+          <span class="col rank{% if loop.index == 1 %} rank-1{% elif loop.index == 2 %} rank-2{% elif loop.index == 3 %} rank-3{% endif %}">{{ loop.index }}</span>
+          <span class="col user">{{ entry.email }}{% if entry.is_me %} <span class="badge-you">you</span>{% endif %}</span>
+          <span class="col pct">{{ entry.known }} / {{ entry.total }}</span>
+          <span class="col bar">
+            <div class="bar">
+              <div class="bar-fill {% if entry.bar_percentage < 40 %}danger{% elif entry.bar_percentage < 70 %}warn{% endif %}"
+                   style="width: {{ entry.bar_percentage }}%"></div>
+            </div>
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+
+  </div>
+
+{% endblock %}
