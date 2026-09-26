@@ -1,0 +1,11 @@
+.git
+.github
+.circleci
+myenv
+.venv
+__pycache__
+**/__pycache__
+*.pyc
+*.tar.gz
+data
+vocabulary

@@ -25,4 +25,12 @@ Long term goal
 
 > docker build . -t myimage
 
-> docker run -it -v $PWD/data:/data -p 8000:80 myimage
+> docker run -d --name wlt -v $PWD/data:/data -p 8000:80 myimage
+
+The database lives on the mounted `./data` volume (`/data/learn.db` inside the
+container). The first time you run it, initialize the database and import your
+vocabulary from the host using the repository venv:
+
+> myenv/bin/python app/cli.py database data/learn.db init
+> myenv/bin/python app/cli.py database data/learn.db create-user you@example.com --speaks fr
+> myenv/bin/python app/cli.py database data/learn.db add-dictionary data/merged.cleaned
