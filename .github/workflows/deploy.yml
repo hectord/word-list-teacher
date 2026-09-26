@@ -1,0 +1,66 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t wlt:latest .
+
+      - name: Push image to GitHub Container Registry
+        env:
+          REGISTRY: ghcr.io
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+          docker tag wlt:latest "$IMAGE:latest"
+          docker tag wlt:latest "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:${{ github.sha }}"
+
+      - name: Deploy to production server
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          IMAGE: ghcr.io/${{ github.repository }}:latest
+        run: |
+          set -euo pipefail
+
+          if [ -z "${HOST:-}" ] || [ -z "${KEY:-}" ]; then
+            echo "Skip deploy: set the DEPLOY_HOST and DEPLOY_SSH_KEY" \
+                 "repository secrets (see README)."
+            exit 0
+          fi
+
+          echo "${KEY}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+
+          # volume path on the server (defaults to ~/wlt/data)
+          SRV_PATH="${DEPLOY_PATH:-$HOME}/data"
+
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=accept-new \
+              -p "${PORT:-22}" \
+              "${USER:-root}@${HOST}" \
+              "set -e
+               docker pull '${IMAGE}'
+               docker rm -f wlt 2>/dev/null || true
+               mkdir -p '${SRV_PATH}'
+               docker run -d --name wlt --restart unless-stopped \
+                 -v '${SRV_PATH}:/data' \
+                 -p 8000:80 \
+                 '${IMAGE}'"
