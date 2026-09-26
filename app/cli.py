@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import os.path
-from typing import Set
+from typing import List, Set
 import getpass
 import sys
+import csv
+import re
 
 import argparse
 from termcolor import colored
@@ -11,6 +13,67 @@ from termcolor import colored
 from learn import Word, InvalidFileException, Vocabulary, Session
 from learn import Language
 from store import load_database
+
+
+def load_dictionary(filename: str,
+                    input_language: str = 'fr',
+                    output_language: str = 'de') -> List[Vocabulary]:
+    """
+    Load a cleaned dictionary file like data/merged.cleaned:
+
+        vocabulary;section;german;translation
+        1 Beschreibung von Menschen;;sein*;être
+        2 Kleidung und Mode;Verbs;tragen;porter
+
+    The dictionary is assumed to be German -> French. Each distinct
+    vocabulary name becomes a separate Vocabulary (named after it);
+    non-empty section names become sections inside it.
+    """
+    by_vocabulary = {}
+
+    with open(filename, encoding='utf-8') as f:
+        for row in csv.reader(f, delimiter=';'):
+            if len(row) != 4:
+                continue
+
+            vocabulary, section, word, translation = \
+                (field.strip() for field in row)
+
+            if vocabulary == 'vocabulary':
+                continue
+            if not word or not translation:
+                continue
+
+            by_vocabulary.setdefault(vocabulary, []).append(
+                (section, word, translation))
+
+    if not by_vocabulary:
+        raise InvalidFileException(f'no words found in {filename}')
+
+    vocabularies = []
+    for vocabulary, entries in by_vocabulary.items():
+        words = []
+        word_sections = []
+        current_section = None
+
+        for section, word, translation in entries:
+            if section != current_section:
+                current_section = section
+
+            words.append(Word(word_output=word,
+                              word_input=translation,
+                              directive=None))
+            word_sections.append(current_section or None)
+
+        name = Word(word_output=vocabulary,
+                    word_input=vocabulary,
+                    directive=None)
+        vocabularies.append(Vocabulary(name, words,
+                                       input_language=input_language,
+                                       output_language=output_language,
+                                       sections=word_sections))
+
+    return vocabularies
 
 
 def say_goodbye():
@@ -120,6 +183,9 @@ if __name__ == '__main__':
     add_vocabulary_subparser = db_subparser.add_parser('add-vocabulary')
     add_vocabulary_subparser.add_argument('files', help='words to load', nargs='+')
 
+    add_dictionary_subparser = db_subparser.add_parser('add-dictionary')
+    add_dictionary_subparser.add_argument('files', help='cleaned dictionary CSV files (vocabulary;section;word;translation)', nargs='+')
+
     create_user_subparser = db_subparser.add_parser('create-user')
     create_user_subparser.add_argument('username', help='new username', nargs=1)
     create_user_subparser.add_argument('--speaks', help='language spoken', nargs='+')
@@ -177,6 +243,18 @@ if __name__ == '__main__':
                 vocabulary = Vocabulary.load(f)
             database.create_vocabulary(vocabulary)
 
+    elif args.db_cmd == 'add-dictionary':
+        database = args.database[0]
+        database = load_database(database)
+
+        for filename in args.files:
+            for vocabulary in load_dictionary(filename):
+                voc_id = database.create_vocabulary(vocabulary)
+                print('%s: %d words, %d sections -> vocabulary %d %r'
+                      % (filename, len(vocabulary),
+                         len(vocabulary.sections), voc_id,
+                         vocabulary.name.word_input))
+
     elif args.db_cmd == 'create-user':
         username = args.username[0]
 
@@ -207,7 +285,11 @@ if __name__ == '__main__':
         database = load_database(database)
 
         for voc_id, voc in database.list_vocabularies_for(None).items():
-            print(voc_id, voc)
+            print('%4d (%s -> %s) %5d words, %2d sections%s'
+                  % (voc_id, voc.input_language, voc.output_language,
+                     len(voc), len(voc.sections),
+                     ('' if voc.name is None
+                      else '  name: %s' % voc.name.word_input)))
     elif args.db_cmd == 'list-sections':
         database = args.database[0]
         database = load_database(database)

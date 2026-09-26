@@ -43,6 +43,7 @@ class DbSpeak(Model):
 class DbVocabulary(Model):
     input_language = ForeignKeyField(DbLanguage)
     output_language = ForeignKeyField(DbLanguage)
+    name = CharField(null=True)
 
     class Meta:
         database = db
@@ -319,10 +320,14 @@ class Database:
         output_language = DbLanguage.get(code=voc.output_language)
 
         new_voc = DbVocabulary.create(input_language=input_language,
-                                      output_language=output_language)
+                                      output_language=output_language,
+                                      name=voc._name_word()
+                                      )
 
-        for word in voc.words:
-            self._create_db_word(new_voc, word, voc.section_of(word))
+        # note: zip by index so that identical words in different sections
+        # keep their own section (section_of would collapse them by value)
+        for word, section in zip(voc.words, voc.word_sections):
+            self._create_db_word(new_voc, word, section)
 
         voc.set_id(new_voc.id)
         return new_voc.id
@@ -354,6 +359,10 @@ class Database:
         ret = Vocabulary(name, words, input_language, output_language,
                          sections=sections)
         ret.set_id(voc.id)
+
+        if name is None and voc.name:
+            ret._name = Word(word_input=voc.name, word_output=voc.name,
+                             directive=None)
 
         for word, word_id in word_ids.items():
             ret.set_word_id(word, word_id)
@@ -501,8 +510,9 @@ def load_database(name: str) -> Database:
                       DbVocabularySession, DbSession,
                       DbWordAttempt, DbLanguage, DbSpeak])
 
-    # migrate older databases which predate sections
+    # migrate older databases which predate sections / names
     _add_column_if_missing('dbword', 'section', 'varchar(255)')
     _add_column_if_missing('dbvocabularysession', 'section', 'varchar(255)')
+    _add_column_if_missing('dbvocabulary', 'name', 'varchar(255)')
 
     return Database()

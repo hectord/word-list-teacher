@@ -235,6 +235,28 @@ a.signout:hover { text-decoration: underline; }
   vertical-align: 2px;
 }
 
+/* ---------- vocabulary page: collapsible word list ---------- */
+
+.word-list-toggle {
+  margin-bottom: 22px;
+  border: 1px solid #EDE3DB;
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px 18px;
+  box-shadow: 0 1px 3px rgba(80, 50, 30, 0.06);
+}
+
+.word-list-toggle summary {
+  cursor: pointer;
+  color: #3B2F2A;
+  font-size: 15px;
+  list-style-position: outside;
+}
+
+.word-list-toggle[open] .toolbar {
+  margin-top: 16px;
+}
+
 /* ---------- vocabulary page: toolbar + word list ---------- */
 
 .toolbar {

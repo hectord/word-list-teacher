@@ -113,7 +113,7 @@ async def index(request: Request,
     if whole_session is not None and not whole_session.is_finished:
         unfinished_session = whole_session
 
-    sections_by_index = [voc.section_of(word) for word in voc.words]
+    sections_by_index = list(voc.word_sections)
 
     return TEMPLATES.TemplateResponse(
         request, "vocabulary.html",

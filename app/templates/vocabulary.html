@@ -25,6 +25,11 @@
 
   <div class="center">
 
+    {% if word_count > 500 %}
+    <details class="word-list-toggle">
+      <summary>Word list — {{ word_count }} words{% if unknown_count %} · <b class="unknown-text">{{ unknown_count }} hard</b>{% endif %}</summary>
+    {% endif %}
+
     <div class="toolbar">
       <input id="word-filter" type="search" placeholder="Filter words…">
       <span class="stats">{{ word_count }} words{% if unknown_count %} · <b class="unknown-text">{{ unknown_count }} hard words</b>{% endif %}<span id="filter-count"></span></span>
@@ -87,6 +92,10 @@
         </div>
       {% endfor %}
     </div>
+
+    {% if word_count > 500 %}
+    </details>
+    {% endif %}
 
   </div>
 

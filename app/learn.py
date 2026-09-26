@@ -189,6 +189,11 @@ class Vocabulary:
         except ValueError:
             return None
 
+    @property
+    def word_sections(self) -> List[Optional[str]]:
+        """Section of each word, aligned with ``words`` (by index)."""
+        return self._word_sections.copy()
+
     def section(self, name: str) -> Optional['Vocabulary']:
         """Return a vocabulary restricted to one section (with word IDs)."""
         words = []
@@ -297,6 +302,12 @@ class Vocabulary:
     @property
     def name(self) -> Word:
         return self._name
+
+    def _name_word(self) -> Optional[str]:
+        """Persistable vocabulary name (or None)."""
+        if self._name is None:
+            return None
+        return self._name.word_input
 
     def __iter__(self) -> Generator[Word, None, None]:
         for word in self._words:

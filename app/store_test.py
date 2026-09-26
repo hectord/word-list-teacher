@@ -52,6 +52,7 @@ class TestStore(unittest.TestCase):
         voc2 = self.db.get_vocabulary(self.user, 1)
         self.assertEqual([self.word1, self.word2],
                          voc2.words)
+        self.assertEqual('fr_1', voc2.name.word_input)
 
     def test_manage_sessions(self):
         self._create_vocabulary()
@@ -334,6 +335,47 @@ class TestStore(unittest.TestCase):
 
         self.assertTrue(word_attempt.success)
         self.db.last_session(self.user, new_voc)
+
+    def test_load_dictionary(self):
+        import tempfile
+        import os
+        from cli import load_dictionary
+
+        fd, path = tempfile.mkstemp(suffix='.csv')
+        os.close(fd)
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('vocabulary;section;german;translation\n')
+                f.write('1 Beschreibung von Menschen;;sein*;être\n')
+                f.write('1 Beschreibung von Menschen;;haben;avoir\n')
+                f.write('2 Kleidung und Mode;Verbs;tragen;porter\n')
+                f.write('2 Kleidung und Mode;Verbs;anziehen;to put on\n')
+
+            vocabularies = load_dictionary(path)
+
+            self.assertEqual(2, len(vocabularies))
+
+            voc1 = vocabularies[0]
+            self.assertEqual('fr', voc1.input_language)
+            self.assertEqual('de', voc1.output_language)
+            self.assertEqual('1 Beschreibung von Menschen',
+                             voc1.name.word_input)
+            self.assertEqual([], [s.name for s in voc1.sections])
+            self.assertEqual(2, len(voc1.words))
+            self.assertEqual('sein*', voc1.words[0].word_output)
+            self.assertEqual('être', voc1.words[0].word_input)
+            self.assertIsNone(voc1.section_of(voc1.words[0]))
+
+            voc2 = vocabularies[1]
+            self.assertEqual('fr', voc2.input_language)
+            self.assertEqual('2 Kleidung und Mode',
+                             voc2.name.word_input)
+            self.assertEqual(['Verbs'], [s.name for s in voc2.sections])
+            self.assertEqual(2, len(voc2.words))
+            self.assertEqual('Verbs', voc2.section_of(voc2.words[0]))
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
 
     def test_migration_adds_section_columns(self):
         import os

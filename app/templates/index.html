@@ -43,7 +43,7 @@
           <div class="vocabulary">
             <div class="voc-info">
               <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
-                <span class="voc-name">{{ vocabulary.name.word_input if vocabulary.name else '-' }}</span>
+                <span class="voc-name">{{ vocabulary.name.word_input if vocabulary.name else (language_input.name ~ ' → ' ~ language_output.name) }}</span>
               </a>
               <div class="voc-meta">
                 <span class="lang">{{ language_input.name }} <b>→</b> {{ language_output.name }}</span>
