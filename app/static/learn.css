@@ -119,17 +119,19 @@
     width: 100%;
     left: auto;
     right: auto;
-    margin: 16px 0 0;
+    margin: 10px 0 0;
   }
 
   body { overflow-y: auto; }
 
+  .word-box { height: 56px; }
   .word-box .field,
   #current-output {
-    font-size: 28px;
-    padding-left: 20px;
-    padding-right: 20px;
+    height: 56px;
+    font-size: 24px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
-  .word { margin-bottom: 26px; }
+  .word { margin-bottom: 16px; }
 }

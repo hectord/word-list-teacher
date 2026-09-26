@@ -62,9 +62,12 @@
 }
 
 @media (max-width: 700px) {
-  .score-row { grid-template-columns: 32px 1fr 110px; padding: 12px 14px; }
+  .score-row { grid-template-columns: 28px 1fr 96px; gap: 8px; padding: 8px 12px; }
   .score-row.head { display: none; }
   .col.bar { grid-column: 2 / -1; }
-  .col.pct { font-size: 13px; }
-  .col.bar .bar { height: 10px; }
+  .col.rank { font-size: 14px; }
+  .col.user { font-size: 14px; }
+  .col.pct { font-size: 12px; }
+  .col.bar .bar { height: 8px; }
+  .badge-you { font-size: 10px; padding: 1px 6px; margin-left: 6px; }
 }
