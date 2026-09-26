@@ -3,8 +3,8 @@
 {% block title %}Vocabulary{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css">
-    <script src="/static/vocabulary.js"></script>
+    <link rel="stylesheet" href="/static/pages.css?v=3">
+    <script src="/static/vocabulary.js?v=3"></script>
 {% endblock %}
 
 {% block body %}
@@ -37,11 +37,11 @@
 
     {% if sections %}
       <div class="sections">
-        <div class="section-card all">
-          <div class="section-info">
+        <div class="section-card all active" data-section-name="">
+          <a class="section-filter" href="#" title="Show all words">
             <span class="section-name">Whole vocabulary</span>
             <span class="section-count">{{ word_count }} words</span>
-          </div>
+          </a>
           <div class="section-actions">
             {% if unfinished_session %}
               <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume</a>
@@ -51,11 +51,11 @@
         </div>
 
         {% for section in sections %}
-          <div class="section-card">
-            <div class="section-info">
+          <div class="section-card" data-section-name="{{ section.name }}">
+            <a class="section-filter" href="#" title="Filter the word list to this section">
               <span class="section-name">{{ section.name }}</span>
               <span class="section-count">{{ section.size }} words</span>
-            </div>
+            </a>
             <div class="section-actions">
               {% if section.resume %}
                 <a class="button resume" href="/learn?session_id={{ section.resume.id }}">Resume</a>
@@ -77,7 +77,7 @@
       {% for word in voc.words %}
         {% set err = stats.errors_prob_for(word) %}
         {% set sec = sections_by_index[loop.index0] %}
-        <div class="row" data-search="{{ (word.word_output ~ ' ' ~ word.word_input) | lower }}">
+        <div class="row" data-search="{{ (word.word_output ~ ' ' ~ word.word_input) | lower }}" data-section="{{ sec }}">
           <span class="col out">{% if sec %}<span class="sec-badge">{{ sec }}</span>{% endif %}{{ word.word_output }}</span>
           <span class="col in">{{ word.word_input }}</span>
           <span class="col err">

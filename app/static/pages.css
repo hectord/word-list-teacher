@@ -243,11 +243,20 @@ a.signout:hover { text-decoration: underline; }
 }
 .section-card.all { border-color: #D9C6B8; background: #FDF8F4; }
 
-.section-info {
+.section-card.active {
+  border-color: #C75B39;
+  box-shadow: 0 0 0 2px rgba(199, 91, 57, 0.18);
+}
+
+.section-filter {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 8px;
 }
+.section-filter:hover .section-name { color: #C75B39; }
 .section-name { font-size: 18px; color: #3B2F2A; }
 .section-count { font-size: 13px; color: #A08B7F; }
 
