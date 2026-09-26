@@ -183,6 +183,12 @@ class Vocabulary:
                          self.input_language,
                          not self.is_flipped)
         voc.set_id(self._id)
+
+        for word in self._words:
+            word_id = self._word_ids.get(word)
+            if word_id is not None:
+                voc.set_word_id(word.flip(), word_id)
+
         return voc
 
     @property

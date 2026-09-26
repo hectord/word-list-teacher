@@ -1,0 +1,276 @@
+/* Shared styling for /index and /vocabulary pages.
+   Loaded AFTER base.css by these two templates only,
+   so it never affects the /learn page. */
+
+/* base.css inflates fonts to 50px on high-DPI screens;
+   reset to a sane size for these pages. */
+body * { font-size: 16px; }
+
+@media (min-resolution: 200dpi) {
+  body * { font-size: 24px; }
+  .page-header h1 { font-size: 40px; }
+  .voc-name { font-size: 36px; }
+  .col { font-size: 26px; }
+  .languages-category { font-size: 22px; }
+  .button { font-size: 22px; }
+}
+
+/* ---------- top header ---------- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px 32px;
+  background: rgba(255, 255, 255, 0.75);
+  border-bottom: 1px solid #ECE2DA;
+}
+
+.brand-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 26px;
+  color: #3B2F2A;
+}
+
+.page-header .subtitle { color: #A08B7F; }
+
+.page-header a.back {
+  display: block;
+  color: #C75B39;
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.page-header a.back:hover { text-decoration: underline; }
+
+.user-box { display: flex; align-items: center; gap: 14px; }
+.user { color: #6B5D55; }
+a.signout { color: #C75B39; text-decoration: none; font-size: 14px; }
+a.signout:hover { text-decoration: underline; }
+
+/* ---------- layout container ---------- */
+
+.center {
+  width: min(960px, 92vw);
+  margin: 28px auto;
+  padding: 0;
+}
+
+/* ---------- language categories ---------- */
+
+.languages-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.languages-category {
+  display: inline-block;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: #fff;
+  color: #7A4B36;
+  border: 1px solid #E8DBD2;
+  box-shadow: 0 1px 2px rgba(80, 50, 30, 0.05);
+  transition: background .15s ease, color .15s ease, transform .1s ease;
+}
+
+.languages-category:hover {
+  background: #7A4B36;
+  color: #fff;
+  border-color: #7A4B36;
+  transform: translateY(-1px);
+}
+
+/* ---------- vocabulary cards ---------- */
+
+.vocabulary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #EDE3DB;
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(80, 50, 30, 0.06);
+  transition: box-shadow .15s ease, transform .15s ease;
+}
+
+/* override the base.css bottom-border separator */
+.vocabulary:not(:last-child) { border-bottom: 1px solid #EDE3DB; }
+
+.vocabulary:hover {
+  box-shadow: 0 8px 24px rgba(80, 50, 30, 0.10);
+  transform: translateY(-2px);
+}
+.vocabulary:last-child { margin-bottom: 0; }
+
+.show-vocabulary { text-decoration: none; }
+.voc-name { font-size: 22px; color: #3B2F2A; }
+.show-vocabulary:hover .voc-name { color: #C75B39; }
+
+.voc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 6px;
+  color: #A08B7F;
+}
+.voc-meta .lang b { color: #6B5D55; }
+
+.voc-info { min-width: 0; }
+.unknown-text { color: #C0392B; }
+
+.voc-side { display: flex; align-items: center; gap: 22px; }
+.voc-actions { display: flex; gap: 12px; }
+
+.accuracy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.accuracy-value { font-size: 20px; color: #3B2F2A; }
+.accuracy-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #B4A398;
+}
+
+/* ---------- progress bars ---------- */
+
+.bar {
+  width: 140px;
+  height: 8px;
+  border-radius: 999px;
+  background: #F0E7E0;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #2F7D5B;
+}
+.bar-fill.warn { background: #E0A63C; }
+.bar-fill.danger { background: #C75B39; }
+
+/* ---------- buttons ---------- */
+
+.button {
+  display: inline-block;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background .15s ease;
+}
+.button.new { background: #2F7D5B; color: #fff; }
+.button.new:hover { background: #27694C; }
+.button.resume { background: #FCEFD8; color: #B97B1E; border: 1px solid #F3DFBC; }
+.button.resume:hover { background: #F7E3C0; }
+
+/* ---------- empty state ---------- */
+
+.empty { color: #A08B7F; text-align: center; padding: 60px 0; }
+
+/* ---------- vocabulary page: toolbar + word list ---------- */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.toolbar input[type="search"] {
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #E0D3C9;
+  background: #fff;
+  font-size: 15px;
+  min-width: 240px;
+  color: #3B2F2A;
+  outline: none;
+}
+.toolbar input[type="search"]:focus {
+  border-color: #C75B39;
+  box-shadow: 0 0 0 3px rgba(199, 91, 57, 0.12);
+}
+.toolbar .stats { color: #A08B7F; }
+
+.word-list {
+  background: #fff;
+  border: 1px solid #EDE3DB;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(80, 50, 30, 0.06);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 180px;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 24px;
+  border-bottom: 1px solid #F3EBE5;
+}
+.row:nth-child(even) { background: #FBF8F5; }
+.row:last-child { border-bottom: none; }
+
+.row.head {
+  background: #F6EFEA;
+  border-bottom: 1px solid #E8DBD2;
+  padding: 10px 24px;
+}
+.row.head .col {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #B4A398;
+}
+
+.col { font-size: 17px; color: #3B2F2A; }
+.col.out { font-weight: 600; }
+
+.col.err {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.col.err .bar { width: 100%; }
+
+.badge {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.badge.good { background: #E1F1E2; color: #2F7D5B; }
+.badge.shaky { background: #FCEFD8; color: #B97B1E; }
+.badge.unknown { background: #FFE8E8; color: #C0392B; }
+
+@media (max-width: 700px) {
+  .row { grid-template-columns: 1fr 1fr; }
+  .col.err {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}

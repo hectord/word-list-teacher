@@ -92,6 +92,10 @@ async def index(request: Request,
     voc = db.get_vocabulary(user, id)
     stats = db.vocabulary_stats(voc)
 
+    word_count = len(voc.words)
+    unknown_count = sum(
+        1 for word in voc.words if stats.errors_prob_for(word) > 40.0)
+
     session = db.last_session(user, voc)
     unfinished_session = None
     if session is not None and not session.is_finished:
@@ -100,9 +104,12 @@ async def index(request: Request,
     return TEMPLATES.TemplateResponse(
         request, "vocabulary.html",
         {
+            'user': user,
             'voc': voc,
             'stats': stats,
             'voc_id': id,
+            'word_count': word_count,
+            'unknown_count': unknown_count,
             'unfinished_session': unfinished_session
         },
         headers={'Cache-Control': 'no-store'}
@@ -113,6 +120,7 @@ async def index(request: Request, user: User = Depends(get_user)):
     vocabularies = db.list_vocabularies(user)
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
+    has_finished_session = {}
     vocabularies_by_languages = defaultdict(list)
 
     for voc_id, vocabulary in vocabularies.items():
@@ -128,8 +136,10 @@ async def index(request: Request, user: User = Depends(get_user)):
         finished_session = db.last_session(user, vocabulary,
                                            finished=True)
         percentage_by_vocabulary[vocabulary] = 0.0
+        has_finished_session[vocabulary] = False
         if finished_session:
             percentage_by_vocabulary[vocabulary] = finished_session.accuracy
+            has_finished_session[vocabulary] = True
 
         vocabularies_by_languages[inout].append((voc_id, vocabulary))
 
@@ -139,9 +149,11 @@ async def index(request: Request, user: User = Depends(get_user)):
     return TEMPLATES.TemplateResponse(
         request, "index.html",
         {
+            'user': user,
             'vocabularies_by_languages': vocabularies_by_languages,
             'session_by_vocabulary': session_by_vocabulary,
-            'percentage_by_vocabulary': percentage_by_vocabulary
+            'percentage_by_vocabulary': percentage_by_vocabulary,
+            'has_finished_session': has_finished_session
         },
         headers={'Cache-Control': 'no-store'}
     )

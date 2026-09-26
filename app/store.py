@@ -338,6 +338,9 @@ class Database:
 
             word = self._create_word_from(attempt.word)
 
+            if voc.is_flipped:
+                word = word.flip()
+
             if attempt.success:
                 success_by_word_id[word] += 1
             else:

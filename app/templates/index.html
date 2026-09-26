@@ -1,46 +1,78 @@
 {% extends "base.html" %}
 
-{% block title %}Learn{% endblock %}
+{% block title %}Vocabularies{% endblock %}
+
+{% block header %}
+    <link rel="stylesheet" href="/static/pages.css">
+{% endblock %}
 
 {% block body %}
 
+  <header class="page-header">
+    <div class="brand-line">
+      <h1>Word List Teacher</h1>
+      <span class="subtitle">choose a vocabulary to practice</span>
+    </div>
+    <div class="user-box">
+      <span class="user">{{ user.email }}</span>
+      <a class="signout" href="/logout">sign&nbsp;out</a>
+    </div>
+  </header>
+
   <div class="center">
 
-    <div class="languages-categories">
-      {% for (language_input, language_output), vocabularies in vocabularies_by_languages.items() %}
-        <a href="#{{ language_input.code }}_{{ language_output.code }}" class="languages-category">
-          {{ language_input.name }} ➔ {{ language_output.name }}
-        </a>
-      {% endfor %}
-    </div>
+    {% if not vocabularies_by_languages %}
+      <p class="empty">No vocabulary yet — add one from the CLI:<br>
+        <code>python app/cli.py database data/learn.db add-vocabulary vocabulary/&lt;file&gt;.txt</code></p>
+    {% endif %}
+
+    {% if vocabularies_by_languages %}
+      <div class="languages-categories">
+        {% for (language_input, language_output), vocabularies in vocabularies_by_languages.items() %}
+          <a href="#{{ language_input.code }}_{{ language_output.code }}" class="languages-category">
+            {{ language_input.name }} ➔ {{ language_output.name }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
 
     {% for (language_input, language_output), vocabularies in vocabularies_by_languages.items() %}
       <section id="{{ language_input.code }}_{{ language_output.code }}">
+
         {% for voc_id, vocabulary in vocabularies %}
           <div class="vocabulary">
-            <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
-              <span class="name cell">{{ vocabulary.name.word_input or '-' }}</span><span class="name cell">{{ vocabulary.name.word_output or '-' }}</span>
-            </a>
-            <div>
-              <span class="percentage small-cell">
-                {{ '%.2f' % percentage_by_vocabulary[vocabulary] }}%
-              </span>
-              <a class="new-session" href="/new_session?voc_id={{ voc_id }}">
-                <span class="voc-action small-cell">
-                  new
-                </span>
+            <div class="voc-info">
+              <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
+                <span class="voc-name">{{ vocabulary.name.word_input if vocabulary.name else '-' }}</span>
               </a>
-              {% if vocabulary in session_by_vocabulary %}
-                <a class="resume-session" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">
-                  <span class="voc-action small-cell">
-                    resume
-                  </span>
-                </a>
-              {% endif %}
+              <div class="voc-meta">
+                <span class="lang">{{ language_input.name }} <b>→</b> {{ language_output.name }}</span>
+                <span class="count">{{ vocabulary | length }} words</span>
+              </div>
+            </div>
 
+            <div class="voc-side">
+              <div class="accuracy">
+                {% if has_finished_session[vocabulary] %}
+                  <span class="accuracy-value">{{ '%.2f' % percentage_by_vocabulary[vocabulary] }}% accuracy</span>
+                  <div class="bar">
+                    <div class="bar-fill {% if percentage_by_vocabulary[vocabulary] < 40.0 %}danger{% elif percentage_by_vocabulary[vocabulary] < 70.0 %}warn{% endif %}"
+                         style="width: {{ percentage_by_vocabulary[vocabulary] | round }}%"></div>
+                  </div>
+                {% else %}
+                  <span class="accuracy-label">not practiced yet</span>
+                {% endif %}
+              </div>
+              <div class="voc-actions">
+                <a class="button new" href="/new_session?voc_id={{ voc_id }}">New</a>
+                {% if vocabulary in session_by_vocabulary %}
+                  <a class="button resume" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">Resume</a>
+                {% endif %}
+              </div>
             </div>
           </div>
         {% endfor %}
+
       </section>
     {% endfor %}
 

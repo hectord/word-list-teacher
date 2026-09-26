@@ -2,25 +2,58 @@
 
 {% block title %}Vocabulary{% endblock %}
 
+{% block header %}
+    <link rel="stylesheet" href="/static/pages.css">
+    <script src="/static/vocabulary.js"></script>
+{% endblock %}
+
 {% block body %}
 
+  <header class="page-header">
+    <div class="brand-line">
+      <a class="back" href="/index">&larr; All vocabularies</a>
+      <h1>{{ voc.name.word_input if voc.name else 'Vocabulary' }}</h1>
+      <span class="subtitle">{{ voc.input_language or '?' }} → {{ voc.output_language or '?' }}</span>
+    </div>
+    <div class="voc-actions">
+      <a class="button new" href="/new_session?voc_id={{ voc_id }}">New session</a>
+      {% if unfinished_session %}
+        <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume</a>
+      {% endif %}
+    </div>
+  </header>
+
   <div class="center">
-    <div class="title-bar">
-      <span class="title">Vocabulary</span><a href="/new_session?voc_id={{ voc_id }}"><span class="title-action">New</span></a>{% if unfinished_session %}<a href="/learn?session_id={{ unfinished_session.id }}"><span class="title-action">Resume</span></a>{% endif %}
+
+    <div class="toolbar">
+      <input id="word-filter" type="search" placeholder="Filter words…">
+      <span class="stats">{{ word_count }} words{% if unknown_count %} · <b class="unknown-text">{{ unknown_count }} hard words</b>{% endif %}<span id="filter-count"></span></span>
     </div>
 
-
-    {% for word in voc.words %}
-      <div class="words-list">
-        <span class="cell voc-word">{{ word.word_output }}</span><span class="cell voc-word">{{ word.word_input }}</span><span class="voc-percentage
-
-        {% if stats.errors_prob_for(word) > 40.0 %}
-          voc-word-unknown
-        {% endif %}
-
-        ">{{ '%.2f%%' % stats.errors_prob_for(word) }}</span>
+    <div id="word-list" class="word-list">
+      <div class="row head">
+        <span class="col">word</span>
+        <span class="col">translation</span>
+        <span class="col">error rate</span>
       </div>
-    {% endfor %}
+
+      {% for word in voc.words %}
+        {% set err = stats.errors_prob_for(word) %}
+        <div class="row" data-search="{{ (word.word_output ~ ' ' ~ word.word_input) | lower }}">
+          <span class="col out">{{ word.word_output }}</span>
+          <span class="col in">{{ word.word_input }}</span>
+          <span class="col err">
+            <span class="badge {% if err > 40.0 %}unknown{% elif err > 20.0 %}shaky{% else %}good{% endif %}">
+              {{ '%.0f%%' % err }}
+            </span>
+            <div class="bar">
+              <div class="bar-fill {% if err > 40.0 %}danger{% elif err > 20.0 %}warn{% endif %}"
+                   style="width: {{ err | round }}%"></div>
+            </div>
+          </span>
+        </div>
+      {% endfor %}
+    </div>
 
   </div>
 
