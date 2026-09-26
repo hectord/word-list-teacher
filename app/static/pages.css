@@ -377,12 +377,59 @@ a.signout:hover { text-decoration: underline; }
 .badge.shaky { background: #FCEFD8; color: #B97B1E; }
 .badge.unknown { background: #FFE8E8; color: #C0392B; }
 
+/* ============ smartphone rendering (< 700px) ============ */
+
 @media (max-width: 700px) {
-  .row { grid-template-columns: 1fr 1fr; }
+  body * { font-size: 17px; }
+
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .brand-line { align-items: flex-start; gap: 6px; }
+  .page-header h1 { font-size: 22px; }
+  .page-header .subtitle { font-size: 15px; }
+  .user-box { justify-content: flex-start; flex-wrap: wrap; }
+
+  .center {
+    width: 100%;
+    margin: 16px auto 24px;
+    padding: 0 14px;
+  }
+
+  .button { padding: 12px 20px; font-size: 16px; }
+  .section-actions .button { padding: 10px 14px; }
+
+  .vocabulary { padding: 16px; }
+  .voc-top { flex-direction: column; align-items: stretch; gap: 10px; }
+  .voc-actions { justify-content: flex-end; }
+  .voc-name { font-size: 20px; }
+  .voc-meta { margin: 6px 0 12px; }
+
+  .sections { grid-template-columns: 1fr; }
+
+  /* word list rows: word + translation on one line, error below */
+  .row {
+    grid-template-columns: 1fr auto;
+    gap: 6px 12px;
+    padding: 12px 16px;
+  }
+  .row.head { display: none; }
+  .col.out { font-size: 18px; }
+  .col.in { color: #6B5D55; }
   .col.err {
     grid-column: 1 / -1;
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
   }
+  .col.err .bar { width: 55%; }
+
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar input[type="search"] { width: 100%; min-width: 0; }
+  .toolbar .stats { text-align: right; }
+
+  .word-list-toggle { padding: 12px 14px; }
 }

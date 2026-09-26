@@ -7,6 +7,8 @@ function update_height() {
 $(document).ready(function() {
   update_height();
 
+  $(window).on('resize', update_height);
+
   $("#current-output").keyup(function(e) {
 
     if($(this).attr('readonly'))
