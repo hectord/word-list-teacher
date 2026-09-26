@@ -35,9 +35,9 @@
 {% block title %}Learn{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/learn.css?v=6">
+    <link rel="stylesheet" href="/static/learn.css?v=7">
 
-    <script src="/static/script.js?v=5"></script>
+    <script src="/static/script.js?v=6"></script>
 
 {% endblock %}
 
@@ -46,6 +46,19 @@
   <div class="centering-box">
 
     <div class="words">
+
+      {% if first_word %}
+        <div id="current-word" class="word current">
+          <div class="word-box input">
+            <span id="current-input" class="field">
+              {{ first_word.word }}
+            </span>
+          </div>
+          <div class="word-box output">
+            <input data-current-word-id="{{first_word.word_id}}" data-session-id="{{ session.id }}" autocomplete="off" autofocus id="current-output" class="field" type="text" value=""/>
+          </div>
+        </div>
+      {% endif %}
 
       {% for attempt in session.attempts %}
         {% if attempt.success %}
@@ -61,19 +74,6 @@
           </div>
         {% endif %}
       {% endfor %}
-
-      {% if first_word %}
-        <div id="current-word" class="word current">
-          <div class="word-box input">
-            <span id="current-input" class="field">
-              {{ first_word.word }}
-            </span>
-          </div>
-          <div class="word-box output">
-            <input data-current-word-id="{{first_word.word_id}}" data-session-id="{{ session.id }}" autocomplete="off" autofocus id="current-output" class="field" type="text" value=""/>
-          </div>
-        </div>
-      {% endif %}
     </div>
 
   </div>

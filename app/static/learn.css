@@ -2,10 +2,8 @@
 
 @media (min-resolution: 200dpi) {
   .centering-box {
-    left: 0px;
-    right: 0px;
-    margin-left: 20px;
-    margin-right: 20px;
+    width: 100%;
+    max-width: 640px;
   }
 
   .word {
@@ -29,8 +27,8 @@
 
 @media (max-resolution: 200dpi) {
   .centering-box {
-    left: calc(50% - 250px);
-    width: 500px;
+    width: 100%;
+    max-width: 520px;
   }
 
   .word {
@@ -52,16 +50,31 @@
   }
 }
 
+.centering-box {
+  position: static;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 0 8px 24px;
+}
+
 .words {
   width: 100%;
 }
 
-.centering-box {
-  position: absolute;
-}
-
 .word {
   outline:1px solid black;
+}
+
+/* the current word stays pinned at the top of the screen while the
+   practice history scrolls underneath it */
+.word.current {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+
+  background: #F9F1F0;
+  padding-bottom: 14px;
+  box-shadow: 0 8px 18px -8px rgba(80, 50, 30, 0.25);
 }
 
 .word-box {
@@ -117,9 +130,9 @@
   .centering-box {
     position: static;
     width: 100%;
-    left: auto;
-    right: auto;
-    margin: 10px 0 0;
+    max-width: none;
+    margin: 0;
+    padding: 0 12px 16px;
   }
 
   body { overflow-y: auto; }

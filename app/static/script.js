@@ -1,13 +1,24 @@
-
-function update_height() {
-  var size = $(".words").height() + 100;
-  $(".centering-box").css("top", "calc(100% - " + size + "px)");
-}
-
 $(document).ready(function() {
-  update_height();
+  var current_word = $("#current-word");
+  var current_output = $("#current-output");
 
-  $(window).on('resize', update_height);
+  function keep_focus() {
+    if (current_output.length && current_word.length &&
+        current_word.is(":visible")) {
+      current_output.focus();
+    }
+  }
+
+  keep_focus();
+
+  // on touch devices, keep the keyboard/input focused while practicing
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+    current_output.on("focusout", function() {
+      if (current_word.is(":visible")) {
+        setTimeout(keep_focus, 0);
+      }
+    });
+  }
 
   $("#current-output").keyup(function(e) {
 
@@ -16,7 +27,6 @@ $(document).ready(function() {
 
     if(e.which == 13) {
       var current_input = $("#current-input");
-      var current_output = $("#current-output");
       var output = current_output.val();
       var session_id = current_output.data("session-id");
       var current_word_id = current_output.data("current-word-id");
@@ -44,19 +54,18 @@ $(document).ready(function() {
         new_node.find(".output .field").text(result.word_output.word);
         new_node.find(".result .field").text(result.hint);
 
-        $(".current").before(new_node);
+        // insert the answer right below the pinned current word
+        $("#current-word").after(new_node);
 
         if(result.next_word) {
-          current_input.text(result.next_word.word)
-          current_input.text(result.next_word.word)
+          current_input.text(result.next_word.word);
           current_output.data("current-word-id", result.next_word.word_id);
           current_output.val("");
         } else {
           $("#current-word").hide();
         }
 
-        // update the size of the words
-        update_height();
+        keep_focus();
       });
     }
   });
