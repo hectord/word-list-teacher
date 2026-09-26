@@ -1,24 +1,5 @@
 [![CI](https://github.com/hectord/word-list-teacher/actions/workflows/ci.yml/badge.svg)](https://github.com/hectord/word-list-teacher/actions)
 
-## CI / Deployment
-
-Unit tests run on every push via GitHub Actions (`.github/workflows/ci.yml`).
-
-Pushing to `main` also builds the Docker image, publishes it to the GitHub
-Container Registry, and deploys it to the production server
-(`.github/workflows/deploy.yml`). To enable the automatic deployment, add
-these repository secrets:
-
-* `DEPLOY_HOST` — address of the production server
-* `DEPLOY_USER` — ssh user (defaults to `root` when missing)
-* `DEPLOY_PORT` — ssh port (defaults to `22`)
-* `DEPLOY_SSH_KEY` — private ssh key with access to the server
-* `DEPLOY_PATH` — directory on the server where the `data` volume lives
-  (defaults to `~/wlt`; the database is stored at `./data/learn.db`)
-
-On the server the image runs as container `wlt`, mapping host port `8000`
-to the container's port 80, with `--restart unless-stopped`.
-
 # Word list teacher (WLT)
 
 Teach someone a new language through vocabulary.
@@ -34,22 +15,104 @@ Long term goal
 * make statistics available to everybody (anonymized)
 * speed up the learning process for any language
 
+## Getting started (local)
+
+```bash
+# 1. setup the environment (once)
+python3 -m venv myenv
+myenv/bin/pip install -r requirements.txt
+
+# 2. start the server (see run.sh for HOST/PORT/RELOAD overrides)
+./run.sh
+```
+
+The server runs on http://127.0.0.1:8000 and uses the database at
+`data/learn.db` (created on first start, ignored by git).
+
+## Dictionary & CLI
+
+Vocabularies are loaded into the database with the CLI (`app/cli.py`):
+
+```bash
+# initialize the languages (once per fresh database)
+myenv/bin/python app/cli.py database data/learn.db init
+
+# create a user; --speaks controls which vocabularies are visible
+# (the app shows a vocabulary only when the user knows exactly one of
+# its two languages)
+myenv/bin/python app/cli.py database data/learn.db \
+    create-user you@example.com --speaks fr
+
+# import a cleaned dictionary (assumed German -> French):
+# vocabulary;section;german;translation
+myenv/bin/python app/cli.py database data/learn.db \
+    add-dictionary data/merged.cleaned
+```
+
+Useful commands: `list-vocabularies`, `list-sections <voc-id>`,
+`list-words <voc-id>`, `add-vocabulary <file>`, `remove-vocabulary <voc-id>`.
+
+## Docker image
+
+```bash
+docker build -t wlt .
+docker run -d --name wlt -v $PWD/data:/data -p 8000:80 wlt
+```
+
+The database lives on the mounted `./data` volume (`/data/learn.db` inside
+the container). The first time you run it, initialize the database and import
+your vocabulary from the host using the repository venv (see above — the
+commands are the same, against `data/learn.db`, which is the mounted volume).
+
+## CI / Deployment
+
+**CI** — unit tests run on every push / pull request via GitHub Actions
+(`.github/workflows/ci.yml`: Python 3.13, `pip install -r requirements.txt`,
+`python -m unittest`).
+
+**Deploy** — pushing to `main` (or a manual `workflow_dispatch` run) triggers
+`.github/workflows/deploy.yml`:
+
+1. builds the Docker image and publishes it to the GitHub Container
+   Registry (`ghcr.io/<repo>:latest` and `:<commit sha>`),
+2. connects over SSH to the production server, pulls the image, and restarts
+   the `wlt` container with `--restart unless-stopped`, mapping host port
+   `8000` to the container's port `80`, with the data volume mounted.
+
+To enable the automatic deployment, add these **repository secrets**
+(Settings → Secrets and variables → Actions):
+
+| Secret            | Description                                                     | Default            |
+|-------------------|-----------------------------------------------------------------|--------------------|
+| `DEPLOY_HOST`     | address of the production server                                | (required)         |
+| `DEPLOY_SSH_KEY`  | private ssh key with access to the server                       | (required)         |
+| `DEPLOY_USER`     | ssh user                                                        | `root`             |
+| `DEPLOY_PORT`     | ssh port                                                        | `22`               |
+| `DEPLOY_PATH`     | server directory for the `data` volume                          | derived, see below |
+
+If `DEPLOY_PATH` is not set, the data volume path is derived from the ssh
+user: `/root/wlt/data` when `DEPLOY_USER` is `root`, otherwise
+`/home/<user>/wlt/data`. The database is stored at `<path>/data/learn.db`.
+
+If `DEPLOY_HOST` or `DEPLOY_SSH_KEY` are missing, the workflow still builds
+and publishes the image, and prints a "skip deploy" notice instead of failing.
+
+On the server, initialize the database once (the container starts with an
+empty volume):
+
+```bash
+docker exec -it wlt python cli.py database /data/learn.db init
+docker exec -it wlt python cli.py database /data/learn.db \
+    create-user you@example.com --speaks fr
+# then import your dictionary file, mounted or copied into the container
+```
+
 ## FAQ
 
 ### How can I start the server?
 
+> ./run.sh
+
+or directly with uvicorn (from the `app/` directory):
+
 > uvicorn server:app --reload
-
-### How do I create a Docker container?
-
-> docker build . -t myimage
-
-> docker run -d --name wlt -v $PWD/data:/data -p 8000:80 myimage
-
-The database lives on the mounted `./data` volume (`/data/learn.db` inside the
-container). The first time you run it, initialize the database and import your
-vocabulary from the host using the repository venv:
-
-> myenv/bin/python app/cli.py database data/learn.db init
-> myenv/bin/python app/cli.py database data/learn.db create-user you@example.com --speaks fr
-> myenv/bin/python app/cli.py database data/learn.db add-dictionary data/merged.cleaned

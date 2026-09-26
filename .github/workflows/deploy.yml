@@ -47,15 +47,19 @@ jobs:
             exit 0
           fi
 
+          # Note: derive defaults EXPLICITLY here - $HOME/$USER on the
+          # runner (e.g. /home/runner, runner) must never leak into the
+          # remote commands.
+          REMOTE_USER="${USER:-root}"
+          REMOTE_PORT="${PORT:-22}"
+          SRV_PATH="${DEPLOY_PATH}/data"
+
           echo "${KEY}" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
 
-          # volume path on the server (defaults to ~/wlt/data)
-          SRV_PATH="${DEPLOY_PATH:-$HOME}/data"
-
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=accept-new \
-              -p "${PORT:-22}" \
-              "${USER:-root}@${HOST}" \
+              -p "${REMOTE_PORT}" \
+              "${REMOTE_USER}@${HOST}" \
               "set -e
                docker pull '${IMAGE}'
                docker rm -f wlt 2>/dev/null || true
