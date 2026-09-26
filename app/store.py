@@ -407,6 +407,26 @@ class Database:
 
         return VocabularyStats(voc, ret)
 
+    def known_word_counts(self) -> Dict[int, int]:
+        """Vocabulary id -> number of words guessed correctly at least once."""
+        counts = defaultdict(int)
+        seen = set()
+
+        rows = (DbWordAttempt
+                .select(DbWordAttempt.word_id, DbWord.vocabulary_id)
+                .join(DbWord)
+                .join(DbVocabulary)
+                .where(DbWordAttempt.success == True)
+                .tuples())
+
+        for word_id, vocabulary_id in rows:
+            if word_id in seen:
+                continue
+            seen.add(word_id)
+            counts[vocabulary_id] += 1
+
+        return dict(counts)
+
     def list_vocabularies_for(self, languages: Optional[Set[Language]]) -> Dict[int, Vocabulary]:
         vocs = {}
 

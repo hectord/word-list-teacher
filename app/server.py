@@ -137,6 +137,11 @@ async def index(request: Request, user: User = Depends(get_user)):
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
     has_finished_session = {}
+    known_by_vocabulary = {}
+    known_percentage_by_vocabulary = {}
+    known_counts = db.known_word_counts()
+    total_words = 0
+    total_known = 0
     vocabularies_by_languages = defaultdict(list)
 
     for voc_id, vocabulary in vocabularies.items():
@@ -157,10 +162,21 @@ async def index(request: Request, user: User = Depends(get_user)):
             percentage_by_vocabulary[vocabulary] = finished_session.accuracy
             has_finished_session[vocabulary] = True
 
+        size = len(vocabulary)
+        known = known_counts.get(voc_id, 0)
+        known_by_vocabulary[vocabulary] = known
+        known_percentage_by_vocabulary[vocabulary] = \
+            (100 * known // size) if size else 0
+        total_words += size
+        total_known += known
+
         vocabularies_by_languages[inout].append((voc_id, vocabulary))
 
     for vocabularies in vocabularies_by_languages.values():
         vocabularies.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
+
+    known_percentage = \
+        (100 * total_known // total_words) if total_words else 0
 
     return TEMPLATES.TemplateResponse(
         request, "index.html",
@@ -169,7 +185,12 @@ async def index(request: Request, user: User = Depends(get_user)):
             'vocabularies_by_languages': vocabularies_by_languages,
             'session_by_vocabulary': session_by_vocabulary,
             'percentage_by_vocabulary': percentage_by_vocabulary,
-            'has_finished_session': has_finished_session
+            'has_finished_session': has_finished_session,
+            'known_by_vocabulary': known_by_vocabulary,
+            'known_percentage_by_vocabulary': known_percentage_by_vocabulary,
+            'total_words': total_words,
+            'total_known': total_known,
+            'known_percentage': known_percentage
         },
         headers={'Cache-Control': 'no-store'}
     )
