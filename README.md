@@ -66,12 +66,13 @@ commands are the same, against `data/learn.db`, which is the mounted volume).
 
 ## CI / Deployment
 
-**CI** — unit tests run on every push / pull request via GitHub Actions
+**CI** — unit tests run on every **pull request** via GitHub Actions
 (`.github/workflows/ci.yml`: Python 3.13, `pip install -r requirements.txt`,
 `python -m unittest`).
 
 **Deploy** — pushing to `main` (or a manual `workflow_dispatch` run) triggers
-`.github/workflows/deploy.yml`:
+`.github/workflows/deploy.yml`, which first runs the same unit tests and,
+only if they pass, proceeds with the deployment:
 
 1. builds the Docker image and publishes it to the GitHub Container
    Registry (`ghcr.io/<repo>:latest` and `:<commit sha>`),
