@@ -55,7 +55,6 @@ class DbWord(Model):
     vocabulary = ForeignKeyField(DbVocabulary, backref='words')
     word_input = CharField()
     word_output = CharField()
-    directive = CharField(null=True)
     section = CharField(null=True)
 
     class Meta:
@@ -176,7 +175,6 @@ class Database:
                      word: Word) -> Optional[DbWord]:
 
         word_input, word_output = word.word_input, word.word_output
-        directive = word.directive
 
         if session.is_flipped:
             word_input, word_output = word_output, word_input
@@ -187,8 +185,7 @@ class Database:
                  .join(DbSession)
                  .where(DbSession.id == session.id)
                  .where(DbWord.word_input == word_input)
-                 .where(DbWord.word_output == word_output)
-                 .where(DbWord.directive == directive))
+                 .where(DbWord.word_output == word_output))
 
         db_voc_session = (DbVocabularySession
                           .select()
@@ -336,20 +333,15 @@ class Database:
 
     def _create_word_from(self, word: DbWord) -> Word:
         return Word(word_input=word.word_input,
-                    word_output=word.word_output,
-                    directive=word.directive)
+                    word_output=word.word_output)
 
     def _load_vocabulary(self, voc: DbVocabulary) -> Vocabulary:
-        name = None
         words = []
         word_ids = {}
         sections = []
 
         for word in voc.words:
             new_word = self._create_word_from(word)
-
-            if new_word.is_name:
-                name = new_word
 
             word_ids[new_word] = word.id
             words.append(new_word)
@@ -358,13 +350,12 @@ class Database:
         input_language = voc.input_language.code
         output_language = voc.output_language.code
 
-        ret = Vocabulary(name, words, input_language, output_language,
+        ret = Vocabulary(None, words, input_language, output_language,
                          sections=sections)
         ret.set_id(voc.id)
 
-        if name is None and voc.name:
-            ret._name = Word(word_input=voc.name, word_output=voc.name,
-                             directive=None)
+        if voc.name:
+            ret._name = Word(word_input=voc.name, word_output=voc.name)
 
         for word, word_id in word_ids.items():
             ret.set_word_id(word, word_id)
@@ -514,7 +505,6 @@ class Database:
         return DbWord.create(vocabulary=voc,
                              word_input=word.word_input,
                              word_output=word.word_output,
-                             directive=word.directive,
                              section=section)
 
     def add_word(self, voc: Vocabulary, word: Word):
@@ -526,8 +516,7 @@ class Database:
 
     def update_word(self, voc: Vocabulary, word: Word,
                     word_input: str = None,
-                    word_output: str = None,
-                    directive: str = None):
+                    word_output: str = None):
 
         if word_input is None:
             word_input = word.word_input
@@ -535,15 +524,11 @@ class Database:
         if word_output is None:
             word_output = word.word_output
 
-        if directive is None:
-            directive = word.directive
-
         word_id = voc.word_id(word)
         assert word_id is not None
 
         DbWord.update(word_input=word_input,
-                      word_output=word_output,
-                      directive=directive).where(DbWord.id == word_id).execute()
+                      word_output=word_output).where(DbWord.id == word_id).execute()
 
 
 def _add_column_if_missing(table: str, column: str, definition: str):
@@ -553,6 +538,20 @@ def _add_column_if_missing(table: str, column: str, definition: str):
     if column not in columns:
         db.execute_sql('ALTER TABLE %s ADD COLUMN %s %s'
                        % (table, column, definition))
+
+
+def _drop_column_if_present(table: str, column: str):
+    cursor = db.execute_sql('PRAGMA table_info(%s)' % table)
+    columns = [row[1] for row in cursor.fetchall()]
+
+    if column in columns:
+        try:
+            db.execute_sql('ALTER TABLE %s DROP COLUMN %s'
+                           % (table, column))
+        except Exception:
+            # sqlite < 3.35 cannot drop columns; the unused column
+            # is then left in place (it is not used by the model)
+            pass
 
 
 def load_database(name: str) -> Database:
@@ -566,5 +565,8 @@ def load_database(name: str) -> Database:
     _add_column_if_missing('dbword', 'section', 'varchar(255)')
     _add_column_if_missing('dbvocabularysession', 'section', 'varchar(255)')
     _add_column_if_missing('dbvocabulary', 'name', 'varchar(255)')
+
+    # the per-word 'directive' was removed
+    _drop_column_if_present('dbword', 'directive')
 
     return Database()

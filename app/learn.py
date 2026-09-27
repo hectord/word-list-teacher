@@ -120,20 +120,14 @@ def word_filter(word):
 class Word:
     word_output: str
     word_input: str
-    directive: Optional[str]
 
     def flip(self) -> 'Word':
         return Word(word_output=self.word_input,
-                    word_input=self.word_output,
-                    directive=self.directive)
+                    word_input=self.word_output)
 
     @property
     def is_complex(self) -> bool:
         return self.word_output != self._simplified_word_output
-
-    @property
-    def is_name(self) -> Optional[str]:
-        return self.directive == '#name'
 
     @property
     def key(self) -> str:
@@ -156,15 +150,10 @@ class Word:
 
     @property
     def line(self) -> str:
-        word_line = f'{self.word_output};{self.word_input}'
-
-        if self.directive is not None:
-            word_line = f'{self.directive} {word_line}'
-
-        return word_line
+        return f'{self.word_output};{self.word_input}'
 
     @staticmethod
-    def load(line: str, directive: str = None):
+    def load(line: str):
         line = line.strip()
 
         word = line.strip().split(';')
@@ -174,8 +163,7 @@ class Word:
             raise InvalidFileException(error)
 
         word_output, word_input = tuple(word)
-        return Word(directive=directive,
-                    word_output=word_output,
+        return Word(word_output=word_output,
                     word_input=word_input)
 
 
@@ -423,7 +411,7 @@ class Vocabulary:
                 if directive == '#name':
                     line = Vocabulary._after_directive(line)
 
-                word = Word.load(line, directive)
+                word = Word.load(line)
                 if directive == '#name':
                     name = word
                 words.append(word)

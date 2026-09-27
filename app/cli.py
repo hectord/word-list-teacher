@@ -61,13 +61,11 @@ def load_dictionary(filename: str,
                 current_section = section
 
             words.append(Word(word_output=word,
-                              word_input=translation,
-                              directive=None))
+                              word_input=translation))
             word_sections.append(current_section or None)
 
         name = Word(word_output=vocabulary,
-                    word_input=vocabulary,
-                    directive=None)
+                    word_input=vocabulary)
         vocabularies.append(Vocabulary(name, words,
                                        input_language=input_language,
                                        output_language=output_language,
@@ -205,7 +203,6 @@ if __name__ == '__main__':
     remove_word_subparser.add_argument('word-id', nargs=1, type=int)
     remove_word_subparser.add_argument('--word-input', nargs='?')
     remove_word_subparser.add_argument('--word-output', nargs='?')
-    remove_word_subparser.add_argument('--directive', nargs='?')
 
     add_word_subparser = db_subparser.add_parser('add-word')
     add_word_subparser.add_argument('voc-id', nargs=1, type=int)
@@ -352,8 +349,7 @@ if __name__ == '__main__':
             sys.exit(1)
 
         word = Word(word_input=word_input,
-                    word_output=word_output,
-                    directive=None)
+                    word_output=word_output)
         database.add_word(voc, word)
 
     elif args.db_cmd == 'update-word':
@@ -365,7 +361,6 @@ if __name__ == '__main__':
         word_id = args['word-id'][0]
         word_input = args['word_input'] if args['word_input'] else None
         word_output = args['word_output'] if args['word_output'] else None
-        directive = args['directive'] if args['directive'] else None
 
         voc = database.get_vocabulary(None, voc_id)
 
@@ -381,8 +376,7 @@ if __name__ == '__main__':
 
         database.update_word(voc, word,
                              word_input=word_input,
-                             word_output=word_output,
-                             directive=directive)
+                             word_output=word_output)
 
     else:
         assert False

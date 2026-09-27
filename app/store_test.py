@@ -19,11 +19,9 @@ class TestStore(unittest.TestCase):
     def _create_vocabulary(self):
 
         self.word1 = Word(word_input='fr_1',
-                          word_output='de_1',
-                          directive=None)
+                          word_output='de_1')
         self.word2 = Word(word_input='fr_2',
-                          word_output='de_2',
-                          directive=None)
+                          word_output='de_2')
         self.words = [self.word1, self.word2]
 
         self.new_voc = Vocabulary(self.word1, self.words,
@@ -172,12 +170,9 @@ class TestStore(unittest.TestCase):
         self.db.add_word_attempt(session_fetched, attempt)
 
     def _create_sectioned_vocabulary(self):
-        self.sec_words = [Word(word_input='en_1', word_output='fr_1',
-                               directive=None),
-                          Word(word_input='en_2', word_output='fr_2',
-                               directive=None),
-                          Word(word_input='en_3', word_output='fr_3',
-                               directive=None)]
+        self.sec_words = [Word(word_input='en_1', word_output='fr_1'),
+                          Word(word_input='en_2', word_output='fr_2'),
+                          Word(word_input='en_3', word_output='fr_3')]
 
         self.sec_voc = Vocabulary(self.sec_words[0], self.sec_words,
                                   input_language='en',
@@ -310,32 +305,6 @@ class TestStore(unittest.TestCase):
         self.assertEqual([self.word1, self.word2],
                          self.db.get_vocabulary(None, 1).words)
 
-    def test_same_name_several_times(self):
-
-        word1 = Word(word_input='fr_1',
-                     word_output='de_1',
-                     directive=None)
-        word2 = Word(word_input='fr_1',
-                     word_output='de_1',
-                     directive='#name')
-        words = [word1, word2]
-
-        new_voc = Vocabulary(word1, words,
-                             input_language='fr',
-                             output_language='de')
-        self._create_user()
-
-        self.db.create_vocabulary(new_voc)
-
-        self.db.create_new_session(self.user, new_voc)
-        session = self.db.last_session(self.user, new_voc)
-
-        word_attempt = session.guess(word2, word2.word_output)
-        self.db.add_word_attempt(session, word_attempt)
-
-        self.assertTrue(word_attempt.success)
-        self.db.last_session(self.user, new_voc)
-
     def test_load_dictionary(self):
         import tempfile
         import os
@@ -430,6 +399,11 @@ class TestStore(unittest.TestCase):
                     'PRAGMA table_info(%s)' % table)
                 columns = [row[1] for row in cursor.fetchall()]
                 self.assertIn('section', columns)
+
+            # the legacy 'directive' column is dropped by the migration
+            cursor = store_module.db.execute_sql('PRAGMA table_info(dbword)')
+            columns = [row[1] for row in cursor.fetchall()]
+            self.assertNotIn('directive', columns)
         finally:
             if os.path.exists(path):
                 os.remove(path)
@@ -451,20 +425,17 @@ class TestStore(unittest.TestCase):
         self._create_user()
 
         self.word3 = Word(word_input='fr_3',
-                          word_output='de_3',
-                          directive=None)
+                          word_output='de_3')
 
         self.db.add_word(self.new_voc, self.word3)
 
         self.db.update_word(self.new_voc, self.word3,
                             word_input='fr_4',
-                            word_output='de_4',
-                            directive='#name')
+                            word_output='de_4')
 
         vocs = self.db.list_vocabularies(None)
         new_word = Word(word_input='fr_4',
-                        word_output='de_4',
-                        directive='#name')
+                        word_output='de_4')
 
         self.assertIn(new_word, vocs[self.new_voc.id].words)
 

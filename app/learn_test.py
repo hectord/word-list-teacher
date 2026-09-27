@@ -10,11 +10,9 @@ class LearnTest(unittest.TestCase):
 
     def setUp(self):
         self.word1 = Word(word_output='word1_output',
-                          word_input='word1_input',
-                          directive='name')
+                          word_input='word1_input')
         self.word2 = Word(word_output='word2_output',
-                          word_input='word2_input',
-                          directive=None)
+                          word_input='word2_input')
 
         words = [self.word1, self.word2]
         self.voc = Vocabulary(self.word1, words, 'fr', 'de')
@@ -69,13 +67,11 @@ class LearnTest(unittest.TestCase):
 
     def test_manage_words_with_same_input(self):
         word1 = Word(word_output='word1_output',
-                     word_input='word1_input',
-                     directive='name')
+                     word_input='word1_input')
         voc1 = Vocabulary(word1, [word1], 'fr', 'de')
 
         word2 = Word(word_output='word2_output',
-                     word_input='word1_input',
-                     directive=None)
+                     word_input='word1_input')
         voc2 = Vocabulary(word2, [word2], 'fr', 'de')
         voc1.add(voc2)
 
@@ -96,24 +92,21 @@ class LearnTest(unittest.TestCase):
 
     def test_filter_word(self):
         word = Word(word_output='abc (1)',
-                    word_input='def (2)',
-                    directive=None)
+                    word_input='def (2)')
 
         self.assertTrue(word.accepts('abc'))
         self.assertEqual('abc (1)', word.word_output)
         self.assertEqual('def (2)', word.word_input)
 
         complex_word = Word(word_output='die (other) Umweltverschmutzung (-en) (1)',
-                            word_input='def (2)',
-                            directive=None)
+                            word_input='def (2)')
 
         self.assertTrue(complex_word.accepts('die Umweltverschmutzung'))
         self.assertEqual('abc (1)', word.word_output)
 
     def test_accepts_ignores_plural_and_spaces(self):
         word = Word(word_output='die Beschreibung (-en)',
-                    word_input='description',
-                    directive=None)
+                    word_input='description')
 
         self.assertTrue(word.accepts('die Beschreibung', 'de'))
         self.assertTrue(word.accepts('  die Beschreibung  ', 'de'))
@@ -122,8 +115,7 @@ class LearnTest(unittest.TestCase):
 
     def test_accepts_german_umlauts(self):
         word = Word(word_output='die Größe (-n)',
-                    word_input='taille',
-                    directive=None)
+                    word_input='taille')
 
         self.assertTrue(word.accepts('die Größe', 'de'))
         self.assertTrue(word.accepts('die Groesse', 'de'))
@@ -131,14 +123,12 @@ class LearnTest(unittest.TestCase):
 
     def test_accepts_french_accents_and_apostrophes(self):
         word = Word(word_output='être',
-                    word_input='sein',
-                    directive=None)
+                    word_input='sein')
         self.assertTrue(word.accepts('etre', 'fr'))
         self.assertTrue(word.accepts('ÊTRE', 'fr'))
 
         phrase = Word(word_output="avoir l'air",
-                      word_input='aussehen',
-                      directive=None)
+                      word_input='aussehen')
         self.assertTrue(phrase.accepts('avoir l’air', 'fr'))
         self.assertTrue(phrase.accepts("avoir l' air", 'fr'))
         self.assertTrue(phrase.accepts('avoir lair', 'fr'))
@@ -154,8 +144,7 @@ class LearnTest(unittest.TestCase):
 
     def test_guess_uses_output_language(self):
         word = Word(word_output='die Beschreibung (-en)',
-                    word_input='description',
-                    directive=None)
+                    word_input='description')
         vocabulary = Vocabulary(None, [word], 'fr', 'de')
         session = Session([], vocabulary, word)
 
@@ -164,8 +153,7 @@ class LearnTest(unittest.TestCase):
 
     def test_load_vocabulary(self):
         expected_word = Word(word_output='abc',
-                             word_input='def',
-                             directive=None)
+                             word_input='def')
         voc = Vocabulary.load(StringIO('abc;def'))
 
         self.assertEqual([expected_word],
@@ -173,11 +161,23 @@ class LearnTest(unittest.TestCase):
 
     def _sectioned_vocabulary(self):
         words = [Word(word_output=f'out_{i}',
-                      word_input=f'in_{i}',
-                      directive=None)
+                      word_input=f'in_{i}')
                  for i in range(3)]
         return Vocabulary(words[0], words, 'en', 'fr',
                           sections=['A', 'A', 'B'])
+
+    def test_name_is_vocabulary_metadata(self):
+        content = ('#input fr\n'
+                   '#output de\n'
+                   '#name de_example;fr_example\n'
+                   'de_a;fr_a\n')
+        voc = Vocabulary.load(StringIO(content))
+
+        self.assertIsNotNone(voc.name)
+        self.assertEqual('fr_example', voc.name.word_input)
+        # the name line is also a regular word
+        self.assertEqual(['de_example', 'de_a'],
+                         [w.word_output for w in voc.words])
 
     def test_section_parsing(self):
         content = ('#input en\n'
@@ -221,8 +221,7 @@ class LearnTest(unittest.TestCase):
 
     def test_load_vocabulary_with_language(self):
         expected_word = Word(word_output='abc',
-                             word_input='def',
-                             directive=None)
+                             word_input='def')
         voc_text = '''
         #input fr
         #output de
