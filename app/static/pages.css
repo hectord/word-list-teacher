@@ -307,6 +307,17 @@ a.signout:hover { text-decoration: underline; }
   vertical-align: 2px;
 }
 
+.type-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #E7EEF7;
+  color: #3E5C86;
+  font-size: 12px;
+  vertical-align: 2px;
+}
+
 /* ---------- vocabulary page: collapsible word list ---------- */
 
 .word-list-toggle {

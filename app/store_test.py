@@ -258,6 +258,39 @@ class TestStore(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_word_type(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        # a word added through the CLI style API carries its type
+        word_id = self.db.add_word(
+            1, 'fr', 'de',
+            Word(word_input='fr_3', word_output='de_3', type='verb'))
+
+        voc = self._projection()
+        typed = [w for w in voc.words if w.word_output == 'de_3'][0]
+        self.assertEqual('verb', typed.type)
+
+        # ... and it can be changed (or cleared) later
+        self.db.update_word_type(word_id, 'noun')
+        voc = self._projection()
+        typed = [w for w in voc.words if w.word_output == 'de_3'][0]
+        self.assertEqual('noun', typed.type)
+
+        # the default is None when the type is unknown
+        self.assertIsNone(voc.words[0].type)
+
+    def test_create_vocabulary_keeps_type(self):
+        voc = Vocabulary(None,
+                         [Word(word_input='fr_1', word_output='de_1',
+                               type='adjective')],
+                         input_language='fr', output_language='de')
+        self.db.create_vocabulary(voc)
+        self._create_user()
+
+        projection = self._projection()
+        self.assertEqual('adjective', projection.words[0].type)
+
     def test_add_word_and_update_text(self):
         self._create_vocabulary()
         self._create_user()
@@ -347,6 +380,9 @@ class TestStore(unittest.TestCase):
 
             db_user = DbUser.get(DbUser.id == 1)
             self.assertEqual('fr', db_user.main_language_id)
+
+            # the migration leaves the (unknown) word type as NULL
+            self.assertIsNone(DbWord.get(DbWord.id == 1).type)
 
             user = User(email='u@x', password='pw',
                         main_language=Language.FRENCH)

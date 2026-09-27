@@ -142,6 +142,15 @@ class LearnTest(unittest.TestCase):
         self.assertEqual('fr', merged.input_language)
         self.assertEqual('de', merged.output_language)
 
+    def test_flip_keeps_type(self):
+        word = Word(word_output='de', word_input='fr', type='noun')
+        vocabulary = Vocabulary(None, [word], 'fr', 'de')
+
+        flipped = vocabulary.flip()
+
+        self.assertEqual('noun', flipped.words[0].type)
+        self.assertEqual('noun', flipped.words[0].flip().type)
+
     def test_guess_uses_output_language(self):
         word = Word(word_output='die Beschreibung (-en)',
                     word_input='description')

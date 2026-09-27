@@ -3,7 +3,7 @@
 {% block title %}Vocabulary{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=8">
+    <link rel="stylesheet" href="/static/pages.css?v=9">
     <script src="/static/vocabulary.js?v=4"></script>
 {% endblock %}
 
@@ -79,7 +79,7 @@
         {% set err = stats.errors_prob_for(word) %}
         {% set sec = sections_by_index[loop.index0] %}
         <div class="row" data-search="{{ (word.word_output ~ ' ' ~ word.word_input) | lower }}" data-section="{{ sec }}">
-          <span class="col out">{% if sec %}<span class="sec-badge">{{ sec }}</span>{% endif %}{{ word.word_output }}</span>
+          <span class="col out">{% if sec %}<span class="sec-badge">{{ sec }}</span>{% endif %}{% if word.type %}<span class="type-badge">{{ word.type }}</span>{% endif %}{{ word.word_output }}</span>
           <span class="col in">{{ word.word_input }}</span>
           <span class="col err">
             <span class="badge {% if err > 40.0 %}unknown{% elif err > 20.0 %}shaky{% else %}good{% endif %}">

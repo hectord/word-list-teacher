@@ -202,15 +202,18 @@ if __name__ == '__main__':
 
     update_word_subparser = db_subparser.add_parser('update-word')
     update_word_subparser.add_argument('word-id', nargs=1, type=int)
-    update_word_subparser.add_argument('--language', required=True,
+    update_word_subparser.add_argument('--language',
                                        help='language of the text')
     update_word_subparser.add_argument('--text', nargs='?')
     update_word_subparser.add_argument('--example', nargs='?')
+    update_word_subparser.add_argument('--type', dest='word_type', nargs='?',
+                                       help='noun, verb, adjective, ...')
 
     add_word_subparser = db_subparser.add_parser('add-word')
     add_word_subparser.add_argument('voc-id', nargs=1, type=int)
     add_word_subparser.add_argument('--input-language', required=True)
     add_word_subparser.add_argument('--output-language', required=True)
+    add_word_subparser.add_argument('--type', dest='word_type', nargs='?')
     add_word_subparser.add_argument('word-input', nargs=1)
     add_word_subparser.add_argument('word-output', nargs=1)
 
@@ -333,7 +336,8 @@ if __name__ == '__main__':
         word_output = args['word-output'][0]
 
         word = Word(word_input=word_input,
-                    word_output=word_output)
+                    word_output=word_output,
+                    type=args['word_type'])
         database.add_word(voc_id, input_code, output_code, word)
 
     elif args.db_cmd == 'update-word':
@@ -343,11 +347,15 @@ if __name__ == '__main__':
         args = vars(args)
         word_id = args['word-id'][0]
         language = args['language']
+        word_type = args['word_type']
         text = args['text'] if args['text'] else None
         example = args['example'] if args['example'] else None
 
-        database.update_word_text(word_id, language,
-                                  text=text, example=example)
+        if word_type is not None:
+            database.update_word_type(word_id, word_type)
+        if language is not None:
+            database.update_word_text(word_id, language,
+                                      text=text, example=example)
 
     else:
         assert False

@@ -73,6 +73,7 @@ class DbSectionText(Model):
 class DbWord(Model):
     vocabulary = ForeignKeyField(DbVocabulary, backref='words')
     section = ForeignKeyField(DbSection, null=True, backref='words')
+    type = CharField(null=True)
 
     class Meta:
         database = db
@@ -253,7 +254,8 @@ class Database:
             if in_text is None or out_text is None:
                 continue
 
-            word = Word(word_input=in_text.text, word_output=out_text.text)
+            word = Word(word_input=in_text.text, word_output=out_text.text,
+                       type=db_word.type)
             words.append(word)
             word_ids[word] = db_word.id
 
@@ -384,7 +386,8 @@ class Database:
         # words and their texts
         for word, section_name in zip(voc.words, voc.word_sections):
             db_word = DbWord.create(vocabulary=new_voc,
-                                    section=section_by_name.get(section_name))
+                                    section=section_by_name.get(section_name),
+                                    type=word.type)
             DbWordText.create(word=db_word,
                               language=input_code,
                               text=word.word_input)
@@ -400,7 +403,7 @@ class Database:
                  word: Word) -> int:
         db_voc = DbVocabulary.get(voc_id)
 
-        db_word = DbWord.create(vocabulary=db_voc)
+        db_word = DbWord.create(vocabulary=db_voc, type=word.type)
 
         DbWordText.create(word=db_word, language=input_code,
                           text=word.word_input)
@@ -408,6 +411,10 @@ class Database:
                           text=word.word_output)
 
         return db_word.id
+
+    def update_word_type(self, word_id: int, word_type: Optional[str]):
+        (DbWord.update(type=word_type)
+         .where(DbWord.id == word_id).execute())
 
     def update_word_text(self, word_id: int, language,
                          text: str = None, example: str = None):
@@ -842,6 +849,13 @@ def _migrate_legacy_vocabularies(vocabularies, words, vocabulary_sessions):
             (vs_id, session_id, voc_id, input_code, output_code, section_id))
 
 
+def _add_column_if_missing(table: str, column: str, definition: str):
+    if column in _table_columns(table):
+        return
+    db.execute_sql('ALTER TABLE %s ADD COLUMN %s %s'
+                   % (table, column, definition))
+
+
 def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
@@ -851,6 +865,8 @@ def load_database(name: str) -> Database:
         _migrate_legacy()
     else:
         db.create_tables(NEW_TABLES)
+        # the word 'type' was added later (existing words get NULL)
+        _add_column_if_missing('dbword', 'type', 'varchar(255)')
 
     db.execute_sql('PRAGMA foreign_keys = ON')
 
