@@ -175,6 +175,7 @@ class WordAttempt:
     word: Word
     typed_word: str
     time: datetime
+    example: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -587,7 +588,8 @@ class Session:
         attempt = WordAttempt(word=current_word,
                               typed_word=word_output,
                               success=success,
-                              time=datetime.now())
+                              time=datetime.now(),
+                              example=self.vocabulary.example(current_word))
         self._attempts.append(attempt)
 
         if success:

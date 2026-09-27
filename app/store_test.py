@@ -291,6 +291,45 @@ class TestStore(unittest.TestCase):
         projection = self._projection()
         self.assertEqual('adjective', projection.words[0].type)
 
+    def test_long_example(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        word_id = self.db.add_word(
+            1, 'fr', 'de',
+            Word(word_input='fr_9', word_output='de_9'))
+
+        example = 'a' * 1024
+        self.db.update_word_text(word_id, 'de', example=example)
+
+        texts = self.db.list_word_texts(1)
+        self.assertEqual(1024, len(texts[word_id]['de']['example']))
+        self.assertEqual(example, texts[word_id]['de']['example'])
+
+        voc = self._projection()
+        word = [w for w in voc.words if w.word_output == 'de_9'][0]
+        self.assertEqual(example, voc.example(word))
+
+    def test_attempt_example_on_reload(self):
+        voc = Vocabulary(None,
+                         [Word(word_input='fr_1', word_output='de_1')],
+                         input_language='fr', output_language='de')
+        voc.set_example(voc.words[0], 'Ein Beispielsatz.')
+        voc_id = self.db.create_vocabulary(voc)
+        self._create_user()
+
+        projection = self._projection(voc_id)
+        session = self.db.create_new_session(self.user, projection)
+        word = session.current_word
+        attempt = session.guess(word, word.word_output)
+        self.db.add_word_attempt(session, attempt)
+
+        self.assertEqual('Ein Beispielsatz.', attempt.example)
+
+        reloaded = self.db.load_session(session.id)
+        self.assertEqual(1, len(reloaded.attempts))
+        self.assertEqual('Ein Beispielsatz.', reloaded.attempts[0].example)
+
     def test_add_word_and_update_text(self):
         self._create_vocabulary()
         self._create_user()

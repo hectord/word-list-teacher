@@ -123,12 +123,32 @@
   background: white;
 }
 
-.example .field {
-  background: #FFF9E8;
-  color: #6B5D55;
+/* example sentence of the practised word (smaller: more content) */
+.word-example {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+
+  padding: 10px 16px;
+
+  font-size: 0.6em;
   font-style: italic;
-  font-size: 0.72em;
+
+  background: #FFFDF5;
   border-top: 1px solid #F0E7C8;
+  color: #6B5D55;
+}
+
+.example-text { flex: 1; }
+
+.right-word .word-example {
+  background: #F2F8F2;
+  border-top-color: #D8EAD8;
+}
+
+.wrong-word .word-example {
+  background: #FFF5F5;
+  border-top-color: #F1DADA;
 }
 
 /* ============ smartphone rendering (< 700px) ============ */
@@ -152,6 +172,12 @@
     font-size: 24px;
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .word-example {
+    font-size: 15px;
+    gap: 6px;
+    padding: 6px 12px;
   }
 
   .word { margin-bottom: 16px; }

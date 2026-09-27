@@ -83,7 +83,7 @@ class DbWordText(Model):
     word = ForeignKeyField(DbWord, backref='texts')
     language = ForeignKeyField(DbLanguage)
     text = CharField()
-    example = CharField(null=True)
+    example = CharField(null=True, max_length=1024)
 
     class Meta:
         database = db
@@ -647,7 +647,8 @@ class Database:
             attempts.append(WordAttempt(word=word,
                                         typed_word=attempt.typed_word,
                                         success=attempt.success,
-                                        time=attempt.time))
+                                        time=attempt.time,
+                                        example=v.example(word)))
 
         current_word = None
         if db_session.current_word is not None:

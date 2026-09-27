@@ -55,9 +55,9 @@ $(document).ready(function() {
         new_node.find(".result .field").text(result.hint);
 
         // show the example sentence of the practised word (when any)
-        var example = new_node.find(".example");
+        var example = new_node.find(".word-example");
         if (result.example) {
-          example.find(".field").text(result.example);
+          example.find(".example-text").text(result.example);
           example.attr("style", "");
         } else {
           example.hide();

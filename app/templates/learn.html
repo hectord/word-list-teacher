@@ -11,8 +11,8 @@
       {{ word_output }}
     </span>
   </div>
-  <div class="word-box example"{% if not word_example %} style="display:none"{% endif %}>
-    <span class="field">
+  <div class="word-example"{% if not word_example %} style="display:none"{% endif %}>
+    <span class="example-text">
       {{ word_example }}
     </span>
   </div>
@@ -34,8 +34,8 @@
       {{ word_result }}
     </span>
   </div>
-  <div class="word-box example"{% if not word_example %} style="display:none"{% endif %}>
-    <span class="field">
+  <div class="word-example"{% if not word_example %} style="display:none"{% endif %}>
+    <span class="example-text">
       {{ word_example }}
     </span>
   </div>
@@ -45,9 +45,9 @@
 {% block title %}Learn{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/learn.css?v=8">
+    <link rel="stylesheet" href="/static/learn.css?v=10">
 
-    <script src="/static/script.js?v=7"></script>
+    <script src="/static/script.js?v=8"></script>
 
 {% endblock %}
 
@@ -74,13 +74,15 @@
         {% if attempt.success %}
         <div class="word right-word">
           {{ word_ok(attempt.word.word_input,
-                     attempt.word.word_output) }}
+                     attempt.word.word_output,
+                     attempt.example or '') }}
         </div>
         {% else %}
           <div class="word wrong-word">
             {{ word_nok(attempt.word.word_input,
                         attempt.typed_word,
-                        attempt.word.word_output) }}
+                        attempt.word.word_output,
+                        attempt.example or '') }}
           </div>
         {% endif %}
       {% endfor %}
