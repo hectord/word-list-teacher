@@ -52,7 +52,7 @@ class Language(Enum):
 class User:
     email: str
     password: str
-    languages_spoken: Set[Language]
+    main_language: Optional[Language]
 
 
 
@@ -179,6 +179,7 @@ class WordAttempt:
 class Section:
     name: str
     vocabulary: 'Vocabulary'
+    id: Optional[int] = None
 
 
 class Vocabulary:
@@ -189,7 +190,8 @@ class Vocabulary:
                  input_language: str = None,
                  output_language: str = None,
                  flipped: bool = False,
-                 sections: List[Optional[str]] = None):
+                 sections: List[Optional[str]] = None,
+                 section_ids: Dict[str, int] = None):
         self._name = name
         self._words = []
         self._word_sections = []
@@ -200,6 +202,8 @@ class Vocabulary:
         self._flipped = flipped
         self._input_language = input_language
         self._output_language = output_language
+        self._section_ids = dict(section_ids or {})
+        self._examples = {}
 
         for i, word in enumerate(words or []):
             section = sections[i] if sections is not None else None
@@ -232,6 +236,31 @@ class Vocabulary:
         """Section of each word, aligned with ``words`` (by index)."""
         return self._word_sections.copy()
 
+    def set_section_ids(self, section_ids: Dict[str, int]):
+        self._section_ids = dict(section_ids or {})
+
+    def section_id(self, name: str) -> Optional[int]:
+        return self._section_ids.get(name)
+
+    def section_name_for_id(self, section_id: int) -> Optional[str]:
+        for name, this_id in self._section_ids.items():
+            if this_id == section_id:
+                return name
+        return None
+
+    def section_by_id(self, section_id: int) -> Optional['Vocabulary']:
+        name = self.section_name_for_id(section_id)
+        if name is None:
+            return None
+        return self.section(name)
+
+    def set_example(self, word: Word, example: Optional[str]):
+        if example is not None:
+            self._examples[word] = example
+
+    def example(self, word: Word) -> Optional[str]:
+        return self._examples.get(word)
+
     def section(self, name: str) -> Optional['Vocabulary']:
         """Return a vocabulary restricted to one section (with word IDs)."""
         words = []
@@ -249,13 +278,15 @@ class Vocabulary:
                          self._input_language,
                          self._output_language,
                          self._flipped,
-                         sections=sub_sections)
+                         sections=sub_sections,
+                         section_ids=self._section_ids)
         voc.set_id(self._id)
 
         for word in words:
             word_id = self._word_ids.get(word)
             if word_id is not None:
                 voc.set_word_id(word, word_id)
+            voc.set_example(word, self.example(word))
 
         return voc
 
@@ -271,7 +302,8 @@ class Vocabulary:
             seen.add(name)
             section_voc = self.section(name)
             if section_voc is not None:
-                result.append(Section(name, section_voc))
+                result.append(Section(name, section_voc,
+                                      self._section_ids.get(name)))
 
         return result
 
@@ -286,13 +318,15 @@ class Vocabulary:
                          self.output_language,
                          self.input_language,
                          not self.is_flipped,
-                         sections=list(self._word_sections))
+                         sections=list(self._word_sections),
+                         section_ids=self._section_ids)
         voc.set_id(self._id)
 
         for word in self._words:
             word_id = self._word_ids.get(word)
             if word_id is not None:
                 voc.set_word_id(word.flip(), word_id)
+            voc.set_example(word.flip(), self.example(word))
 
         return voc
 
@@ -335,6 +369,8 @@ class Vocabulary:
 
         self._words.extend(other._words)
         self._word_sections.extend(other._word_sections)
+        self._section_ids.update(other._section_ids)
+        self._examples.update(other._examples)
         self._word_ids.update(other._word_ids)
 
         for key, words in other._similar_words.items():

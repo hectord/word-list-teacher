@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% macro word_ok(word_input, word_output) -%}
+{% macro word_ok(word_input, word_output, word_example='') -%}
   <div class="word-box input">
     <span class="field">
       {{ word_input }}
@@ -11,9 +11,14 @@
       {{ word_output }}
     </span>
   </div>
+  <div class="word-box example"{% if not word_example %} style="display:none"{% endif %}>
+    <span class="field">
+      {{ word_example }}
+    </span>
+  </div>
 {%- endmacro %}
 
-{% macro word_nok(word_input, word_output, word_result) -%}
+{% macro word_nok(word_input, word_output, word_result, word_example='') -%}
   <div class="word-box input">
     <span class="field">
       {{ word_input }}
@@ -29,15 +34,20 @@
       {{ word_result }}
     </span>
   </div>
+  <div class="word-box example"{% if not word_example %} style="display:none"{% endif %}>
+    <span class="field">
+      {{ word_example }}
+    </span>
+  </div>
 {%- endmacro %}
 
 
 {% block title %}Learn{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/learn.css?v=7">
+    <link rel="stylesheet" href="/static/learn.css?v=8">
 
-    <script src="/static/script.js?v=6"></script>
+    <script src="/static/script.js?v=7"></script>
 
 {% endblock %}
 

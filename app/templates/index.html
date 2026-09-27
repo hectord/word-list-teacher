@@ -3,7 +3,7 @@
 {% block title %}Vocabularies{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=6">
+    <link rel="stylesheet" href="/static/pages.css?v=8">
 {% endblock %}
 
 {% block body %}
@@ -22,73 +22,76 @@
 
   <div class="center">
 
-    {% if not vocabularies_by_languages %}
-      <p class="empty">No vocabulary yet — add one from the CLI:<br>
-        <code>python app/cli.py database data/learn.db add-vocabulary vocabulary/&lt;file&gt;.txt</code></p>
-    {% endif %}
-
-    {% if total_words %}
-      <div class="overall">
-        <div class="overall-info">
-          <span class="overall-title">Overall progress</span>
-          <span class="progress-stats">{{ total_known }} / {{ total_words }} words known</span>
-        </div>
-        <div class="bar big">
-          <div class="bar-fill {% if known_percentage < 40 %}danger{% elif known_percentage < 70 %}warn{% endif %}"
-               style="width: {{ known_percentage }}%"></div>
-        </div>
-      </div>
-    {% endif %}
-
-    {% if vocabularies_by_languages %}
-      <div class="languages-categories">
-        {% for (language_input, language_output), vocabularies in vocabularies_by_languages.items() %}
-          <a href="#{{ language_input.code }}_{{ language_output.code }}" class="languages-category">
-            {{ language_input.name }} ➔ {{ language_output.name }}
-          </a>
+    {% if language and targets %}
+      <div class="language-picker">
+        <span class="picker-language">{{ language.name }}</span>
+        <span class="picker-arrow">➔</span>
+        {% for option in targets %}
+          <a class="picker-option{% if target and option.code == target.code %} active{% endif %}"
+             href="/index?to={{ option.code }}">{{ option.name }}</a>
         {% endfor %}
       </div>
     {% endif %}
 
-    {% for (language_input, language_output), vocabularies in vocabularies_by_languages.items() %}
-      <section id="{{ language_input.code }}_{{ language_output.code }}">
+    {% if not target %}
+      <p class="empty">
+        No vocabulary available
+        {% if language %}for {{ language.name }}{% endif %} yet.
+      </p>
+    {% endif %}
 
-        {% for voc_id, vocabulary in vocabularies %}
-          <div class="vocabulary">
-            <div class="voc-top">
-              <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}">
-                <span class="voc-name">{{ vocabulary.name.word_input if vocabulary.name else (language_input.name ~ ' → ' ~ language_output.name) }}</span>
-              </a>
-              <div class="voc-actions">
-                <a class="button new" href="/new_session?voc_id={{ voc_id }}">New</a>
-                {% if vocabulary in session_by_vocabulary %}
-                  <a class="button resume" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">Resume</a>
-                {% endif %}
-              </div>
-            </div>
+    {% if target %}
+      {% if total_words %}
+        <div class="overall">
+          <div class="overall-info">
+            <span class="overall-title">Overall progress</span>
+            <span class="progress-stats">{{ total_known }} / {{ total_words }} words known</span>
+          </div>
+          <div class="bar big">
+            <div class="bar-fill {% if known_percentage < 40 %}danger{% elif known_percentage < 70 %}warn{% endif %}"
+                 style="width: {{ known_percentage }}%"></div>
+          </div>
+        </div>
+      {% endif %}
 
-            <div class="voc-meta">
-              <span class="lang">{{ language_input.name }} <b>→</b> {{ language_output.name }}</span>
-              <span class="count">{{ vocabulary | length }} words</span>
-              {% if has_finished_session[vocabulary] %}
-                <span class="accuracy-chip {% if percentage_by_vocabulary[vocabulary] >= 70.0 %}good{% elif percentage_by_vocabulary[vocabulary] >= 40.0 %}shaky{% else %}unknown{% endif %}">
-                  {{ '%.0f' % percentage_by_vocabulary[vocabulary] }}% accuracy
-                </span>
+      {% for voc_id, vocabulary in vocabularies %}
+        <div class="vocabulary">
+          <div class="voc-top">
+            <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}&to={{ target.code }}">
+              <span class="voc-name">{{ vocabulary.name.word_input if vocabulary.name else (language.name ~ ' → ' ~ target.name) }}</span>
+            </a>
+            <div class="voc-actions">
+              <a class="button new" href="/new_session?voc_id={{ voc_id }}&to={{ target.code }}">New</a>
+              {% if vocabulary in session_by_vocabulary %}
+                <a class="button resume" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">Resume</a>
               {% endif %}
             </div>
-
-            <div class="voc-progress">
-              <div class="bar">
-                <div class="bar-fill {% if known_percentage_by_vocabulary[vocabulary] < 40 %}danger{% elif known_percentage_by_vocabulary[vocabulary] < 70 %}warn{% endif %}"
-                     style="width: {{ known_percentage_by_vocabulary[vocabulary] }}%"></div>
-              </div>
-              <span class="progress-stats">{{ known_by_vocabulary[vocabulary] }} / {{ vocabulary | length }} words known</span>
-            </div>
           </div>
-        {% endfor %}
 
-      </section>
-    {% endfor %}
+          <div class="voc-meta">
+            <span class="lang">{{ language.name }} <b>→</b> {{ target.name }}</span>
+            <span class="count">{{ vocabulary | length }} words</span>
+            {% if has_finished_session[vocabulary] %}
+              <span class="accuracy-chip {% if percentage_by_vocabulary[vocabulary] >= 70.0 %}good{% elif percentage_by_vocabulary[vocabulary] >= 40.0 %}shaky{% else %}unknown{% endif %}">
+                {{ '%.0f' % percentage_by_vocabulary[vocabulary] }}% accuracy
+              </span>
+            {% endif %}
+          </div>
+
+          <div class="voc-progress">
+            <div class="bar">
+              <div class="bar-fill {% if known_percentage_by_vocabulary[vocabulary] < 40 %}danger{% elif known_percentage_by_vocabulary[vocabulary] < 70 %}warn{% endif %}"
+                   style="width: {{ known_percentage_by_vocabulary[vocabulary] }}%"></div>
+            </div>
+            <span class="progress-stats">{{ known_by_vocabulary[vocabulary] }} / {{ vocabulary | length }} words known</span>
+          </div>
+        </div>
+      {% endfor %}
+
+      {% if not vocabularies %}
+        <p class="empty">No vocabulary to practice for this language pair yet.</p>
+      {% endif %}
+    {% endif %}
 
   </div>
 

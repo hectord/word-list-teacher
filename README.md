@@ -31,17 +31,18 @@ The server runs on http://127.0.0.1:8000 and uses the database at
 
 ## Dictionary & CLI
 
-Vocabularies are loaded into the database with the CLI (`app/cli.py`):
+Vocabularies are loaded into the database with the CLI (`app/cli.py`).
+A vocabulary is language agnostic: it has a title, sections and words, and
+each of them has one text per language (plus an optional example sentence).
 
 ```bash
 # initialize the languages (once per fresh database)
 myenv/bin/python app/cli.py database data/learn.db init
 
-# create a user; --speaks controls which vocabularies are visible
-# (the app shows a vocabulary only when the user knows exactly one of
-# its two languages)
+# create a user with their main language (the language they know);
+# on the index page they then pick the language they want to practise
 myenv/bin/python app/cli.py database data/learn.db \
-    create-user you@example.com --speaks fr
+    create-user you@example.com --main-language fr
 
 # import a cleaned dictionary (assumed German -> French):
 # vocabulary;section;german;translation
@@ -50,7 +51,9 @@ myenv/bin/python app/cli.py database data/learn.db \
 ```
 
 Useful commands: `list-vocabularies`, `list-sections <voc-id>`,
-`list-words <voc-id>`, `add-vocabulary <file>`, `remove-vocabulary <voc-id>`.
+`list-words <voc-id>`, `add-vocabulary <file>`, `remove-vocabulary <voc-id>`,
+`add-word <voc-id> --input-language fr --output-language de <in> <out>`,
+`update-word <word-id> --language de [--text <text>] [--example <sentence>]`.
 
 ## Docker image
 

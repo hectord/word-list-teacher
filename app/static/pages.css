@@ -95,6 +95,36 @@ a.signout:hover { text-decoration: underline; }
   transform: translateY(-1px);
 }
 
+/* ---------- language picker ---------- */
+
+.language-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.picker-language { font-size: 18px; color: #3B2F2A; }
+.picker-arrow { color: #A08B7F; }
+
+.picker-option {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid #E8DBD2;
+  background: #fff;
+  color: #7A4B36;
+  font-size: 14px;
+  text-decoration: none;
+  transition: background .15s ease, color .15s ease;
+}
+.picker-option:hover { background: #7A4B36; color: #fff; }
+.picker-option.active {
+  background: #C75B39;
+  border-color: #C75B39;
+  color: #fff;
+}
+
 /* ---------- overall progress ---------- */
 
 .overall {
@@ -420,6 +450,10 @@ a.signout:hover { text-decoration: underline; }
   .section-card { padding: 12px 14px; gap: 8px; }
   .section-name { font-size: 16px; }
   .section-count { font-size: 12px; }
+
+  .language-picker { gap: 6px; margin-bottom: 14px; }
+  .picker-language { font-size: 16px; }
+  .picker-option { padding: 5px 12px; font-size: 13px; }
 
   /* word list rows: word + translation on one line, error below */
   .row {

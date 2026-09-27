@@ -1,11 +1,17 @@
 # -*- coding: utf-8 -*-
 
+import os
+import sqlite3
+import tempfile
 import unittest
 
 from typing import Set
 
-from store import load_database, DbException
-from learn import Vocabulary, Word, Language
+from store import (load_database, DbException,
+                   DbVocabulary, DbVocabularyTitle, DbSection, DbSectionText,
+                   DbWord, DbWordText, DbVocabularySession, DbWordAttempt,
+                   DbUser)
+from learn import Vocabulary, Word, Language, User
 
 
 class TestStore(unittest.TestCase):
@@ -31,38 +37,49 @@ class TestStore(unittest.TestCase):
         voc_id = self.db.create_vocabulary(self.new_voc)
         self.assertEqual(1, voc_id)
 
-    def _create_user(self, languages: Set[Language] = None):
-        if languages is None:
-            languages = {Language.FRENCH, Language.CHINESE}
+    def _create_user(self, main_language: Language = None):
+        if main_language is None:
+            main_language = Language.FRENCH
         self.user = self.db.create_user('test@hotmail.com', 'abc',
-                                        languages)
+                                        main_language)
+
+    def _projection(self, voc_id: int = 1,
+                    target: Language = Language.GERMAN) -> Vocabulary:
+        return self.db.get_vocabulary(self.user, voc_id, target)
 
     def test_voc(self):
         self._create_vocabulary()
         self._create_user()
 
-        vocs = self.db.list_vocabularies(self.user).values()
+        vocs = self.db.list_vocabularies(self.user, Language.GERMAN)
         self.assertEqual(1, len(vocs))
 
-        self.assertEqual([self.word1, self.word2],
-                         next(iter(vocs)).words)
+        voc = next(iter(vocs.values()))
+        self.assertEqual([self.word1, self.word2], voc.words)
+        self.assertEqual('fr', voc.input_language)
+        self.assertEqual('de', voc.output_language)
+        self.assertEqual('fr_1', voc.name.word_input)
 
-        voc2 = self.db.get_vocabulary(self.user, 1)
-        self.assertEqual([self.word1, self.word2],
-                         voc2.words)
-        self.assertEqual('fr_1', voc2.name.word_input)
+    def test_language_agnostic_entities(self):
+        self._create_vocabulary()
+
+        self.assertEqual(1, DbVocabulary.select().count())
+        self.assertEqual(2, DbWord.select().count())
+        self.assertEqual(4, DbWordText.select().count())
+        self.assertEqual(2, DbVocabularyTitle.select().count())
 
     def test_manage_sessions(self):
         self._create_vocabulary()
         self._create_user()
 
-        self.assertIsNone(self.db.last_session(self.user, self.new_voc))
+        voc = self._projection()
+        self.assertIsNone(self.db.last_session(self.user, voc))
 
-        session_id = self.db.create_new_session(self.user, self.new_voc)
-        self.assertIsNotNone(session_id)
+        created = self.db.create_new_session(self.user, voc)
+        self.assertIsNotNone(created.id)
 
-        session = self.db.last_session(self.user, self.new_voc)
-        self.assertEqual(session_id.id, session.id)
+        session = self.db.last_session(self.user, voc)
+        self.assertEqual(created.id, session.id)
 
         first_word = session.current_word
 
@@ -77,9 +94,9 @@ class TestStore(unittest.TestCase):
         self.assertNotEqual(first_word, db_session.current_word)
         self.assertFalse(db_session.is_finished)
 
-        self.assertIsNone(self.db.last_session(self.user, self.new_voc,
+        self.assertIsNone(self.db.last_session(self.user, voc,
                                                finished=True))
-        self.assertIsNotNone(self.db.last_session(self.user, self.new_voc,
+        self.assertIsNotNone(self.db.last_session(self.user, voc,
                                                   finished=False))
 
         word_attempt = session.guess(session.current_word,
@@ -90,102 +107,61 @@ class TestStore(unittest.TestCase):
         self.assertTrue(db_session.is_finished)
         self.assertEqual(100.0, db_session.accuracy)
 
-        self.assertIsNone(self.db.last_session(self.user, self.new_voc,
-                                               finished=False))
-        self.assertIsNotNone(self.db.last_session(self.user, self.new_voc,
-                                                  finished=True))
-
     def test_vocabulary_stats(self):
-        self._create_user()
         self._create_vocabulary()
+        self._create_user()
 
-        new_session = self.db.create_new_session(self.user, self.new_voc)
+        voc = self._projection()
+        new_session = self.db.create_new_session(self.user, voc)
 
         word = new_session.current_word
         attempt = new_session.guess(word, 'bla')
-
         self.db.add_word_attempt(new_session, attempt)
 
-        other_word = new_session.current_word
-
-        stats = self.db.vocabulary_stats(self.new_voc)
+        stats = self.db.vocabulary_stats(voc)
 
         self.assertEqual(100.0, stats.errors_prob_for(word))
-        self.assertEqual(0.0, stats.errors_prob_for(other_word))
+
+    def test_target_languages(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        targets = self.db.target_languages('fr')
+        self.assertEqual([Language.GERMAN], targets)
+        self.assertEqual([Language.FRENCH], self.db.target_languages('de'))
 
     def test_user(self):
         self._create_user()
         self.assertIsNotNone(self.user)
+        self.assertEqual(Language.FRENCH, self.user.main_language)
 
         with self.assertRaises(DbException):
-            self.db.create_user('test@hotmail.com', 'other', set())
+            self.db.create_user('test@hotmail.com', 'other',
+                                Language.FRENCH)
 
         with self.assertRaises(DbException):
             self.db.get_user('test2@gmail.com', 'def')
 
-        with self.assertRaises(DbException):
-            self.db.get_user('test@hotmail.com', 'def')
-
         other_user = self.db.get_user('test@hotmail.com', 'abc')
         self.assertEqual('test@hotmail.com', other_user.email)
 
-
-    def test_normal_vocabulary(self):
-        self._create_vocabulary()
-        self._create_user({Language.FRENCH})
-
-        vocs = self.db.list_vocabularies(self.user)
-
-        self.assertEqual(1, len(vocs))
-        first_voc = next(iter(vocs.values()))
-        self.assertFalse(first_voc.is_flipped)
-
-        first_voc = self.db.get_vocabulary(self.user, first_voc.id)
-
-        self.assertFalse(first_voc.is_flipped)
-        self.assertEqual('fr', first_voc.input_language)
-        self.assertEqual('de', first_voc.output_language)
-
-        self.assertEqual([self.word1, self.word2],
-                          first_voc.words)
-
-        new_session = self.db.create_new_session(self.user, first_voc)
-        self.assertFalse(new_session.is_flipped)
-
-        self.assertIn(new_session.current_word,
-                      {self.word1, self.word2})
-
-        session_fetched = self.db.last_session(self.user, first_voc)
-
-        self.assertIn(session_fetched.current_word,
-                      {self.word1, self.word2})
-
-        session_fetched2 = self.db.load_session(session_fetched.id)
-        self.assertIn(session_fetched2.current_word,
-                      {self.word1, self.word2})
-
-        current_word = session_fetched.current_word
-        attempt = session_fetched.guess(current_word, current_word.word_input)
-
-        self.db.add_word_attempt(session_fetched, attempt)
-
     def _create_sectioned_vocabulary(self):
-        self.sec_words = [Word(word_input='en_1', word_output='fr_1'),
-                          Word(word_input='en_2', word_output='fr_2'),
-                          Word(word_input='en_3', word_output='fr_3')]
+        self.sec_words = [Word(word_input='fr_1', word_output='de_1'),
+                          Word(word_input='fr_2', word_output='de_2'),
+                          Word(word_input='fr_3', word_output='de_3')]
 
         self.sec_voc = Vocabulary(self.sec_words[0], self.sec_words,
-                                  input_language='en',
-                                  output_language='fr',
+                                  input_language='fr',
+                                  output_language='de',
                                   sections=['A', 'A', 'B'])
 
         return self.db.create_vocabulary(self.sec_voc)
 
     def test_section_persistence(self):
         voc_id = self._create_sectioned_vocabulary()
-        self._create_user({Language.ENGLISH})
+        self._create_user()
 
-        voc = self.db.get_vocabulary(self.user, voc_id)
+        voc = self._projection(voc_id)
 
         self.assertEqual(['A', 'B'], [s.name for s in voc.sections])
         self.assertEqual('A', voc.section_of(voc.words[0]))
@@ -193,9 +169,9 @@ class TestStore(unittest.TestCase):
 
     def test_section_session(self):
         voc_id = self._create_sectioned_vocabulary()
-        self._create_user({Language.ENGLISH})
+        self._create_user()
 
-        voc = self.db.get_vocabulary(self.user, voc_id)
+        voc = self._projection(voc_id)
 
         with self.assertRaises(DbException):
             self.db.create_new_session(self.user, voc, section='Nope')
@@ -207,16 +183,16 @@ class TestStore(unittest.TestCase):
         self.assertEqual(3, len(whole_session.vocabulary))
         self.assertEqual(2, len(section_session.vocabulary))
         self.assertEqual(['A', 'A'],
-                         [voc.section_of(w) for w in section_session.vocabulary.words])
+                         [voc.section_of(w)
+                          for w in section_session.vocabulary.words])
 
         self.assertEqual(whole_session.id,
-                         self.db.last_session(self.user, voc, section='').id)
+                         self.db.last_session(self.user, voc,
+                                              section='').id)
         self.assertEqual(section_session.id,
-                         self.db.last_session(self.user, voc, section='A').id)
+                         self.db.last_session(self.user, voc,
+                                              section='A').id)
 
-        attempt = whole_session.guess(whole_session.current_word,
-                                      whole_session.current_word.word_output)
-        self.db.add_word_attempt(whole_session, attempt)
         attempt = section_session.guess(section_session.current_word,
                                         section_session.current_word.word_output)
         self.db.add_word_attempt(section_session, attempt)
@@ -226,135 +202,15 @@ class TestStore(unittest.TestCase):
         self.assertEqual(1, len(reloaded.attempts))
         self.assertFalse(reloaded.is_finished)
 
-    def test_section_flipped(self):
-        voc_id = self._create_sectioned_vocabulary()
-        # user speaks French -> fr/en vocab is flipped
-        self._create_user({Language.FRENCH})
-
-        voc = self.db.get_vocabulary(self.user, voc_id)
-        self.assertTrue(voc.is_flipped)
-        self.assertEqual(['A', 'B'], [s.name for s in voc.sections])
-
-        section_session = self.db.create_new_session(self.user, voc,
-                                                     section='B')
-        self.assertTrue(section_session.is_flipped)
-        self.assertEqual(1, len(section_session.vocabulary))
-
-        attempt = section_session.guess(section_session.current_word,
-                                        section_session.current_word.word_output)
-        self.db.add_word_attempt(section_session, attempt)
-
-        reloaded = self.db.load_session(section_session.id)
-        self.assertTrue(reloaded.is_flipped)
-        self.assertEqual(1, len(reloaded.vocabulary))
-        self.assertEqual(1, len(reloaded.attempts))
-        self.assertTrue(reloaded.is_finished)
-
-    def test_flipped_vocabulary(self):
-        self._create_vocabulary()
-        self._create_user({Language.GERMAN})
-
-        vocs = self.db.list_vocabularies(self.user)
-
-        self.assertEqual(1, len(vocs))
-        first_voc = next(iter(vocs.values()))
-
-        first_voc = self.db.get_vocabulary(self.user, first_voc.id)
-
-        self.assertTrue(first_voc.is_flipped)
-        self.assertEqual('de', first_voc.input_language)
-        self.assertEqual('fr', first_voc.output_language)
-
-        self.assertEqual([self.word1.flip(), self.word2.flip()],
-                          first_voc.words)
-
-        new_session = self.db.create_new_session(self.user, first_voc)
-
-        self.assertIn(new_session.current_word,
-                      {self.word1.flip(), self.word2.flip()})
-        self.assertTrue(new_session.is_flipped)
-
-        self.assertTrue(first_voc.is_flipped)
-        session_fetched = self.db.last_session(self.user, first_voc)
-        self.assertTrue(session_fetched.is_flipped)
-
-        self.assertIn(session_fetched.current_word,
-                      {self.word1.flip(), self.word2.flip()})
-
-        session_fetched2 = self.db.load_session(session_fetched.id)
-        self.assertIn(session_fetched2.current_word,
-                      {self.word1.flip(), self.word2.flip()})
-
-        current_word = session_fetched.current_word
-        attempt = session_fetched.guess(current_word, current_word.word_input)
-
-        self.db.add_word_attempt(session_fetched, attempt)
-
-    def test_list_vocabulary(self):
-        self._create_vocabulary()
-        self._create_user()
-
-        vocs = self.db.list_vocabularies_for(None)
-
-        self.assertEqual({1}, vocs.keys())
-        voc = next(iter(vocs.values()))
-
-        self.assertEqual(self.new_voc.words, voc.words)
-
-        self.assertIsNone(self.db.get_vocabulary(None, 2))
-        self.assertEqual([self.word1, self.word2],
-                         self.db.get_vocabulary(None, 1).words)
-
-    def test_load_dictionary(self):
-        import tempfile
-        import os
-        from cli import load_dictionary
-
-        fd, path = tempfile.mkstemp(suffix='.csv')
-        os.close(fd)
-        try:
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write('vocabulary;section;german;translation\n')
-                f.write('1 Beschreibung von Menschen;;sein*;être\n')
-                f.write('1 Beschreibung von Menschen;;haben;avoir\n')
-                f.write('2 Kleidung und Mode;Verbs;tragen;porter\n')
-                f.write('2 Kleidung und Mode;Verbs;anziehen;to put on\n')
-
-            vocabularies = load_dictionary(path)
-
-            self.assertEqual(2, len(vocabularies))
-
-            voc1 = vocabularies[0]
-            self.assertEqual('fr', voc1.input_language)
-            self.assertEqual('de', voc1.output_language)
-            self.assertEqual('1 Beschreibung von Menschen',
-                             voc1.name.word_input)
-            self.assertEqual([], [s.name for s in voc1.sections])
-            self.assertEqual(2, len(voc1.words))
-            self.assertEqual('sein*', voc1.words[0].word_output)
-            self.assertEqual('être', voc1.words[0].word_input)
-            self.assertIsNone(voc1.section_of(voc1.words[0]))
-
-            voc2 = vocabularies[1]
-            self.assertEqual('fr', voc2.input_language)
-            self.assertEqual('2 Kleidung und Mode',
-                             voc2.name.word_input)
-            self.assertEqual(['Verbs'], [s.name for s in voc2.sections])
-            self.assertEqual(2, len(voc2.words))
-            self.assertEqual('Verbs', voc2.section_of(voc2.words[0]))
-        finally:
-            if os.path.exists(path):
-                os.remove(path)
-
     def test_known_word_counts_by_user(self):
         self._create_vocabulary()
         self._create_user()
 
-        other = self.db.create_user('other@x.com', 'abc',
-                                    {Language.FRENCH})
+        other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
 
         def practice(user):
-            session = self.db.create_new_session(user, self.new_voc)
+            voc = self.db.get_vocabulary(user, 1, Language.GERMAN)
+            session = self.db.create_new_session(user, voc)
             word = session.current_word
             attempt = session.guess(word, word.word_output)
             self.db.add_word_attempt(session, attempt)
@@ -365,101 +221,149 @@ class TestStore(unittest.TestCase):
         users = self.db.list_users()
         self.assertEqual(2, len(users))
         user_ids = {email: user_id for user_id, email in users}
-        self.assertEqual({'test@hotmail.com', 'other@x.com'},
-                         set(user_ids))
 
         counts = self.db.known_word_counts_by_user()
         self.assertEqual(1, sum(counts[user_ids['test@hotmail.com']].values()))
         self.assertEqual(1, sum(counts[user_ids['other@x.com']].values()))
 
-    def test_migration_adds_section_columns(self):
-        import os
-        import tempfile
+    def test_load_dictionary(self):
+        from cli import load_dictionary
 
-        import store as store_module
-
-        fd, path = tempfile.mkstemp(suffix='.db')
+        fd, path = tempfile.mkstemp(suffix='.csv')
         os.close(fd)
         try:
-            raw = store_module.SqliteDatabase(path)
-            raw.execute_sql(
-                'CREATE TABLE dbword (id INTEGER PRIMARY KEY AUTOINCREMENT, '
-                'vocabulary_id INTEGER NOT NULL, word_input VARCHAR(255) NOT NULL, '
-                'word_output VARCHAR(255) NOT NULL, directive VARCHAR(255))')
-            raw.execute_sql(
-                'CREATE TABLE dbvocabularysession (id INTEGER PRIMARY KEY AUTOINCREMENT, '
-                'session_id INTEGER NOT NULL, vocabulary_id INTEGER NOT NULL, '
-                'flipped INTEGER NOT NULL)')
-            raw.close()
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('vocabulary;section;german;translation\n')
+                f.write('1 Menschen;;sein*;être\n')
+                f.write('1 Menschen;;haben;avoir\n')
+                f.write('2 Mode;Verbs;tragen;porter\n')
+                f.write('2 Mode;Verbs;anziehen;to put on\n')
 
-            load_database(path)
+            vocabularies = load_dictionary(path)
+            self.assertEqual(2, len(vocabularies))
 
-            for table in ('dbword', 'dbvocabularysession'):
-                cursor = store_module.db.execute_sql(
-                    'PRAGMA table_info(%s)' % table)
-                columns = [row[1] for row in cursor.fetchall()]
-                self.assertIn('section', columns)
+            voc1 = vocabularies[0]
+            self.assertEqual('fr', voc1.input_language)
+            self.assertEqual('de', voc1.output_language)
+            self.assertEqual('1 Menschen', voc1.name.word_input)
+            self.assertEqual(2, len(voc1.words))
+            self.assertIsNone(voc1.section_of(voc1.words[0]))
 
-            # the legacy 'directive' column is dropped by the migration
-            cursor = store_module.db.execute_sql('PRAGMA table_info(dbword)')
-            columns = [row[1] for row in cursor.fetchall()]
-            self.assertNotIn('directive', columns)
+            voc_id = self.db.create_vocabulary(voc1)
+            self._create_user()
+            projection = self._projection(voc_id)
+            self.assertEqual(2, len(projection.words))
+            self.assertEqual('sein*', projection.words[0].word_output)
         finally:
             if os.path.exists(path):
                 os.remove(path)
+
+    def test_add_word_and_update_text(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        word = Word(word_input='fr_3', word_output='de_3')
+        word_id = self.db.add_word(1, 'fr', 'de', word)
+
+        self.db.update_word_text(word_id, 'de', text='de_4',
+                                 example='ein Beispiel')
+
+        texts = self.db.list_word_texts(1)
+        self.assertEqual('de_4', texts[word_id]['de']['text'])
+        self.assertEqual('ein Beispiel', texts[word_id]['de']['example'])
+        self.assertEqual('fr_3', texts[word_id]['fr']['text'])
 
     def test_remove_vocabulary(self):
         self._create_vocabulary()
         self._create_user()
 
-        self.db.create_new_session(self.user, self.new_voc)
-        session = self.db.last_session(self.user, self.new_voc)
-        session.guess(self.word1, self.word1.word_output)
+        voc = self._projection()
+        self.db.create_new_session(self.user, voc)
 
-        self.db.remove_vocabulary(self.new_voc)
+        self.db.remove_vocabulary(1)
 
-        self.assertEqual({}, self.db.list_vocabularies(None))
+        self.assertEqual({}, self.db.list_vocabularies(self.user,
+                                                       Language.GERMAN))
+        self.assertEqual(0, DbWord.select().count())
+        self.assertEqual(0, DbWordText.select().count())
 
-    def test_add_word(self):
-        self._create_vocabulary()
-        self._create_user()
+    def test_legacy_migration(self):
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        try:
+            con = sqlite3.connect(path)
+            con.executescript(
+                "CREATE TABLE dblanguage (code VARCHAR(255) PRIMARY KEY, "
+                "name VARCHAR(255) NOT NULL);"
+                "CREATE TABLE dbuser (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "email VARCHAR(255) NOT NULL, password VARCHAR(255) NOT NULL);"
+                "CREATE TABLE dbspeak (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "language_id VARCHAR(255) NOT NULL, user_id INTEGER NOT NULL);"
+                "CREATE TABLE dbvocabulary (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "input_language_id VARCHAR(255) NOT NULL, "
+                "output_language_id VARCHAR(255) NOT NULL, name VARCHAR(255));"
+                "CREATE TABLE dbword (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "vocabulary_id INTEGER NOT NULL, word_input VARCHAR(255) NOT NULL, "
+                "word_output VARCHAR(255) NOT NULL, section VARCHAR(255));"
+                "CREATE TABLE dbsession (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "user_id INTEGER NOT NULL, current_word_id INTEGER, "
+                "creation DATETIME NOT NULL, finished SMALLINT NOT NULL);"
+                "CREATE TABLE dbvocabularysession (id INTEGER PRIMARY KEY "
+                "AUTOINCREMENT, session_id INTEGER NOT NULL, "
+                "vocabulary_id INTEGER NOT NULL, flipped SMALLINT NOT NULL, "
+                "section VARCHAR(255));"
+                "CREATE TABLE dbwordattempt (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "word_id INTEGER NOT NULL, session_id INTEGER NOT NULL, "
+                "typed_word VARCHAR(255) NOT NULL, success SMALLINT NOT NULL, "
+                "time DATETIME NOT NULL);"
+                "INSERT INTO dblanguage VALUES ('fr','French'),('de','German');"
+                "INSERT INTO dbuser (id,email,password) VALUES (1,'u@x','pw');"
+                "INSERT INTO dbspeak (language_id,user_id) VALUES ('fr',1);"
+                "INSERT INTO dbvocabulary "
+                "(id,input_language_id,output_language_id,name) "
+                "VALUES (1,'fr','de','Test');"
+                "INSERT INTO dbword "
+                "(id,vocabulary_id,word_input,word_output,section) "
+                "VALUES (1,1,'un','eins','A'),(2,1,'deux','zwei',NULL);"
+                "INSERT INTO dbsession (id,user_id,creation,finished) "
+                "VALUES (1,1,'2020-01-01',0);"
+                "INSERT INTO dbvocabularysession "
+                "(id,session_id,vocabulary_id,flipped,section) "
+                "VALUES (1,1,1,0,'A');"
+                "INSERT INTO dbwordattempt "
+                "(id,word_id,session_id,typed_word,success,time) "
+                "VALUES (1,1,1,'eins',1,'2020-01-01');"
+            )
+            con.commit()
+            con.close()
 
-        self.word3 = Word(word_input='fr_3',
-                          word_output='de_3')
+            database = load_database(path)
 
-        self.db.add_word(self.new_voc, self.word3)
+            self.assertEqual(1, DbVocabulary.select().count())
+            self.assertEqual(2, DbWord.select().count())
+            self.assertEqual(4, DbWordText.select().count())
+            self.assertEqual(1, DbSection.select().count())
+            self.assertEqual(1, DbWordAttempt.select().count())
 
-        self.db.update_word(self.new_voc, self.word3,
-                            word_input='fr_4',
-                            word_output='de_4')
+            db_user = DbUser.get(DbUser.id == 1)
+            self.assertEqual('fr', db_user.main_language_id)
 
-        vocs = self.db.list_vocabularies(None)
-        new_word = Word(word_input='fr_4',
-                        word_output='de_4')
+            user = User(email='u@x', password='pw',
+                        main_language=Language.FRENCH)
+            vocs = database.list_vocabularies(user, Language.GERMAN)
+            self.assertEqual(1, len(vocs))
 
-        self.assertIn(new_word, vocs[self.new_voc.id].words)
+            voc = next(iter(vocs.values()))
+            self.assertEqual('Test', voc.name.word_input)
+            self.assertEqual(2, len(voc.words))
+            self.assertEqual(['A'], [s.name for s in voc.sections])
 
-    def test_save_same_words_twice(self):
-        self._create_vocabulary()
-        self._create_user()
-
-        session_id = self.db.create_new_session(self.user, self.new_voc)
-        self.assertIsNotNone(session_id)
-
-        session = self.db.last_session(self.user, self.new_voc)
-        self.assertEqual(session_id.id, session.id)
-
-        first_word = session.current_word
-
-        word_attempt = session.guess(session.current_word,
-                                     session.current_word.word_output)
-
-        self.db.add_word_attempt(session, word_attempt)
-        self.db.add_word_attempt(session, word_attempt)
-
-        session2 = self.db.last_session(self.user, self.new_voc)
-
-        self.assertEqual(2, len(session2.attempts))
+            session = database.load_session(1)
+            self.assertEqual(1, len(session.attempts))
+            self.assertEqual('eins', session.attempts[0].word.word_output)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
 
 
 if __name__ == '__main__':

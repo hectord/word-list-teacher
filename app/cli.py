@@ -186,7 +186,9 @@ if __name__ == '__main__':
 
     create_user_subparser = db_subparser.add_parser('create-user')
     create_user_subparser.add_argument('username', help='new username', nargs=1)
-    create_user_subparser.add_argument('--speaks', help='language spoken', nargs='+')
+    create_user_subparser.add_argument('--main-language', required=True,
+                                       help='language the user knows',
+                                       nargs=1)
 
     db_subparser.add_parser('list-vocabularies')
     list_words_subparser = db_subparser.add_parser('list-words')
@@ -198,14 +200,17 @@ if __name__ == '__main__':
     remove_vocabulary_subparser = db_subparser.add_parser('remove-vocabulary')
     remove_vocabulary_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
-    remove_word_subparser = db_subparser.add_parser('update-word')
-    remove_word_subparser.add_argument('voc-id', nargs=1, type=int)
-    remove_word_subparser.add_argument('word-id', nargs=1, type=int)
-    remove_word_subparser.add_argument('--word-input', nargs='?')
-    remove_word_subparser.add_argument('--word-output', nargs='?')
+    update_word_subparser = db_subparser.add_parser('update-word')
+    update_word_subparser.add_argument('word-id', nargs=1, type=int)
+    update_word_subparser.add_argument('--language', required=True,
+                                       help='language of the text')
+    update_word_subparser.add_argument('--text', nargs='?')
+    update_word_subparser.add_argument('--example', nargs='?')
 
     add_word_subparser = db_subparser.add_parser('add-word')
     add_word_subparser.add_argument('voc-id', nargs=1, type=int)
+    add_word_subparser.add_argument('--input-language', required=True)
+    add_word_subparser.add_argument('--output-language', required=True)
     add_word_subparser.add_argument('word-input', nargs=1)
     add_word_subparser.add_argument('word-output', nargs=1)
 
@@ -260,16 +265,12 @@ if __name__ == '__main__':
 
         password = getpass.getpass()
 
-        languages = set()
-        for language_code in args.speaks:
-            language = Language.from_code(language_code)
+        language = Language.from_code(args.main_language[0])
+        if language is None:
+            print("invalid language code", file=sys.stderr)
+            sys.exit(-1)
 
-            if language is None:
-                print("invalid code", file=sys.stdout)
-                sys.exit(-1)
-            languages.add(language)
-
-        database.create_user(username, password, languages)
+        database.create_user(username, password, language)
 
     elif args.db_cmd == 'init':
         database = args.database[0]
@@ -281,26 +282,23 @@ if __name__ == '__main__':
         database = args.database[0]
         database = load_database(database)
 
-        for voc_id, voc in database.list_vocabularies_for(None).items():
-            print('%4d (%s -> %s) %5d words, %2d sections%s'
-                  % (voc_id, voc.input_language, voc.output_language,
-                     len(voc), len(voc.sections),
-                     ('' if voc.name is None
-                      else '  name: %s' % voc.name.word_input)))
+        for summary in database.vocabulary_summaries():
+            title = next(iter(summary['titles'].values()), '-')
+            print('%4d %5d words  %s'
+                  % (summary['id'], summary['size'], title))
+
     elif args.db_cmd == 'list-sections':
         database = args.database[0]
         database = load_database(database)
 
         voc_id = vars(args)['voc-id'][0]
 
-        voc = database.get_vocabulary(None, voc_id)
-
-        if voc is None:
-            print("no vocabulary found", file=sys.stderr)
-            sys.exit(1)
-
-        for section in voc.sections:
-            print('%2d %s' % (len(section.vocabulary), section.name))
+        for section_id, texts in \
+                database.list_section_texts(voc_id).items():
+            print('%4d %s'
+                  % (section_id,
+                     ' | '.join('%s: %s' % (code, text)
+                                for code, text in texts.items())))
 
     elif args.db_cmd == 'list-words':
         database = args.database[0]
@@ -308,15 +306,11 @@ if __name__ == '__main__':
 
         voc_id = vars(args)['voc-id'][0]
 
-        voc = database.get_vocabulary(None, voc_id)
-
-        if voc is None:
-            print("no vocabulary found", file=sys.stderr)
-            sys.exit(1)
-
-        for word in voc.words:
-            word_id = voc.word_id(word)
-            print('%4d %30s %30s' % (word_id, word.word_output, word.word_input))
+        for word_id, texts in database.list_word_texts(voc_id).items():
+            print('%4d %s'
+                  % (word_id,
+                     ' | '.join('%s: %s' % (code, data['text'])
+                                for code, data in texts.items())))
 
     elif args.db_cmd == 'remove-vocabulary':
         database = args.database[0]
@@ -325,13 +319,7 @@ if __name__ == '__main__':
         args = vars(args)
         voc_id = args['voc-id'][0]
 
-        voc = database.get_vocabulary(None, voc_id)
-
-        if voc is None:
-            print("no vocabulary found", file=sys.stderr)
-            sys.exit(1)
-
-        database.remove_vocabulary(voc)
+        database.remove_vocabulary(voc_id)
 
     elif args.db_cmd == 'add-word':
         database = args.database[0]
@@ -339,44 +327,27 @@ if __name__ == '__main__':
 
         args = vars(args)
         voc_id = args['voc-id'][0]
+        input_code = args['input_language']
+        output_code = args['output_language']
         word_input = args['word-input'][0]
         word_output = args['word-output'][0]
 
-        voc = database.get_vocabulary(None, voc_id)
-
-        if voc is None:
-            print("no vocabulary found", file=sys.stderr)
-            sys.exit(1)
-
         word = Word(word_input=word_input,
                     word_output=word_output)
-        database.add_word(voc, word)
+        database.add_word(voc_id, input_code, output_code, word)
 
     elif args.db_cmd == 'update-word':
         database = args.database[0]
         database = load_database(database)
 
         args = vars(args)
-        voc_id = args['voc-id'][0]
         word_id = args['word-id'][0]
-        word_input = args['word_input'] if args['word_input'] else None
-        word_output = args['word_output'] if args['word_output'] else None
+        language = args['language']
+        text = args['text'] if args['text'] else None
+        example = args['example'] if args['example'] else None
 
-        voc = database.get_vocabulary(None, voc_id)
-
-        if voc is None:
-            print("no vocabulary found", file=sys.stderr)
-            sys.exit(1)
-
-        word = voc.word(word_id)
-
-        if word is None:
-            print("no word found", file=sys.stderr)
-            sys.exit(1)
-
-        database.update_word(voc, word,
-                             word_input=word_input,
-                             word_output=word_output)
+        database.update_word_text(word_id, language,
+                                  text=text, example=example)
 
     else:
         assert False

@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import Optional
+from typing import Optional, List
 from pathlib import Path
-import secrets
-from collections import defaultdict
 
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -16,7 +14,6 @@ from pydantic import BaseModel
 
 from learn import Vocabulary, Session, Word, Language, User
 from store import load_database, DbException
-
 
 
 BASE_PATH = Path(__file__).resolve().parent
@@ -51,6 +48,9 @@ class WordResult(BaseModel):
 
     hint: Optional[str]
 
+    # a sentence using the answer word (in the answer's language)
+    example: Optional[str] = None
+
     # if None => no more word
     next_word: Optional[WordInput]
 
@@ -71,12 +71,43 @@ def get_user(creds: HTTPBasicCredentials = Depends(security)) -> User:
     return user
 
 
+def _target_languages(user: User) -> List[Language]:
+    if user.main_language is None:
+        return []
+    return db.target_languages(user.main_language.code)
+
+
+def _resolve_target(user: User,
+                    voc_id: Optional[int] = None,
+                    to: Optional[str] = None) -> Optional[Language]:
+    """Pick the language the user practises (B), defaulting to the first
+    available one."""
+    targets = _target_languages(user)
+
+    if to is not None:
+        language = Language.from_code(to)
+        if language in targets:
+            return language
+
+    if voc_id is None or user.main_language is None:
+        return targets[0] if targets else None
+
+    for language in targets:
+        supported = db.target_vocabulary_ids(user.main_language.code,
+                                             language.code)
+        if voc_id in supported:
+            return language
+
+    return targets[0] if targets else None
+
+
 @app.get("/")
 def root():
     return RedirectResponse(url='/index')
 
+
 @app.get("/logout")
-def root():
+def logout():
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Incorrect email or password",
@@ -85,11 +116,18 @@ def root():
 
 
 @app.get("/vocabulary")
-async def index(request: Request,
-                id: int,
-                user: User = Depends(get_user)):
+async def vocabulary(request: Request,
+                     id: int,
+                     to: Optional[str] = None,
+                     user: User = Depends(get_user)):
 
-    voc = db.get_vocabulary(user, id)
+    target = _resolve_target(user, voc_id=id, to=to)
+    voc = db.get_vocabulary(user, id, target)
+
+    if voc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="vocabulary not found")
+
     stats = db.vocabulary_stats(voc)
 
     word_count = len(voc.words)
@@ -122,6 +160,7 @@ async def index(request: Request,
             'voc': voc,
             'stats': stats,
             'voc_id': id,
+            'target': target,
             'word_count': word_count,
             'unknown_count': unknown_count,
             'sections': sections,
@@ -131,9 +170,16 @@ async def index(request: Request,
         headers={'Cache-Control': 'no-store'}
     )
 
+
 @app.get("/index")
-async def index(request: Request, user: User = Depends(get_user)):
-    vocabularies = db.list_vocabularies(user)
+async def index(request: Request,
+                to: Optional[str] = None,
+                user: User = Depends(get_user)):
+
+    targets = _target_languages(user)
+    target = _resolve_target(user, to=to)
+
+    vocabularies = db.list_vocabularies(user, target)
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
     has_finished_session = {}
@@ -142,20 +188,14 @@ async def index(request: Request, user: User = Depends(get_user)):
     known_counts = db.known_word_counts()
     total_words = 0
     total_known = 0
-    vocabularies_by_languages = defaultdict(list)
+    entries = []
 
     for voc_id, vocabulary in vocabularies.items():
-        input_language = Language.from_code(vocabulary.input_language)
-        output_language = Language.from_code(vocabulary.output_language)
-
-        inout = (input_language, output_language)
-
         session = db.last_session(user, vocabulary)
         if session is not None and not session.is_finished:
             session_by_vocabulary[vocabulary] = session
 
-        finished_session = db.last_session(user, vocabulary,
-                                           finished=True)
+        finished_session = db.last_session(user, vocabulary, finished=True)
         percentage_by_vocabulary[vocabulary] = 0.0
         has_finished_session[vocabulary] = False
         if finished_session:
@@ -170,10 +210,9 @@ async def index(request: Request, user: User = Depends(get_user)):
         total_words += size
         total_known += known
 
-        vocabularies_by_languages[inout].append((voc_id, vocabulary))
+        entries.append((voc_id, vocabulary))
 
-    for vocabularies in vocabularies_by_languages.values():
-        vocabularies.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
+    entries.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
 
     known_percentage = \
         (100 * total_known // total_words) if total_words else 0
@@ -182,7 +221,10 @@ async def index(request: Request, user: User = Depends(get_user)):
         request, "index.html",
         {
             'user': user,
-            'vocabularies_by_languages': vocabularies_by_languages,
+            'language': user.main_language,
+            'targets': targets,
+            'target': target,
+            'vocabularies': entries,
             'session_by_vocabulary': session_by_vocabulary,
             'percentage_by_vocabulary': percentage_by_vocabulary,
             'has_finished_session': has_finished_session,
@@ -200,17 +242,15 @@ async def index(request: Request, user: User = Depends(get_user)):
 async def scoreboard(request: Request,
                      user: User = Depends(get_user)):
 
-    vocabularies = db.list_vocabularies_for(None)
-    voc_sizes = {voc_id: len(voc) for voc_id, voc in vocabularies.items()}
-    total_words = sum(voc_sizes.values())
+    sizes = db.all_vocabulary_sizes()
+    total_words = sum(sizes.values())
 
     known_by_user = db.known_word_counts_by_user()
 
     entries = []
     for user_id, email in db.list_users():
         per_vocabulary = known_by_user.get(user_id, {})
-        known = sum(per_vocabulary.get(voc_id, 0)
-                    for voc_id in voc_sizes)
+        known = sum(per_vocabulary.get(voc_id, 0) for voc_id in sizes)
         percentage = (100 * known // total_words) if total_words else 0
         entries.append({
             'email': email,
@@ -243,10 +283,16 @@ async def scoreboard(request: Request,
 @app.get("/new_session")
 async def new_session(request: Request,
                       voc_id: int,
+                      to: Optional[str] = None,
                       section: Optional[str] = None,
                       user: User = Depends(get_user)):
 
-    voc = db.get_vocabulary(user, voc_id)
+    target = _resolve_target(user, voc_id=voc_id, to=to)
+    voc = db.get_vocabulary(user, voc_id, target)
+
+    if voc is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="vocabulary not found")
 
     try:
         session = db.create_new_session(user, voc, section=section)
@@ -266,7 +312,6 @@ async def learn(request: Request,
     session = db.load_session(session_id)
 
     first_word = None
-    first_word_id = None
     if session.current_word is not None:
         current_word = session.current_word
         vocabulary = session.vocabulary
@@ -292,6 +337,7 @@ async def post_word(word_output: WordOutput):
 
     current_word = vocabulary.word(word_output.word_id)
     hint_word = current_word.word_output
+    example = vocabulary.example(current_word)
 
     result = session.guess(current_word, word_output.word)
 
@@ -303,12 +349,12 @@ async def post_word(word_output: WordOutput):
     next_word_input = None
     if session.current_word is not None:
         next_word = session.current_word
-        vocabulary = session.vocabulary
         next_word_input = WordInput(word=next_word.word_input,
                                     word_id=vocabulary.word_id(next_word))
 
     return WordResult(success=success,
                       hint=hint_word,
+                      example=example,
                       word_input=WordInput(word=current_word.word_input,
                                            word_id=word_output.word_id),
                       word_output=word_output,

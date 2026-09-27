@@ -54,6 +54,15 @@ $(document).ready(function() {
         new_node.find(".output .field").text(result.word_output.word);
         new_node.find(".result .field").text(result.hint);
 
+        // show the example sentence of the practised word (when any)
+        var example = new_node.find(".example");
+        if (result.example) {
+          example.find(".field").text(result.example);
+          example.attr("style", "");
+        } else {
+          example.hide();
+        }
+
         // insert the answer right below the pinned current word
         $("#current-word").after(new_node);
 

@@ -123,6 +123,14 @@
   background: white;
 }
 
+.example .field {
+  background: #FFF9E8;
+  color: #6B5D55;
+  font-style: italic;
+  font-size: 0.72em;
+  border-top: 1px solid #F0E7C8;
+}
+
 /* ============ smartphone rendering (< 700px) ============ */
 
 @media (max-width: 700px) {

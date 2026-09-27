@@ -3,21 +3,21 @@
 {% block title %}Vocabulary{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=6">
-    <script src="/static/vocabulary.js?v=3"></script>
+    <link rel="stylesheet" href="/static/pages.css?v=8">
+    <script src="/static/vocabulary.js?v=4"></script>
 {% endblock %}
 
 {% block body %}
 
   <header class="page-header">
     <div class="brand-line">
-      <a class="back" href="/index">&larr; All vocabularies</a>
+      <a class="back" href="/index{% if target %}?to={{ target.code }}{% endif %}">&larr; All vocabularies</a>
       <h1>{{ voc.name.word_input if voc.name else 'Vocabulary' }}</h1>
       <span class="subtitle">{{ voc.input_language or '?' }} → {{ voc.output_language or '?' }}</span>
       <a class="nav-link" href="/scoreboard">Scoreboard</a>
     </div>
     <div class="voc-actions">
-      <a class="button new" href="/new_session?voc_id={{ voc_id }}">New session</a>
+      <a class="button new" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}">New session</a>
       {% if unfinished_session %}
         <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume</a>
       {% endif %}
@@ -47,7 +47,7 @@
             {% if unfinished_session %}
               <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume</a>
             {% endif %}
-            <a class="button new" href="/new_session?voc_id={{ voc_id }}">Practice all</a>
+            <a class="button new" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}">Practice all</a>
           </div>
         </div>
 
@@ -61,7 +61,7 @@
               {% if section.resume %}
                 <a class="button resume" href="/learn?session_id={{ section.resume.id }}">Resume</a>
               {% endif %}
-              <a class="button new" href="/new_session?voc_id={{ voc_id }}&amp;section={{ section.name | urlencode }}">Practice</a>
+              <a class="button new" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}&amp;section={{ section.name | urlencode }}">Practice</a>
             </div>
           </div>
         {% endfor %}
