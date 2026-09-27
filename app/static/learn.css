@@ -78,15 +78,14 @@
 }
 
 .word-box {
-  display:table;
-  vertical-align: middle;
+  display: flex;
+  align-items: stretch;
 
   width: 100%;
 }
 
 .word-box .field {
-  display:table-cell;
-  vertical-align:middle;
+  flex: 1 1 auto;
 
   height: 50px; /* need it for Firefox */
   width: 100%;
@@ -96,6 +95,17 @@
 
   box-sizing: border-box;
   outline: none;
+}
+
+/* text cells center their content, the answer input fills its box */
+span.field {
+  display: flex;
+  align-items: center;
+}
+
+input.field {
+  display: block;
+  width: 100%;
 }
 
 .input .field {
