@@ -133,15 +133,15 @@ input.field {
   background: white;
 }
 
-/* example sentence of the practised word (smaller: more content) */
+/* example sentence of the practised word (kept small: it is often long) */
 .word-example {
   display: flex;
   align-items: baseline;
   gap: 10px;
 
-  padding: 10px 16px;
+  padding: 6px 16px;
 
-  font-size: 0.6em;
+  font-size: 14px;
   font-style: italic;
 
   background: #FFFDF5;
@@ -185,9 +185,9 @@ input.field {
   }
 
   .word-example {
-    font-size: 15px;
+    font-size: 13px;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 5px 12px;
   }
 
   .word { margin-bottom: 16px; }
