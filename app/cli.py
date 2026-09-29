@@ -189,6 +189,12 @@ if __name__ == '__main__':
     create_user_subparser.add_argument('--main-language', required=True,
                                        help='language the user knows',
                                        nargs=1)
+    create_user_subparser.add_argument('--level', nargs=1,
+                                       help='level: A2, B1, B2 or C1')
+
+    set_level_subparser = db_subparser.add_parser('set-user-level')
+    set_level_subparser.add_argument('email', help='user email', nargs=1)
+    set_level_subparser.add_argument('level', help='A2, B1, B2 or C1', nargs=1)
 
     db_subparser.add_parser('list-vocabularies')
     list_words_subparser = db_subparser.add_parser('list-words')
@@ -276,7 +282,14 @@ if __name__ == '__main__':
             print("invalid language code", file=sys.stderr)
             sys.exit(-1)
 
-        database.create_user(username, password, language)
+        level = args.level[0] if args.level else None
+        database.create_user(username, password, language, level=level)
+
+    elif args.db_cmd == 'set-user-level':
+        database = args.database[0]
+        database = load_database(database)
+
+        database.set_user_level(args.email[0], args.level[0])
 
     elif args.db_cmd == 'init':
         database = args.database[0]

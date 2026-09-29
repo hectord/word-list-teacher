@@ -11,7 +11,7 @@ from peewee import *
 from typing import Dict, List, Optional, Tuple
 
 from learn import Vocabulary, Word, Session, WordAttempt
-from learn import Language, User, VocabularyStats
+from learn import Language, User, VocabularyStats, included_levels
 
 db = SqliteDatabase(None)
 
@@ -32,6 +32,7 @@ class DbUser(Model):
     email = CharField()
     password = CharField()
     main_language = ForeignKeyField(DbLanguage, null=True)
+    level = CharField(null=True)
 
     class Meta:
         database = db
@@ -107,6 +108,7 @@ class DbVocabularySession(Model):
     input_language = ForeignKeyField(DbLanguage)
     output_language = ForeignKeyField(DbLanguage)
     section = ForeignKeyField(DbSection, null=True)
+    level = CharField(null=True)
 
     class Meta:
         database = db
@@ -166,12 +168,14 @@ class Database:
             main_language = Language.from_code(db_user.main_language.code)
 
         return User(email=email, password=password,
-                    main_language=main_language)
+                    main_language=main_language,
+                    level=db_user.level)
 
     def create_user(self,
                     email: str,
                     password: str,
-                    main_language: Optional[Language] = None) -> User:
+                    main_language: Optional[Language] = None,
+                    level: Optional[str] = None) -> User:
         if DbUser.select().where(DbUser.email == email).count():
             raise DbException('user already exists')
 
@@ -183,9 +187,17 @@ class Database:
 
         DbUser.create(email=email,
                       password=hash_password,
-                      main_language=language)
+                      main_language=language,
+                      level=level)
 
         return self.get_user(email, password)
+
+    def set_user_level(self, user, level: Optional[str]):
+        email = user if isinstance(user, str) else user.email
+        updated = (DbUser.update(level=level)
+                   .where(DbUser.email == email).execute())
+        if not updated:
+            raise DbException('user not found')
 
     def list_users(self) -> List[Tuple[int, str]]:
         """All users as (id, email) pairs."""
@@ -225,9 +237,11 @@ class Database:
                          voc_id: int,
                          input_code: str,
                          output_code: str,
-                         display_code: str = None) -> Optional[Vocabulary]:
+                         display_code: str = None,
+                         levels=None) -> Optional[Vocabulary]:
         """Project the language agnostic entities into a vocabulary view
-        for the ``input_code -> output_code`` direction."""
+        for the ``input_code -> output_code`` direction, optionally
+        restricted to the levels the learner has to know."""
         display_code = display_code or input_code
 
         texts = defaultdict(dict)
@@ -254,6 +268,11 @@ class Database:
             out_text = word_texts.get(output_code)
 
             if in_text is None or out_text is None:
+                continue
+
+            # words without a level are always kept
+            if levels is not None and db_word.level is not None \
+                    and db_word.level not in levels:
                 continue
 
             word = Word(word_input=in_text.text, word_output=out_text.text,
@@ -304,7 +323,8 @@ class Database:
         return [row.vocabulary_id for row in rows]
 
     def list_vocabularies(self, user: User,
-                          target_language) -> Dict[int, Vocabulary]:
+                          target_language,
+                          levels=None) -> Dict[int, Vocabulary]:
         input_code = None if user is None else _code(user.main_language)
         output_code = _code(target_language)
 
@@ -313,13 +333,23 @@ class Database:
 
         vocs = {}
         for voc_id in self.target_vocabulary_ids(input_code, output_code):
-            voc = self._load_vocabulary(voc_id, input_code, output_code)
+            voc = self._load_vocabulary(voc_id, input_code, output_code,
+                                        levels=levels)
+            if len(voc) == 0:
+                continue
             vocs[voc_id] = voc
         return vocs
 
     def get_vocabulary(self, user: User, voc_id: int,
-                       target_language) -> Optional[Vocabulary]:
-        return self.list_vocabularies(user, target_language).get(voc_id)
+                       target_language, levels=None) -> Optional[Vocabulary]:
+        input_code = None if user is None else _code(user.main_language)
+        output_code = _code(target_language)
+
+        if input_code is None or output_code is None:
+            return None
+
+        return self._load_vocabulary(voc_id, input_code, output_code,
+                                     levels=levels)
 
     def all_vocabulary_sizes(self) -> Dict[int, int]:
         sizes = defaultdict(int)
@@ -484,7 +514,8 @@ class Database:
     def create_new_session(self,
                            user: User,
                            voc: Vocabulary,
-                           section: Optional[str] = None) -> Session:
+                           section: Optional[str] = None,
+                           level: Optional[str] = None) -> Session:
         scope_voc = voc
         section_id = None
 
@@ -506,7 +537,8 @@ class Database:
                                    vocabulary=scope_voc.id,
                                    input_language=voc.input_language,
                                    output_language=voc.output_language,
-                                   section=section_id)
+                                   section=section_id,
+                                   level=level)
 
         db_session = DbSession.get(new_db_session.id)
         current_db_word = None
@@ -632,9 +664,11 @@ class Database:
 
         input_code = db_voc_session.input_language.code
         output_code = db_voc_session.output_language.code
+        levels = included_levels(db_voc_session.level)
 
         v = self._load_vocabulary(db_voc_session.vocabulary_id,
-                                  input_code, output_code)
+                                  input_code, output_code,
+                                  levels=levels)
 
         if db_voc_session.section_id is not None:
             section_voc = v.section_by_id(db_voc_session.section_id)
@@ -695,18 +729,21 @@ class Database:
 
         return VocabularyStats(voc, ret)
 
-    def known_word_counts(self) -> Dict[int, int]:
+    def known_word_counts(self, levels=None) -> Dict[int, int]:
         """Vocabulary id -> number of words guessed correctly at least once."""
         counts = defaultdict(int)
         seen = set()
 
-        rows = (DbWordAttempt
-                .select(DbWordAttempt.word_id, DbWord.vocabulary_id)
-                .join(DbWord)
-                .where(DbWordAttempt.success == True)
-                .tuples())
+        query = (DbWordAttempt
+                 .select(DbWordAttempt.word_id, DbWord.vocabulary_id)
+                 .join(DbWord)
+                 .where(DbWordAttempt.success == True))
 
-        for word_id, vocabulary_id in rows:
+        if levels is not None:
+            query = query.where((DbWord.level.in_(list(levels))) |
+                                DbWord.level.is_null())
+
+        for word_id, vocabulary_id in query.tuples():
             if word_id in seen:
                 continue
             seen.add(word_id)
@@ -882,9 +919,11 @@ def load_database(name: str) -> Database:
         _migrate_legacy()
     else:
         db.create_tables(NEW_TABLES)
-        # the word 'type' and 'level' were added later
+        # columns added after the first releases
         _add_column_if_missing('dbword', 'type', 'varchar(255)')
         _add_level_column()
+        _add_column_if_missing('dbuser', 'level', 'varchar(255)')
+        _add_column_if_missing('dbvocabularysession', 'level', 'varchar(255)')
 
     db.execute_sql('PRAGMA foreign_keys = ON')
 

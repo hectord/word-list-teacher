@@ -39,10 +39,12 @@ each of them has one text per language (plus an optional example sentence).
 # initialize the languages (once per fresh database)
 myenv/bin/python app/cli.py database data/learn.db init
 
-# create a user with their main language (the language they know);
-# on the index page they then pick the language they want to practise
+# create a user with their main language (the language they know) and
+# their level (A2, B1, B2 or C1). On the index page they then pick the
+# language to practise and the level (both saved in their profile for
+# the level)
 myenv/bin/python app/cli.py database data/learn.db \
-    create-user you@example.com --main-language fr
+    create-user you@example.com --main-language fr --level B1
 
 # import a cleaned dictionary (assumed German -> French):
 # vocabulary;section;german;translation
@@ -52,8 +54,9 @@ myenv/bin/python app/cli.py database data/learn.db \
 
 Useful commands: `list-vocabularies`, `list-sections <voc-id>`,
 `list-words <voc-id>`, `add-vocabulary <file>`, `remove-vocabulary <voc-id>`,
+`set-user-level <email> <level>`,
 `add-word <voc-id> --input-language fr --output-language de <in> <out>`,
-`update-word <word-id> --language de [--text <text>] [--example <sentence>]`.
+`update-word <word-id> --language de [--text <text>] [--example <sentence>] [--type noun] [--level B1]`.
 
 ## Docker image
 

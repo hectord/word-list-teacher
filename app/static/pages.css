@@ -108,6 +108,10 @@ a.signout:hover { text-decoration: underline; }
 .picker-language { font-size: 18px; color: #3B2F2A; }
 .picker-arrow { color: #A08B7F; }
 
+/* the level picker sits right under the language picker */
+.level-picker { margin-top: -12px; }
+.level-picker .picker-language { color: #6B5D55; }
+
 .picker-option {
   padding: 6px 16px;
   border-radius: 999px;

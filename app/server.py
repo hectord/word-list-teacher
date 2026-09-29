@@ -13,6 +13,7 @@ from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
 from learn import Vocabulary, Session, Word, Language, User
+from learn import LEVELS, included_levels
 from store import load_database, DbException
 
 
@@ -122,7 +123,8 @@ async def vocabulary(request: Request,
                      user: User = Depends(get_user)):
 
     target = _resolve_target(user, voc_id=id, to=to)
-    voc = db.get_vocabulary(user, id, target)
+    levels = included_levels(user.level)
+    voc = db.get_vocabulary(user, id, target, levels=levels)
 
     if voc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
@@ -174,18 +176,28 @@ async def vocabulary(request: Request,
 @app.get("/index")
 async def index(request: Request,
                 to: Optional[str] = None,
+                level: Optional[str] = None,
                 user: User = Depends(get_user)):
 
     targets = _target_languages(user)
     target = _resolve_target(user, to=to)
 
-    vocabularies = db.list_vocabularies(user, target)
+    # the level lives in the user profile; selecting one saves it
+    selected_level = user.level
+    if level is not None and level in LEVELS:
+        if level != user.level:
+            db.set_user_level(user, level)
+        selected_level = level
+
+    levels = included_levels(selected_level)
+
+    vocabularies = db.list_vocabularies(user, target, levels=levels)
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
     has_finished_session = {}
     known_by_vocabulary = {}
     known_percentage_by_vocabulary = {}
-    known_counts = db.known_word_counts()
+    known_counts = db.known_word_counts(levels)
     total_words = 0
     total_known = 0
     entries = []
@@ -224,6 +236,8 @@ async def index(request: Request,
             'language': user.main_language,
             'targets': targets,
             'target': target,
+            'levels': LEVELS,
+            'selected_level': selected_level,
             'vocabularies': entries,
             'session_by_vocabulary': session_by_vocabulary,
             'percentage_by_vocabulary': percentage_by_vocabulary,
@@ -288,14 +302,16 @@ async def new_session(request: Request,
                       user: User = Depends(get_user)):
 
     target = _resolve_target(user, voc_id=voc_id, to=to)
-    voc = db.get_vocabulary(user, voc_id, target)
+    levels = included_levels(user.level)
+    voc = db.get_vocabulary(user, voc_id, target, levels=levels)
 
     if voc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="vocabulary not found")
 
     try:
-        session = db.create_new_session(user, voc, section=section)
+        session = db.create_new_session(user, voc, section=section,
+                                        level=user.level)
     except DbException:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

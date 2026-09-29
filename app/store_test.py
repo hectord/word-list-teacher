@@ -11,7 +11,7 @@ from store import (load_database, DbException,
                    DbVocabulary, DbVocabularyTitle, DbSection, DbSectionText,
                    DbWord, DbWordText, DbVocabularySession, DbWordAttempt,
                    DbUser, db as store_db, _table_columns)
-from learn import Vocabulary, Word, Language, User
+from learn import Vocabulary, Word, Language, User, included_levels
 
 
 class TestStore(unittest.TestCase):
@@ -257,6 +257,95 @@ class TestStore(unittest.TestCase):
         finally:
             if os.path.exists(path):
                 os.remove(path)
+
+    def test_user_level(self):
+        self._create_user()
+        self.assertIsNone(self.user.level)
+
+        self.db.set_user_level(self.user, 'B2')
+        self.assertEqual('B2', self.db.get_user('test@hotmail.com',
+                                                'abc').level)
+
+        # also accepts an email
+        self.db.set_user_level('test@hotmail.com', 'C1')
+        self.assertEqual('C1', self.db.get_user('test@hotmail.com',
+                                                'abc').level)
+
+        with self.assertRaises(DbException):
+            self.db.set_user_level('nobody@x.com', 'B1')
+
+    def test_level_filtering(self):
+        words = [Word(word_input='fr_a2', word_output='de_a2', level='A2'),
+                 Word(word_input='fr_b1', word_output='de_b1', level='B1'),
+                 Word(word_input='fr_b2', word_output='de_b2', level='B2'),
+                 Word(word_input='fr_c1', word_output='de_c1', level='C1'),
+                 # no level -> always included
+                 Word(word_input='fr_uk', word_output='de_uk')]
+        voc = Vocabulary(None, words,
+                         input_language='fr', output_language='de')
+        voc_id = self.db.create_vocabulary(voc)
+        self._create_user()
+
+        def outputs(level):
+            projection = self.db.get_vocabulary(
+                self.user, voc_id, Language.GERMAN,
+                levels=included_levels(level))
+            return sorted(w.word_output for w in projection.words)
+
+        self.assertEqual(['de_a2', 'de_uk'], outputs('A2'))
+        self.assertEqual(['de_a2', 'de_b1', 'de_uk'], outputs('B1'))
+        self.assertEqual(['de_a2', 'de_b1', 'de_b2', 'de_uk'], outputs('B2'))
+        self.assertEqual(['de_a2', 'de_b1', 'de_b2', 'de_c1', 'de_uk'],
+                         outputs('C1'))
+        self.assertEqual(5, len(outputs(None)))
+
+        # vocabularies without words at the level are not listed
+        listed = self.db.list_vocabularies(self.user, Language.GERMAN,
+                                           levels=included_levels('A2'))
+        self.assertEqual([voc_id], list(listed.keys()))
+
+    def test_session_keeps_level(self):
+        words = [Word(word_input='fr_a2', word_output='de_a2', level='A2'),
+                 Word(word_input='fr_b1', word_output='de_b1', level='B1'),
+                 Word(word_input='fr_b2', word_output='de_b2', level='B2')]
+        voc = Vocabulary(None, words,
+                         input_language='fr', output_language='de')
+        voc_id = self.db.create_vocabulary(voc)
+        self._create_user()
+
+        projection = self.db.get_vocabulary(self.user, voc_id,
+                                            Language.GERMAN,
+                                            levels=included_levels('B1'))
+        self.assertEqual(2, len(projection))
+
+        session = self.db.create_new_session(self.user, projection,
+                                             level='B1')
+        self.assertEqual(2, len(session.vocabulary))
+
+        # even after the user changes level, the session keeps its set
+        self.db.set_user_level(self.user, 'C1')
+        reloaded = self.db.load_session(session.id)
+        self.assertEqual(2, len(reloaded.vocabulary))
+
+    def test_known_word_counts_by_level(self):
+        words = [Word(word_input='fr_a2', word_output='de_a2', level='A2'),
+                 Word(word_input='fr_b2', word_output='de_b2', level='B2')]
+        voc = Vocabulary(None, words,
+                         input_language='fr', output_language='de')
+        voc_id = self.db.create_vocabulary(voc)
+        self._create_user()
+
+        projection = self.db.get_vocabulary(self.user, voc_id,
+                                            Language.GERMAN)
+        session = self.db.create_new_session(self.user, projection)
+        while not session.is_finished:
+            word = session.current_word
+            attempt = session.guess(word, word.word_output)
+            self.db.add_word_attempt(session, attempt)
+
+        self.assertEqual(2, self.db.known_word_counts().get(voc_id))
+        self.assertEqual(1, self.db.known_word_counts(
+            included_levels('A2')).get(voc_id))
 
     def test_word_level(self):
         self._create_vocabulary()

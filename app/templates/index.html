@@ -3,7 +3,7 @@
 {% block title %}Vocabularies{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=9">
+    <link rel="stylesheet" href="/static/pages.css?v=10">
 {% endblock %}
 
 {% block body %}
@@ -28,7 +28,17 @@
         <span class="picker-arrow">➔</span>
         {% for option in targets %}
           <a class="picker-option{% if target and option.code == target.code %} active{% endif %}"
-             href="/index?to={{ option.code }}">{{ option.name }}</a>
+             href="/index?to={{ option.code }}{% if selected_level %}&amp;level={{ selected_level }}{% endif %}">{{ option.name }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if language %}
+      <div class="language-picker level-picker">
+        <span class="picker-language">Level</span>
+        {% for option in levels %}
+          <a class="picker-option{% if option == selected_level %} active{% endif %}"
+             href="/index?{% if target %}to={{ target.code }}&amp;{% endif %}level={{ option }}">{{ option }}</a>
         {% endfor %}
       </div>
     {% endif %}
