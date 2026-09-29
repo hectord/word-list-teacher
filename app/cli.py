@@ -128,6 +128,7 @@ def load_csv_dictionary(filename: str):
         section_column = _column(fields, ('section',))
         type_column = _column(fields, ('type',))
         level_column = _column(fields, ('cefr_level', 'level'))
+        id_column = _column(fields, ('id',))
 
         for row in reader:
             def value(column):
@@ -150,7 +151,18 @@ def load_csv_dictionary(filename: str):
                 if example:
                     examples[language] = example
 
+            word_id = value(id_column)
+            if word_id:
+                try:
+                    word_id = int(word_id)
+                except ValueError:
+                    raise InvalidFileException(
+                        f'invalid id "{word_id}" in {filename}')
+            else:
+                word_id = None
+
             records.append({
+                'id': word_id,
                 'vocabulary': value(vocabulary_column),
                 'section': value(section_column),
                 'type': value(type_column) or None,
@@ -276,7 +288,10 @@ if __name__ == '__main__':
     add_dictionary_subparser.add_argument('files', help='cleaned dictionary CSV files (vocabulary;section;word;translation)', nargs='+')
 
     import_dictionary_subparser = db_subparser.add_parser('import-dictionary')
-    import_dictionary_subparser.add_argument('file', help='CSV file to import (replaces all vocabularies)', nargs=1)
+    import_dictionary_subparser.add_argument('file', help='CSV file to import', nargs=1)
+    import_dictionary_subparser.add_argument(
+        '--update', action='store_true',
+        help='update the existing words (by id) instead of replacing everything')
 
     create_user_subparser = db_subparser.add_parser('create-user')
     create_user_subparser.add_argument('username', help='new username', nargs=1)
@@ -382,11 +397,16 @@ if __name__ == '__main__':
         database = load_database(database)
 
         records = load_csv_dictionary(args.file[0])
-        vocabularies = database.import_vocabularies(records)
+        vocabularies = database.import_vocabularies(
+            records, replace=not args.update)
 
-        print('%s: imported %d words in %d vocabularies '
-              '(previous vocabularies removed)'
-              % (args.file[0], len(records), vocabularies))
+        if args.update:
+            print('%s: updated %d words in %d vocabularies'
+                  % (args.file[0], len(records), vocabularies))
+        else:
+            print('%s: imported %d words in %d vocabularies '
+                  '(previous vocabularies removed)'
+                  % (args.file[0], len(records), vocabularies))
 
     elif args.db_cmd == 'create-user':
         username = args.username[0]

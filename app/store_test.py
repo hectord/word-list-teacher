@@ -409,6 +409,48 @@ class TestStore(unittest.TestCase):
         with self.assertRaises(DbException):
             self.db.remove_user('nobody@x.com')
 
+    def test_import_vocabularies_update(self):
+        self.db.import_vocabularies([
+            {'id': 10, 'vocabulary': 'Greetings', 'section': '',
+             'type': 'noun', 'level': 'B1',
+             'texts': {'de': 'Hallo', 'fr': 'bonjour'}, 'examples': {}}])
+
+        self.assertEqual(10, DbWord.get().id)
+
+        self._create_user()   # main language: french
+        voc = self.db.get_vocabulary(self.user, 1, Language.GERMAN)
+        session = self.db.create_new_session(self.user, voc)
+        word = session.current_word
+        self.db.add_word_attempt(session,
+                                 session.guess(word, word.word_output))
+        self.assertEqual(1, DbWordAttempt.select().count())
+
+        # re-import without replacing: the word ids are stable, the texts
+        # are updated, new words are added and the history survives
+        self.db.import_vocabularies([
+            {'id': 10, 'vocabulary': 'Greetings', 'section': '',
+             'type': 'noun', 'level': 'B2',
+             'texts': {'de': 'Hallo', 'fr': 'salut', 'en': 'hello'},
+             'examples': {'de': 'Hallo Welt.'}},
+            {'id': 11, 'vocabulary': 'Greetings', 'section': '',
+             'type': 'verb', 'level': 'B1',
+             'texts': {'de': 'gehen', 'fr': 'aller'}, 'examples': {}},
+        ], replace=False)
+
+        self.assertEqual(1, DbVocabulary.select().count())
+        self.assertEqual(2, DbWord.select().count())
+        self.assertEqual(1, DbWordAttempt.select().count())
+        self.assertEqual(1, DbSession.select().count())
+
+        self.assertEqual('B2', DbWord.get(DbWord.id == 10).level)
+        texts = {t.language_id: t.text for t in
+                 DbWordText.select().where(DbWordText.word == 10)}
+        self.assertEqual('salut', texts['fr'])
+        self.assertEqual('hello', texts['en'])
+        example = DbWordText.get((DbWordText.word == 10) &
+                                 (DbWordText.language == 'de')).example
+        self.assertEqual('Hallo Welt.', example)
+
     def test_load_csv_dictionary(self):
         from cli import load_csv_dictionary
 
@@ -416,16 +458,18 @@ class TestStore(unittest.TestCase):
         os.close(fd)
         try:
             with open(path, 'w', encoding='utf-8') as f:
-                f.write('vocabulary,section,type,cefr_level,german,french,'
-                        'english,german_example\n')
-                f.write('Greetings,Basics,noun,B1,Hallo,bonjour,hello,'
+                f.write('id,vocabulary,section,type,cefr_level,german,'
+                        'french,english,german_example\n')
+                f.write('7,Greetings,Basics,noun,B1,Hallo,bonjour,hello,'
                         'Hallo Welt.\n')
-                f.write('Greetings,Basics,verb,B2,gehen,aller,to go,\n')
-                f.write('Greetings,,,C1,,,,,\n')   # no text -> skipped
+                f.write('8,Greetings,Basics,verb,B2,gehen,aller,to go,\n')
+                f.write('9,Greetings,,,C1,,,,,\n')   # no text -> skipped
 
             records = load_csv_dictionary(path)
 
             self.assertEqual(2, len(records))
+            self.assertEqual(7, records[0]['id'])
+            self.assertEqual(8, records[1]['id'])
             self.assertEqual('Greetings', records[0]['vocabulary'])
             self.assertEqual('Basics', records[0]['section'])
             self.assertEqual('noun', records[0]['type'])

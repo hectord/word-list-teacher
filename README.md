@@ -52,10 +52,16 @@ myenv/bin/python app/cli.py database data/learn.db \
     add-dictionary data/merged.cleaned
 
 # import a full dictionary from a CSV with a header, e.g.
-# vocabulary,section,type,cefr_level,german,french,english,german_example
-# This REPLACES every existing vocabulary (users are kept).
+# id,vocabulary,section,type,cefr_level,german,french,english,german_example
+# By default this REPLACES every existing vocabulary (users are kept).
 myenv/bin/python app/cli.py database data/learn.db \
-    import-dictionary data/german_vocabulary_exam_levels.csv
+    import-dictionary data/german_vocabulary_exam_levels_irregular_verbs_with_id.csv
+
+# Re-import later to apply changes: with --update the words are matched by
+# their 'id' column and updated (texts, type, level, example), new words
+# are added, and sessions / practice history are kept.
+myenv/bin/python app/cli.py database data/learn.db \
+    import-dictionary data/german_vocabulary_exam_levels_irregular_verbs_with_id.csv --update
 ```
 
 Useful commands: `list-vocabularies`, `list-sections <voc-id>`,

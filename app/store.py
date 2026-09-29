@@ -542,56 +542,105 @@ class Database:
 
     def import_vocabularies(self, records, title_language: str = 'de',
                             replace: bool = True) -> int:
-        """Create vocabularies from ``records`` (see
-        ``cli.load_csv_dictionary``).
+        """Create or update vocabularies from ``records``.
 
-        Each record is a dict with ``vocabulary``, ``section``, ``type``,
-        ``level``, ``texts`` ({language: text}) and ``examples``
-        ({language: sentence}). When ``replace`` is set the existing
-        vocabularies are removed first.
+        Each record is a dict with ``id`` (optional, stable word id),
+        ``vocabulary``, ``section``, ``type``, ``level``, ``texts``
+        ({language: text}) and ``examples`` ({language: sentence}).
+
+        With ``replace`` the existing vocabularies are removed first.
+        Without it, words are matched by their id and updated, so their
+        ids and practice history are preserved.
         """
         if replace:
             self.clear_vocabularies()
 
-        vocabularies = {}
-        sections = {}
+        # vocabularies / sections are matched by their name
+        vocabulary_ids = {}
+        for voc_id, title in (DbVocabularyTitle
+                              .select(DbVocabularyTitle.vocabulary_id,
+                                      DbVocabularyTitle.title)
+                              .where(DbVocabularyTitle.language ==
+                                     title_language)
+                              .tuples()):
+            vocabulary_ids.setdefault(title, voc_id)
+
+        section_ids = {}
+        for section_id, text, voc_id in (DbSectionText
+                                         .select(DbSectionText.section_id,
+                                                 DbSectionText.text,
+                                                 DbSection.vocabulary_id)
+                                         .join(DbSection)
+                                         .where(DbSectionText.language ==
+                                                title_language)
+                                         .tuples()):
+            section_ids.setdefault((voc_id, text), section_id)
+
+        used_vocabularies = set()
 
         for record in records:
             name = record['vocabulary']
 
-            db_voc = vocabularies.get(name)
-            if db_voc is None:
-                db_voc = DbVocabulary.create()
-                vocabularies[name] = db_voc
+            voc_id = vocabulary_ids.get(name)
+            if voc_id is None:
+                voc_id = DbVocabulary.create().id
+                vocabulary_ids[name] = voc_id
                 if name:
-                    DbVocabularyTitle.create(vocabulary=db_voc,
+                    DbVocabularyTitle.create(vocabulary=voc_id,
                                              language=title_language,
                                              title=name)
+            used_vocabularies.add(voc_id)
 
             section_name = record['section']
-            key = (name, section_name)
-            if key not in sections:
+            key = (voc_id, section_name)
+            if key not in section_ids:
                 if section_name:
-                    db_section = DbSection.create(vocabulary=db_voc)
-                    DbSectionText.create(section=db_section,
+                    section = DbSection.create(vocabulary=voc_id)
+                    DbSectionText.create(section=section,
                                          language=title_language,
                                          text=section_name)
+                    section_ids[key] = section.id
                 else:
-                    db_section = None
-                sections[key] = db_section
+                    section_ids[key] = None
 
-            db_word = DbWord.create(vocabulary=db_voc,
-                                    section=sections[key],
-                                    type=record['type'],
-                                    level=record['level'])
+            word_id = record.get('id')
+            db_word = None
+            if word_id is not None:
+                db_word = DbWord.get_or_none(DbWord.id == word_id)
+
+            if db_word is None:
+                values = {
+                    'vocabulary': voc_id,
+                    'section': section_ids[key],
+                    'type': record['type'],
+                    'level': record['level'],
+                }
+                if word_id is not None:
+                    values['id'] = word_id
+                db_word = DbWord.create(**values)
+            else:
+                db_word.vocabulary = voc_id
+                db_word.section = section_ids[key]
+                db_word.type = record['type']
+                db_word.level = record['level']
+                db_word.save()
 
             for language, text in record['texts'].items():
-                DbWordText.create(word=db_word,
-                                  language=language,
-                                  text=text,
-                                  example=record['examples'].get(language))
+                example = record['examples'].get(language)
+                word_text = DbWordText.get_or_none(
+                    (DbWordText.word == db_word.id) &
+                    (DbWordText.language == language))
+                if word_text is None:
+                    DbWordText.create(word=db_word.id,
+                                      language=language,
+                                      text=text,
+                                      example=example)
+                else:
+                    word_text.text = text
+                    word_text.example = example
+                    word_text.save()
 
-        return len(vocabularies)
+        return len(used_vocabularies)
 
     def create_vocabulary(self, voc: Vocabulary) -> int:
         input_code = voc.input_language
