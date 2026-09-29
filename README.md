@@ -39,12 +39,13 @@ each of them has one text per language (plus an optional example sentence).
 # initialize the languages (once per fresh database)
 myenv/bin/python app/cli.py database data/learn.db init
 
-# create a user with their main language (the language they know) and
-# their level (B1, B2 or C1). On the index page they then pick the
-# language to practise and the level (both saved in their profile for
-# the level)
+# create a user with their main language (the language they know),
+# their level (B1, B2 or C1) and optionally the language to practise.
+# On the index page they pick the target language and the level, both
+# of which are saved in their profile.
 myenv/bin/python app/cli.py database data/learn.db \
-    create-user you@example.com --main-language fr --level B1
+    create-user you@example.com --main-language fr --level B1 \
+    --target-language en
 
 # import a cleaned dictionary (assumed German -> French):
 # vocabulary;section;german;translation
@@ -77,7 +78,8 @@ myenv/bin/python app/cli.py database data/learn.db list-users
 
 # update a profile (only the given options are changed)
 myenv/bin/python app/cli.py database data/learn.db \
-    update-user you@example.com --main-language de --level B2
+    update-user you@example.com --main-language de --level B2 \
+    --target-language fr
 myenv/bin/python app/cli.py database data/learn.db \
     update-user you@example.com --password      # prompts for a new password
 

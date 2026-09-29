@@ -300,6 +300,8 @@ if __name__ == '__main__':
                                        nargs=1)
     create_user_subparser.add_argument('--level', nargs=1,
                                        help='level: B1, B2 or C1')
+    create_user_subparser.add_argument('--target-language', nargs=1,
+                                       help='language to practise (optional)')
 
     set_level_subparser = db_subparser.add_parser('set-user-level')
     set_level_subparser.add_argument('email', help='user email', nargs=1)
@@ -313,6 +315,8 @@ if __name__ == '__main__':
                                        help='language the user knows')
     update_user_subparser.add_argument('--level', nargs='?',
                                        help='B1, B2 or C1')
+    update_user_subparser.add_argument('--target-language', nargs='?',
+                                       help='language to practise')
     update_user_subparser.add_argument('--password', action='store_true',
                                        help='prompt for a new password')
 
@@ -422,7 +426,16 @@ if __name__ == '__main__':
             sys.exit(-1)
 
         level = args.level[0] if args.level else None
-        database.create_user(username, password, language, level=level)
+
+        target_language = None
+        if args.target_language:
+            target_language = Language.from_code(args.target_language[0])
+            if target_language is None:
+                print("invalid language code", file=sys.stderr)
+                sys.exit(-1)
+
+        database.create_user(username, password, language, level=level,
+                             target_language=target_language)
 
     elif args.db_cmd == 'set-user-level':
         database = args.database[0]
@@ -441,10 +454,11 @@ if __name__ == '__main__':
         database = load_database(database)
 
         for user in database.list_user_details():
-            print('%4d  %-32s %-5s %-4s'
+            print('%4d  %-32s %-5s %-4s %-5s'
                   % (user['id'], user['email'],
                      user['main_language'] or '-',
-                     user['level'] or '-'))
+                     user['level'] or '-',
+                     user['target_language'] or '-'))
 
     elif args.db_cmd == 'update-user':
         database = args.database[0]
@@ -462,9 +476,17 @@ if __name__ == '__main__':
         level = args.level if args.level else None
         password = getpass.getpass() if args.password else None
 
+        target_language = None
+        if args.target_language:
+            target_language = Language.from_code(args.target_language)
+            if target_language is None:
+                print("invalid language code", file=sys.stderr)
+                sys.exit(-1)
+
         try:
             database.update_user(email, main_language=main_language,
-                                 level=level, password=password)
+                                 level=level, password=password,
+                                 target_language=target_language)
         except DbException as e:
             print(e, file=sys.stderr)
             sys.exit(1)

@@ -352,12 +352,23 @@ class TestStore(unittest.TestCase):
         self.assertEqual('test@hotmail.com', details[0]['email'])
         self.assertEqual('fr', details[0]['main_language'])
         self.assertIsNone(details[0]['level'])
+        self.assertIsNone(details[0]['target_language'])
 
         self.db.update_user('test@hotmail.com', level='B2',
-                            main_language=Language.GERMAN)
+                            main_language=Language.GERMAN,
+                            target_language=Language.FRENCH)
         updated = self.db.get_user('test@hotmail.com', 'abc')
         self.assertEqual('B2', updated.level)
         self.assertEqual(Language.GERMAN, updated.main_language)
+        self.assertEqual(Language.FRENCH, updated.target_language)
+        self.assertEqual('fr',
+                         self.db.list_user_details()[0]['target_language'])
+
+        # the shortcut updates the cache too
+        self.db.set_user_target_language('test@hotmail.com', 'en')
+        self.assertEqual(Language.ENGLISH,
+                         self.db.get_user('test@hotmail.com',
+                                          'abc').target_language)
 
         self.db.update_user('test@hotmail.com', password='newpass')
         with self.assertRaises(DbException):

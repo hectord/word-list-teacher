@@ -35,6 +35,7 @@ class DbUser(Model):
     password = CharField()
     main_language = ForeignKeyField(DbLanguage, null=True)
     level = CharField(null=True)
+    target_language = ForeignKeyField(DbLanguage, null=True, backref='+')
 
     class Meta:
         database = db
@@ -190,9 +191,14 @@ class Database:
         if db_user.main_language is not None:
             main_language = Language.from_code(db_user.main_language.code)
 
+        target_language = None
+        if db_user.target_language is not None:
+            target_language = Language.from_code(db_user.target_language.code)
+
         user = User(email=email, password=password,
                     main_language=main_language,
-                    level=db_user.level)
+                    level=db_user.level,
+                    target_language=target_language)
 
         _AUTH_CACHE[email] = (credentials, now + _AUTH_CACHE_TTL, user)
         return user
@@ -201,7 +207,8 @@ class Database:
                     email: str,
                     password: str,
                     main_language: Optional[Language] = None,
-                    level: Optional[str] = None) -> User:
+                    level: Optional[str] = None,
+                    target_language: Optional[Language] = None) -> User:
         if DbUser.select().where(DbUser.email == email).count():
             raise DbException('user already exists')
 
@@ -211,10 +218,15 @@ class Database:
         if main_language is not None:
             language = DbLanguage.get(code=main_language.code)
 
+        target = None
+        if target_language is not None:
+            target = DbLanguage.get(code=target_language.code)
+
         DbUser.create(email=email,
                       password=hash_password,
                       main_language=language,
-                      level=level)
+                      level=level,
+                      target_language=target)
 
         return self.get_user(email, password)
 
@@ -232,7 +244,26 @@ class Database:
             _AUTH_CACHE[email] = (
                 credentials, expires,
                 User(email=previous.email, password=previous.password,
-                     main_language=previous.main_language, level=level))
+                     main_language=previous.main_language, level=level,
+                     target_language=previous.target_language))
+
+    def set_user_target_language(self, user, target_language):
+        email = user if isinstance(user, str) else user.email
+        code = _code(target_language)
+        updated = (DbUser.update(target_language=code)
+                   .where(DbUser.email == email).execute())
+        if not updated:
+            raise DbException('user not found')
+
+        cached = _AUTH_CACHE.get(email)
+        if cached is not None:
+            credentials, expires, previous = cached
+            _AUTH_CACHE[email] = (
+                credentials, expires,
+                User(email=previous.email, password=previous.password,
+                     main_language=previous.main_language,
+                     level=previous.level,
+                     target_language=Language.from_code(code)))
 
     def list_users(self) -> List[Tuple[int, str]]:
         """All users as (id, email) pairs."""
@@ -251,6 +282,9 @@ class Database:
                 'email': db_user.email,
                 'main_language': main_language,
                 'level': db_user.level,
+                'target_language': (db_user.target_language.code
+                                    if db_user.target_language is not None
+                                    else None),
             })
         return details
 
@@ -279,11 +313,15 @@ class Database:
                     email: str,
                     main_language=None,
                     level: Optional[str] = None,
-                    password: Optional[str] = None):
+                    password: Optional[str] = None,
+                    target_language=None):
         """Update the user profile. ``None`` means 'leave unchanged'."""
         update = {}
         if main_language is not None:
             update['main_language'] = DbLanguage.get(code=_code(main_language))
+        if target_language is not None:
+            update['target_language'] = DbLanguage.get(
+                code=_code(target_language))
         if level is not None:
             update['level'] = level
         if password is not None:
@@ -1149,19 +1187,21 @@ def _migrate_legacy_vocabularies(vocabularies, words, vocabulary_sessions):
             (vs_id, session_id, voc_id, input_code, output_code, section_id))
 
 
-def _add_column_if_missing(table: str, column: str, definition: str):
+def _add_column_if_missing(table: str, column: str, definition: str) -> bool:
     if column in _table_columns(table):
-        return
+        return False
     db.execute_sql('ALTER TABLE %s ADD COLUMN %s %s'
                    % (table, column, definition))
+    return True
 
 
-def _add_level_column():
+def _add_level_column() -> bool:
     if 'level' in _table_columns('dbword'):
-        return
+        return False
     db.execute_sql('ALTER TABLE dbword ADD COLUMN level varchar(255)')
     # words which existed before levels were introduced are B1
     db.execute_sql("UPDATE dbword SET level = 'B1'")
+    return True
 
 
 def _remap_old_levels():
@@ -1181,11 +1221,20 @@ def load_database(name: str) -> Database:
     else:
         db.create_tables(NEW_TABLES)
         # columns added after the first releases
-        _add_column_if_missing('dbword', 'type', 'varchar(255)')
-        _add_level_column()
-        _add_column_if_missing('dbuser', 'level', 'varchar(255)')
-        _add_column_if_missing('dbvocabularysession', 'level', 'varchar(255)')
+        migrated = False
+        migrated |= _add_column_if_missing('dbword', 'type', 'varchar(255)')
+        migrated |= _add_level_column()
+        migrated |= _add_column_if_missing('dbuser', 'level', 'varchar(255)')
+        migrated |= _add_column_if_missing('dbuser', 'target_language_id',
+                                           'varchar(255)')
+        migrated |= _add_column_if_missing('dbvocabularysession', 'level',
+                                           'varchar(255)')
         _remap_old_levels()
+
+        if migrated:
+            # adding a column can leave an index on the new column
+            # inconsistent (sqlite/peewee): rebuild the indexes
+            db.execute_sql('REINDEX')
 
     db.execute_sql('PRAGMA foreign_keys = ON')
 

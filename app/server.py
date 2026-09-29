@@ -90,6 +90,9 @@ def _resolve_target(user: User,
         if language in targets:
             return language
 
+    if user.target_language is not None and user.target_language in targets:
+        return user.target_language
+
     if voc_id is None or user.main_language is None:
         return targets[0] if targets else None
 
@@ -181,6 +184,12 @@ async def index(request: Request,
 
     targets = _target_languages(user)
     target = _resolve_target(user, to=to)
+
+    # the target language lives in the user profile too; picking one saves it
+    if to is not None:
+        requested = Language.from_code(to)
+        if requested in targets and requested != user.target_language:
+            db.set_user_target_language(user, requested)
 
     # the level lives in the user profile; selecting one saves it
     selected_level = user.level

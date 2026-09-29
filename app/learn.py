@@ -54,6 +54,7 @@ class User:
     password: str
     main_language: Optional[Language]
     level: Optional[str] = None
+    target_language: Optional[Language] = None
 
 
 # levels, ordered from the lowest to the highest
