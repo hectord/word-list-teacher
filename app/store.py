@@ -254,6 +254,27 @@ class Database:
             })
         return details
 
+    def remove_user(self, email: str):
+        """Delete a user together with their sessions and attempts."""
+        db_user = DbUser.get_or_none(DbUser.email == email)
+        if db_user is None:
+            raise DbException('user not found')
+
+        session_ids = [session.id
+                       for session in DbSession.select().where(
+                           DbSession.user == db_user)]
+
+        if session_ids:
+            (DbWordAttempt.delete()
+             .where(DbWordAttempt.session.in_(session_ids)).execute())
+            (DbVocabularySession.delete()
+             .where(DbVocabularySession.session.in_(session_ids)).execute())
+            (DbSession.delete()
+             .where(DbSession.id.in_(session_ids)).execute())
+
+        DbUser.delete().where(DbUser.id == db_user.id).execute()
+        _AUTH_CACHE.pop(email, None)
+
     def update_user(self,
                     email: str,
                     main_language=None,

@@ -77,6 +77,10 @@ myenv/bin/python app/cli.py database data/learn.db \
 
 # shortcut for the level only
 myenv/bin/python app/cli.py database data/learn.db set-user-level you@example.com C1
+
+# remove a user (deletes their sessions and practice history; the
+# vocabularies are kept)
+myenv/bin/python app/cli.py database data/learn.db remove-user you@example.com
 ```
 
 ## Docker image

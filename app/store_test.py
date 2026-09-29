@@ -381,6 +381,34 @@ class TestStore(unittest.TestCase):
         self.assertEqual('B1', DbWord.get().level)
         self.assertEqual('B1', DbUser.get(DbUser.email == 'a2@x.com').level)
 
+    def test_remove_user(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        voc = self._projection()
+        session = self.db.create_new_session(self.user, voc)
+        word = session.current_word
+        self.db.add_word_attempt(session,
+                                 session.guess(word, word.word_output))
+
+        self.assertEqual(1, DbSession.select().count())
+        self.assertEqual(1, DbWordAttempt.select().count())
+
+        self.db.remove_user('test@hotmail.com')
+
+        self.assertEqual(0, DbUser.select().count())
+        self.assertEqual(0, DbSession.select().count())
+        self.assertEqual(0, DbVocabularySession.select().count())
+        self.assertEqual(0, DbWordAttempt.select().count())
+        # vocabularies are not touched
+        self.assertEqual(1, DbVocabulary.select().count())
+        self.assertEqual(2, DbWord.select().count())
+
+        with self.assertRaises(DbException):
+            self.db.get_user('test@hotmail.com', 'abc')
+        with self.assertRaises(DbException):
+            self.db.remove_user('nobody@x.com')
+
     def test_load_csv_dictionary(self):
         from cli import load_csv_dictionary
 

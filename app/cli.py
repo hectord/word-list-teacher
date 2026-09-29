@@ -301,6 +301,9 @@ if __name__ == '__main__':
     update_user_subparser.add_argument('--password', action='store_true',
                                        help='prompt for a new password')
 
+    remove_user_subparser = db_subparser.add_parser('remove-user')
+    remove_user_subparser.add_argument('email', help='user email', nargs=1)
+
     db_subparser.add_parser('list-vocabularies')
     list_words_subparser = db_subparser.add_parser('list-words')
     list_words_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
@@ -447,6 +450,18 @@ if __name__ == '__main__':
             sys.exit(1)
 
         print('updated', email)
+
+    elif args.db_cmd == 'remove-user':
+        database = args.database[0]
+        database = load_database(database)
+
+        try:
+            database.remove_user(args.email[0])
+        except DbException as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
+        print('removed', args.email[0])
 
     elif args.db_cmd == 'init':
         database = args.database[0]
