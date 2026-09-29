@@ -74,6 +74,97 @@ def load_dictionary(filename: str,
     return vocabularies
 
 
+LANGUAGE_NAMES = {
+    'german': 'de', 'de': 'de',
+    'french': 'fr', 'fr': 'fr',
+    'english': 'en', 'en': 'en',
+    'chinese': 'cn', 'cn': 'cn',
+}
+
+CSV_EXAMPLE_SUFFIX = '_example'
+
+
+def _column(fields, names):
+    for field in fields:
+        if field is not None and field.strip().lower() in names:
+            return field
+    return None
+
+
+def load_csv_dictionary(filename: str):
+    """
+    Load a comma separated dictionary with a header, like
+    data/german_vocabulary_exam_levels.csv:
+
+        vocabulary,section,type,cefr_level,german,french,english,german_example
+
+    Language columns and the ``<language>_example`` columns are detected
+    from the header. Returns records for ``Database.import_vocabularies``.
+    """
+    records = []
+
+    with open(filename, encoding='utf-8-sig', newline='') as f:
+        reader = csv.DictReader(f)
+        fields = reader.fieldnames or []
+
+        language_columns = {}
+        example_columns = {}
+        for field in fields:
+            if field is None:
+                continue
+            name = field.strip().lower()
+            if name in LANGUAGE_NAMES:
+                language_columns[field] = LANGUAGE_NAMES[name]
+            elif name.endswith(CSV_EXAMPLE_SUFFIX):
+                base = name[:-len(CSV_EXAMPLE_SUFFIX)]
+                if base in LANGUAGE_NAMES:
+                    example_columns[field] = LANGUAGE_NAMES[base]
+
+        if not language_columns:
+            raise InvalidFileException(
+                f'no language columns found in {filename}')
+
+        vocabulary_column = _column(fields, ('vocabulary',))
+        section_column = _column(fields, ('section',))
+        type_column = _column(fields, ('type',))
+        level_column = _column(fields, ('cefr_level', 'level'))
+
+        for row in reader:
+            def value(column):
+                if column is None:
+                    return ''
+                return (row.get(column) or '').strip()
+
+            texts = {}
+            for field, language in language_columns.items():
+                text = (row.get(field) or '').strip()
+                if text:
+                    texts[language] = text
+
+            if not texts:
+                continue
+
+            examples = {}
+            for field, language in example_columns.items():
+                example = (row.get(field) or '').strip()
+                if example:
+                    examples[language] = example
+
+            records.append({
+                'vocabulary': value(vocabulary_column),
+                'section': value(section_column),
+                'type': value(type_column) or None,
+                'level': value(level_column) or None,
+                'texts': texts,
+                'examples': examples,
+            })
+
+    if not records:
+        raise InvalidFileException(f'no words found in {filename}')
+
+    return records
+
+
 def say_goodbye():
     print()
     print()
@@ -184,6 +275,9 @@ if __name__ == '__main__':
     add_dictionary_subparser = db_subparser.add_parser('add-dictionary')
     add_dictionary_subparser.add_argument('files', help='cleaned dictionary CSV files (vocabulary;section;word;translation)', nargs='+')
 
+    import_dictionary_subparser = db_subparser.add_parser('import-dictionary')
+    import_dictionary_subparser.add_argument('file', help='CSV file to import (replaces all vocabularies)', nargs=1)
+
     create_user_subparser = db_subparser.add_parser('create-user')
     create_user_subparser.add_argument('username', help='new username', nargs=1)
     create_user_subparser.add_argument('--main-language', required=True,
@@ -279,6 +373,17 @@ if __name__ == '__main__':
                       % (filename, len(vocabulary),
                          len(vocabulary.sections), voc_id,
                          vocabulary.name.word_input))
+
+    elif args.db_cmd == 'import-dictionary':
+        database = args.database[0]
+        database = load_database(database)
+
+        records = load_csv_dictionary(args.file[0])
+        vocabularies = database.import_vocabularies(records)
+
+        print('%s: imported %d words in %d vocabularies '
+              '(previous vocabularies removed)'
+              % (args.file[0], len(records), vocabularies))
 
     elif args.db_cmd == 'create-user':
         username = args.username[0]

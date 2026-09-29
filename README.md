@@ -50,6 +50,12 @@ myenv/bin/python app/cli.py database data/learn.db \
 # vocabulary;section;german;translation
 myenv/bin/python app/cli.py database data/learn.db \
     add-dictionary data/merged.cleaned
+
+# import a full dictionary from a CSV with a header, e.g.
+# vocabulary,section,type,cefr_level,german,french,english,german_example
+# This REPLACES every existing vocabulary (users are kept).
+myenv/bin/python app/cli.py database data/learn.db \
+    import-dictionary data/german_vocabulary_exam_levels.csv
 ```
 
 Useful commands: `list-vocabularies`, `list-sections <voc-id>`,

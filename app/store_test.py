@@ -10,7 +10,7 @@ from typing import Set
 from store import (load_database, DbException,
                    DbVocabulary, DbVocabularyTitle, DbSection, DbSectionText,
                    DbWord, DbWordText, DbVocabularySession, DbWordAttempt,
-                   DbUser, db as store_db, _table_columns)
+                   DbUser, DbSession, db as store_db, _table_columns)
 from learn import Vocabulary, Word, Language, User, included_levels
 
 
@@ -380,6 +380,88 @@ class TestStore(unittest.TestCase):
 
         self.assertEqual('B1', DbWord.get().level)
         self.assertEqual('B1', DbUser.get(DbUser.email == 'a2@x.com').level)
+
+    def test_load_csv_dictionary(self):
+        from cli import load_csv_dictionary
+
+        fd, path = tempfile.mkstemp(suffix='.csv')
+        os.close(fd)
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('vocabulary,section,type,cefr_level,german,french,'
+                        'english,german_example\n')
+                f.write('Greetings,Basics,noun,B1,Hallo,bonjour,hello,'
+                        'Hallo Welt.\n')
+                f.write('Greetings,Basics,verb,B2,gehen,aller,to go,\n')
+                f.write('Greetings,,,C1,,,,,\n')   # no text -> skipped
+
+            records = load_csv_dictionary(path)
+
+            self.assertEqual(2, len(records))
+            self.assertEqual('Greetings', records[0]['vocabulary'])
+            self.assertEqual('Basics', records[0]['section'])
+            self.assertEqual('noun', records[0]['type'])
+            self.assertEqual('B1', records[0]['level'])
+            self.assertEqual({'de': 'Hallo', 'fr': 'bonjour',
+                              'en': 'hello'}, records[0]['texts'])
+            self.assertEqual({'de': 'Hallo Welt.'},
+                             records[0]['examples'])
+            self.assertEqual({'de': 'gehen', 'fr': 'aller',
+                              'en': 'to go'}, records[1]['texts'])
+            self.assertEqual({}, records[1]['examples'])
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_import_vocabularies(self):
+        records = [
+            {'vocabulary': 'Greetings', 'section': 'Basics', 'type': 'noun',
+             'level': 'B1',
+             'texts': {'de': 'Hallo', 'fr': 'bonjour', 'en': 'hello'},
+             'examples': {'de': 'Hallo Welt.'}},
+            {'vocabulary': 'Greetings', 'section': 'Basics', 'type': None,
+             'level': 'B2',
+             'texts': {'de': 'Tschuess', 'fr': 'au revoir', 'en': 'bye'},
+             'examples': {}},
+        ]
+
+        count = self.db.import_vocabularies(records)
+        self.assertEqual(1, count)
+        self.assertEqual(1, DbVocabulary.select().count())
+        self.assertEqual(1, DbVocabularyTitle.select().count())
+        self.assertEqual(1, DbSection.select().count())
+        self.assertEqual(1, DbSectionText.select().count())
+        self.assertEqual(2, DbWord.select().count())
+        self.assertEqual(6, DbWordText.select().count())
+
+        self._create_user()   # main language: french
+        voc = self.db.get_vocabulary(self.user, 1, Language.GERMAN)
+        self.assertEqual('Greetings', voc.name.word_input)
+        self.assertEqual('Basics', voc.sections[0].name)
+
+        words = {word.word_output: word for word in voc.words}
+        self.assertEqual('noun', words['Hallo'].type)
+        self.assertEqual('B1', words['Hallo'].level)
+        self.assertEqual('bonjour', words['Hallo'].word_input)
+        self.assertEqual('Hallo Welt.', voc.example(words['Hallo']))
+
+        # practising, then re-importing replaces everything
+        session = self.db.create_new_session(self.user, voc)
+        word = session.current_word
+        self.db.add_word_attempt(session,
+                                 session.guess(word, word.word_output))
+        self.assertGreater(DbWordAttempt.select().count(), 0)
+
+        self.db.import_vocabularies([
+            {'vocabulary': 'Other', 'section': '', 'type': None,
+             'level': 'C1', 'texts': {'de': 'Danke', 'fr': 'merci'},
+             'examples': {}}])
+
+        self.assertEqual(1, DbVocabulary.select().count())
+        self.assertEqual(1, DbWord.select().count())
+        self.assertEqual(0, DbSection.select().count())
+        self.assertEqual(0, DbWordAttempt.select().count())
+        self.assertEqual(0, DbSession.select().count())
 
     def test_word_level(self):
         self._create_vocabulary()

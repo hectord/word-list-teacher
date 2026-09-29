@@ -506,6 +506,72 @@ class Database:
     def list_section_texts(self, voc_id: int) -> Dict[int, Dict[str, str]]:
         return self._section_texts(voc_id)
 
+    def clear_vocabularies(self):
+        """Remove every vocabulary (and the sessions/attempts which
+        belong to them). Users and languages are kept."""
+        DbWordAttempt.delete().execute()
+        DbVocabularySession.delete().execute()
+        DbSession.delete().execute()
+        DbWordText.delete().execute()
+        DbWord.delete().execute()
+        DbSectionText.delete().execute()
+        DbSection.delete().execute()
+        DbVocabularyTitle.delete().execute()
+        DbVocabulary.delete().execute()
+
+    def import_vocabularies(self, records, title_language: str = 'de',
+                            replace: bool = True) -> int:
+        """Create vocabularies from ``records`` (see
+        ``cli.load_csv_dictionary``).
+
+        Each record is a dict with ``vocabulary``, ``section``, ``type``,
+        ``level``, ``texts`` ({language: text}) and ``examples``
+        ({language: sentence}). When ``replace`` is set the existing
+        vocabularies are removed first.
+        """
+        if replace:
+            self.clear_vocabularies()
+
+        vocabularies = {}
+        sections = {}
+
+        for record in records:
+            name = record['vocabulary']
+
+            db_voc = vocabularies.get(name)
+            if db_voc is None:
+                db_voc = DbVocabulary.create()
+                vocabularies[name] = db_voc
+                if name:
+                    DbVocabularyTitle.create(vocabulary=db_voc,
+                                             language=title_language,
+                                             title=name)
+
+            section_name = record['section']
+            key = (name, section_name)
+            if key not in sections:
+                if section_name:
+                    db_section = DbSection.create(vocabulary=db_voc)
+                    DbSectionText.create(section=db_section,
+                                         language=title_language,
+                                         text=section_name)
+                else:
+                    db_section = None
+                sections[key] = db_section
+
+            db_word = DbWord.create(vocabulary=db_voc,
+                                    section=sections[key],
+                                    type=record['type'],
+                                    level=record['level'])
+
+            for language, text in record['texts'].items():
+                DbWordText.create(word=db_word,
+                                  language=language,
+                                  text=text,
+                                  example=record['examples'].get(language))
+
+        return len(vocabularies)
+
     def create_vocabulary(self, voc: Vocabulary) -> int:
         input_code = voc.input_language
         output_code = voc.output_language
