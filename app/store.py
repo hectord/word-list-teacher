@@ -239,6 +239,46 @@ class Database:
         return [(db_user.id, db_user.email)
                 for db_user in DbUser.select().order_by(DbUser.id)]
 
+    def list_user_details(self) -> List[dict]:
+        """All users with their profile (main language and level)."""
+        details = []
+        for db_user in DbUser.select().order_by(DbUser.id):
+            main_language = None
+            if db_user.main_language is not None:
+                main_language = db_user.main_language.code
+            details.append({
+                'id': db_user.id,
+                'email': db_user.email,
+                'main_language': main_language,
+                'level': db_user.level,
+            })
+        return details
+
+    def update_user(self,
+                    email: str,
+                    main_language=None,
+                    level: Optional[str] = None,
+                    password: Optional[str] = None):
+        """Update the user profile. ``None`` means 'leave unchanged'."""
+        update = {}
+        if main_language is not None:
+            update['main_language'] = DbLanguage.get(code=_code(main_language))
+        if level is not None:
+            update['level'] = level
+        if password is not None:
+            update['password'] = get_hashed_password(password)
+
+        if not update:
+            raise DbException('nothing to update')
+
+        updated = (DbUser.update(**update)
+                   .where(DbUser.email == email).execute())
+        if not updated:
+            raise DbException('user not found')
+
+        # the credentials / profile changed: drop the cached auth
+        _AUTH_CACHE.pop(email, None)
+
     def _get_db_user(self, user: User) -> DbUser:
         return DbUser.get(email=user.email)
 

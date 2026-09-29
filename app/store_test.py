@@ -347,6 +347,31 @@ class TestStore(unittest.TestCase):
         self.assertEqual(1, self.db.known_word_counts(
             included_levels('A2')).get(voc_id))
 
+    def test_update_and_list_users(self):
+        self._create_user()
+
+        details = self.db.list_user_details()
+        self.assertEqual(1, len(details))
+        self.assertEqual('test@hotmail.com', details[0]['email'])
+        self.assertEqual('fr', details[0]['main_language'])
+        self.assertIsNone(details[0]['level'])
+
+        self.db.update_user('test@hotmail.com', level='B2',
+                            main_language=Language.GERMAN)
+        updated = self.db.get_user('test@hotmail.com', 'abc')
+        self.assertEqual('B2', updated.level)
+        self.assertEqual(Language.GERMAN, updated.main_language)
+
+        self.db.update_user('test@hotmail.com', password='newpass')
+        with self.assertRaises(DbException):
+            self.db.get_user('test@hotmail.com', 'abc')
+        self.assertEqual('test@hotmail.com',
+                         self.db.get_user('test@hotmail.com',
+                                          'newpass').email)
+
+        with self.assertRaises(DbException):
+            self.db.update_user('nobody@x.com', level='B1')
+
     def test_word_level(self):
         self._create_vocabulary()
         self._create_user()

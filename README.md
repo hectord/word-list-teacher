@@ -54,9 +54,24 @@ myenv/bin/python app/cli.py database data/learn.db \
 
 Useful commands: `list-vocabularies`, `list-sections <voc-id>`,
 `list-words <voc-id>`, `add-vocabulary <file>`, `remove-vocabulary <voc-id>`,
-`set-user-level <email> <level>`,
 `add-word <voc-id> --input-language fr --output-language de <in> <out>`,
 `update-word <word-id> --language de [--text <text>] [--example <sentence>] [--type noun] [--level B1]`.
+
+User management:
+
+```bash
+# list every user with their main language and level
+myenv/bin/python app/cli.py database data/learn.db list-users
+
+# update a profile (only the given options are changed)
+myenv/bin/python app/cli.py database data/learn.db \
+    update-user you@example.com --main-language de --level B2
+myenv/bin/python app/cli.py database data/learn.db \
+    update-user you@example.com --password      # prompts for a new password
+
+# shortcut for the level only
+myenv/bin/python app/cli.py database data/learn.db set-user-level you@example.com C1
+```
 
 ## Docker image
 

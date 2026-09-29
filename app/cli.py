@@ -12,7 +12,7 @@ from termcolor import colored
 
 from learn import Word, InvalidFileException, Vocabulary, Session
 from learn import Language
-from store import load_database
+from store import load_database, DbException
 
 
 def load_dictionary(filename: str,
@@ -196,6 +196,17 @@ if __name__ == '__main__':
     set_level_subparser.add_argument('email', help='user email', nargs=1)
     set_level_subparser.add_argument('level', help='A2, B1, B2 or C1', nargs=1)
 
+    db_subparser.add_parser('list-users')
+
+    update_user_subparser = db_subparser.add_parser('update-user')
+    update_user_subparser.add_argument('email', help='user email', nargs=1)
+    update_user_subparser.add_argument('--main-language', nargs='?',
+                                       help='language the user knows')
+    update_user_subparser.add_argument('--level', nargs='?',
+                                       help='A2, B1, B2 or C1')
+    update_user_subparser.add_argument('--password', action='store_true',
+                                       help='prompt for a new password')
+
     db_subparser.add_parser('list-vocabularies')
     list_words_subparser = db_subparser.add_parser('list-words')
     list_words_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
@@ -289,7 +300,48 @@ if __name__ == '__main__':
         database = args.database[0]
         database = load_database(database)
 
-        database.set_user_level(args.email[0], args.level[0])
+        try:
+            database.set_user_level(args.email[0], args.level[0])
+        except DbException as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
+        print('updated level of', args.email[0])
+
+    elif args.db_cmd == 'list-users':
+        database = args.database[0]
+        database = load_database(database)
+
+        for user in database.list_user_details():
+            print('%4d  %-32s %-5s %-4s'
+                  % (user['id'], user['email'],
+                     user['main_language'] or '-',
+                     user['level'] or '-'))
+
+    elif args.db_cmd == 'update-user':
+        database = args.database[0]
+        database = load_database(database)
+
+        email = args.email[0]
+
+        main_language = None
+        if args.main_language:
+            main_language = Language.from_code(args.main_language)
+            if main_language is None:
+                print("invalid language code", file=sys.stderr)
+                sys.exit(-1)
+
+        level = args.level if args.level else None
+        password = getpass.getpass() if args.password else None
+
+        try:
+            database.update_user(email, main_language=main_language,
+                                 level=level, password=password)
+        except DbException as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+
+        print('updated', email)
 
     elif args.db_cmd == 'init':
         database = args.database[0]
