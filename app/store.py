@@ -74,6 +74,8 @@ class DbWord(Model):
     vocabulary = ForeignKeyField(DbVocabulary, backref='words')
     section = ForeignKeyField(DbSection, null=True, backref='words')
     type = CharField(null=True)
+    # level of the word (A2, B1, B2, C1); same for every language
+    level = CharField(null=True)
 
     class Meta:
         database = db
@@ -255,7 +257,7 @@ class Database:
                 continue
 
             word = Word(word_input=in_text.text, word_output=out_text.text,
-                       type=db_word.type)
+                       type=db_word.type, level=db_word.level)
             words.append(word)
             word_ids[word] = db_word.id
 
@@ -387,7 +389,8 @@ class Database:
         for word, section_name in zip(voc.words, voc.word_sections):
             db_word = DbWord.create(vocabulary=new_voc,
                                     section=section_by_name.get(section_name),
-                                    type=word.type)
+                                    type=word.type,
+                                    level=word.level)
             DbWordText.create(word=db_word,
                               language=input_code,
                               text=word.word_input)
@@ -403,7 +406,8 @@ class Database:
                  word: Word) -> int:
         db_voc = DbVocabulary.get(voc_id)
 
-        db_word = DbWord.create(vocabulary=db_voc, type=word.type)
+        db_word = DbWord.create(vocabulary=db_voc, type=word.type,
+                                level=word.level)
 
         DbWordText.create(word=db_word, language=input_code,
                           text=word.word_input)
@@ -414,6 +418,10 @@ class Database:
 
     def update_word_type(self, word_id: int, word_type: Optional[str]):
         (DbWord.update(type=word_type)
+         .where(DbWord.id == word_id).execute())
+
+    def update_word_level(self, word_id: int, level: Optional[str]):
+        (DbWord.update(level=level)
          .where(DbWord.id == word_id).execute())
 
     def update_word_text(self, word_id: int, language,
@@ -827,8 +835,8 @@ def _migrate_legacy_vocabularies(vocabularies, words, vocabulary_sessions):
                 section_id = section_ids[key]
 
         db.execute_sql(
-            'INSERT INTO dbword (id, vocabulary_id, section_id) '
-            'VALUES (?, ?, ?)', (word_id, voc_id, section_id))
+            'INSERT INTO dbword (id, vocabulary_id, section_id, level) '
+            'VALUES (?, ?, ?, ?)', (word_id, voc_id, section_id, 'B1'))
         db.execute_sql(
             'INSERT INTO dbwordtext (word_id, language_id, text) '
             'VALUES (?, ?, ?)', (word_id, input_code, word_input))
@@ -857,6 +865,14 @@ def _add_column_if_missing(table: str, column: str, definition: str):
                    % (table, column, definition))
 
 
+def _add_level_column():
+    if 'level' in _table_columns('dbword'):
+        return
+    db.execute_sql('ALTER TABLE dbword ADD COLUMN level varchar(255)')
+    # words which existed before levels were introduced are B1
+    db.execute_sql("UPDATE dbword SET level = 'B1'")
+
+
 def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
@@ -866,8 +882,9 @@ def load_database(name: str) -> Database:
         _migrate_legacy()
     else:
         db.create_tables(NEW_TABLES)
-        # the word 'type' was added later (existing words get NULL)
+        # the word 'type' and 'level' were added later
         _add_column_if_missing('dbword', 'type', 'varchar(255)')
+        _add_level_column()
 
     db.execute_sql('PRAGMA foreign_keys = ON')
 

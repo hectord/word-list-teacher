@@ -10,7 +10,7 @@ from typing import Set
 from store import (load_database, DbException,
                    DbVocabulary, DbVocabularyTitle, DbSection, DbSectionText,
                    DbWord, DbWordText, DbVocabularySession, DbWordAttempt,
-                   DbUser)
+                   DbUser, db as store_db, _table_columns)
 from learn import Vocabulary, Word, Language, User
 
 
@@ -258,6 +258,49 @@ class TestStore(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_word_level(self):
+        self._create_vocabulary()
+        self._create_user()
+
+        word_id = self.db.add_word(
+            1, 'fr', 'de',
+            Word(word_input='fr_3', word_output='de_3', level='B2'))
+
+        voc = self._projection()
+        word = [w for w in voc.words if w.word_output == 'de_3'][0]
+        self.assertEqual('B2', word.level)
+
+        self.db.update_word_level(word_id, 'C1')
+        voc = self._projection()
+        word = [w for w in voc.words if w.word_output == 'de_3'][0]
+        self.assertEqual('C1', word.level)
+
+        # the default is None when the level is unknown
+        self.assertIsNone(voc.words[0].level)
+
+    def test_level_backfills_b1(self):
+        fd, path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        try:
+            database = load_database(path)
+            for language in Language:
+                database.create_language(language)
+            database.create_vocabulary(
+                Vocabulary(None,
+                           [Word(word_input='fr_1', word_output='de_1')],
+                           input_language='fr', output_language='de'))
+
+            # pretend the database predates the 'level' column
+            store_db.execute_sql('ALTER TABLE dbword DROP COLUMN level')
+            self.assertNotIn('level', _table_columns('dbword'))
+
+            database = load_database(path)
+
+            self.assertEqual('B1', DbWord.get().level)
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
     def test_word_type(self):
         self._create_vocabulary()
         self._create_user()
@@ -420,8 +463,10 @@ class TestStore(unittest.TestCase):
             db_user = DbUser.get(DbUser.id == 1)
             self.assertEqual('fr', db_user.main_language_id)
 
-            # the migration leaves the (unknown) word type as NULL
+            # the migration leaves the (unknown) word type as NULL and
+            # assumes B1 for the level
             self.assertIsNone(DbWord.get(DbWord.id == 1).type)
+            self.assertEqual('B1', DbWord.get(DbWord.id == 1).level)
 
             user = User(email='u@x', password='pw',
                         main_language=Language.FRENCH)

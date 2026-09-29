@@ -121,11 +121,13 @@ class Word:
     word_output: str
     word_input: str
     type: Optional[str] = None
+    level: Optional[str] = None
 
     def flip(self) -> 'Word':
         return Word(word_output=self.word_input,
                     word_input=self.word_output,
-                    type=self.type)
+                    type=self.type,
+                    level=self.level)
 
     @property
     def is_complex(self) -> bool:
