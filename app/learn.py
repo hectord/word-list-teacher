@@ -218,7 +218,7 @@ class Vocabulary:
         self._words = []
         self._word_sections = []
 
-        self._similar_words = defaultdict(set)
+        self._similar_words = None
         self._id = None
         self._word_ids = {}
         self._flipped = flipped
@@ -238,13 +238,22 @@ class Vocabulary:
         self._word_sections.append(section)
         if word_id is not None:
             self._word_ids[word] = word_id
-        self._similar_words[word.key].add(word)
+        self._similar_words = None   # rebuilt lazily
 
     @property
     def is_flipped(self) -> bool:
         return self._flipped
 
     def similar_words(self, word: Word) -> Set[Word]:
+        # the index is built on demand: building it eagerly costs a
+        # normalisation for every word, which matters for big
+        # vocabularies which are only counted (e.g. the index page)
+        if self._similar_words is None:
+            similar = defaultdict(set)
+            for this_word in self._words:
+                similar[this_word.key].add(this_word)
+            self._similar_words = similar
+
         return self._similar_words[word.key]
 
     def section_of(self, word: Word) -> Optional[str]:
@@ -395,8 +404,8 @@ class Vocabulary:
         self._examples.update(other._examples)
         self._word_ids.update(other._word_ids)
 
-        for key, words in other._similar_words.items():
-            self._similar_words[key].update(words)
+        # the similar-words index is rebuilt lazily
+        self._similar_words = None
 
     def __str__(self) -> str:
         if self.name is None:

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from collections import defaultdict
+import hashlib
+import time
 
 from security import check_password, get_hashed_password
 from datetime import datetime
@@ -131,6 +133,19 @@ def _code(language) -> Optional[str]:
     return language.code if isinstance(language, Language) else language
 
 
+# Successful HTTP Basic auth is cached: bcrypt is intentionally slow
+# (~0.4s) and the browser re-sends the credentials on every request.
+# Entries are keyed by email and hold a hash of the credentials so the
+# password itself is not kept around.
+_AUTH_CACHE = {}
+_AUTH_CACHE_TTL = 300.0
+
+
+def _credentials_hash(email: str, password: str) -> str:
+    return hashlib.sha256(('%s\0%s' % (email, password))
+                          .encode('utf-8')).hexdigest()
+
+
 class Database:
 
     # ------------------------------------------------------------- languages
@@ -157,6 +172,14 @@ class Database:
 
     # ----------------------------------------------------------------- users
     def get_user(self, email: str, password: str) -> User:
+        credentials = _credentials_hash(email, password)
+        now = time.monotonic()
+
+        cached = _AUTH_CACHE.get(email)
+        if cached is not None and cached[0] == credentials \
+                and cached[1] > now:
+            return cached[2]
+
         users = list(DbUser.select().where(DbUser.email == email))
 
         if not users or not check_password(password, users[0].password):
@@ -167,9 +190,12 @@ class Database:
         if db_user.main_language is not None:
             main_language = Language.from_code(db_user.main_language.code)
 
-        return User(email=email, password=password,
+        user = User(email=email, password=password,
                     main_language=main_language,
                     level=db_user.level)
+
+        _AUTH_CACHE[email] = (credentials, now + _AUTH_CACHE_TTL, user)
+        return user
 
     def create_user(self,
                     email: str,
@@ -199,6 +225,15 @@ class Database:
         if not updated:
             raise DbException('user not found')
 
+        # keep the cached profile in sync
+        cached = _AUTH_CACHE.get(email)
+        if cached is not None:
+            credentials, expires, previous = cached
+            _AUTH_CACHE[email] = (
+                credentials, expires,
+                User(email=previous.email, password=previous.password,
+                     main_language=previous.main_language, level=level))
+
     def list_users(self) -> List[Tuple[int, str]]:
         """All users as (id, email) pairs."""
         return [(db_user.id, db_user.email)
@@ -217,53 +252,89 @@ class Database:
             return texts[preferred]
         return next(iter(texts.values()))
 
-    def _titles(self, voc_id: int) -> Dict[str, str]:
-        return {title.language.code: title.title
-                for title in (DbVocabularyTitle
-                              .select()
-                              .where(DbVocabularyTitle.vocabulary == voc_id))}
-
     def _section_texts(self, voc_id: int) -> Dict[int, Dict[str, str]]:
         texts = defaultdict(dict)
         for section_text in (DbSectionText
-                             .select(DbSectionText, DbSection)
+                             .select(DbSectionText, DbSection, DbLanguage)
                              .join(DbSection)
+                             .switch(DbSectionText)
+                             .join(DbLanguage)
                              .where(DbSection.vocabulary == voc_id)):
             texts[section_text.section_id][section_text.language.code] = \
                 section_text.text
         return texts
 
-    def _load_vocabulary(self,
-                         voc_id: int,
-                         input_code: str,
-                         output_code: str,
-                         display_code: str = None,
-                         levels=None) -> Optional[Vocabulary]:
-        """Project the language agnostic entities into a vocabulary view
-        for the ``input_code -> output_code`` direction, optionally
-        restricted to the levels the learner has to know."""
+    def _load_vocabularies(self,
+                           voc_ids,
+                           input_code: str,
+                           output_code: str,
+                           display_code: str = None,
+                           levels=None) -> Dict[int, Vocabulary]:
+        """Load several vocabularies with a handful of queries (instead
+        of four per vocabulary) and project them."""
+        voc_ids = list(voc_ids)
+        if not voc_ids:
+            return {}
+
         display_code = display_code or input_code
 
-        texts = defaultdict(dict)
-        for text in (DbWordText
-                     .select(DbWordText, DbWord)
-                     .join(DbWord)
-                     .where(DbWord.vocabulary == voc_id)):
-            texts[text.word_id][text.language.code] = text
+        # plain SQL + raw rows: peewee's model/tuple hydration costs per
+        # value and dominates the time for ~20k rows
+        placeholders = ','.join('?' * len(voc_ids))
 
-        section_texts = self._section_texts(voc_id)
+        words_by_vocabulary = defaultdict(list)
+        for word_id, voc_id, section_id, word_type, level in db.execute_sql(
+                'SELECT id, vocabulary_id, section_id, type, level '
+                'FROM dbword WHERE vocabulary_id IN (%s) ORDER BY id'
+                % placeholders, voc_ids).fetchall():
+            words_by_vocabulary[voc_id].append(
+                (word_id, section_id, word_type, level))
 
+        texts_by_word = defaultdict(dict)
+        for word_id, language_id, text, example in db.execute_sql(
+                'SELECT t.word_id, t.language_id, t.text, t.example '
+                'FROM dbwordtext t JOIN dbword w ON w.id = t.word_id '
+                'WHERE w.vocabulary_id IN (%s)' % placeholders,
+                voc_ids).fetchall():
+            texts_by_word[word_id][language_id] = (text, example)
+
+        section_texts = defaultdict(dict)
+        for section_id, language_id, text in db.execute_sql(
+                'SELECT st.section_id, st.language_id, st.text '
+                'FROM dbsectiontext st '
+                'JOIN dbsection s ON s.id = st.section_id '
+                'WHERE s.vocabulary_id IN (%s)' % placeholders,
+                voc_ids).fetchall():
+            section_texts[section_id][language_id] = text
+
+        titles = defaultdict(dict)
+        for voc_id, language_id, title in db.execute_sql(
+                'SELECT vocabulary_id, language_id, title '
+                'FROM dbvocabularytitle WHERE vocabulary_id IN (%s)'
+                % placeholders, voc_ids).fetchall():
+            titles[voc_id][language_id] = title
+
+        return {
+            voc_id: self._project_vocabulary(
+                voc_id,
+                words_by_vocabulary.get(voc_id, []),
+                texts_by_word, section_texts, titles.get(voc_id, {}),
+                input_code, output_code, display_code, levels)
+            for voc_id in voc_ids
+        }
+
+    @staticmethod
+    def _project_vocabulary(voc_id, db_words, texts_by_word, section_texts,
+                            titles, input_code, output_code, display_code,
+                            levels) -> Vocabulary:
         words = []
         word_ids = {}
         sections = []
         section_ids = {}
         examples = {}
 
-        for db_word in (DbWord
-                        .select()
-                        .where(DbWord.vocabulary == voc_id)
-                        .order_by(DbWord.id)):
-            word_texts = texts[db_word.id]
+        for word_id, section_id, word_type, level in db_words:
+            word_texts = texts_by_word.get(word_id, {})
             in_text = word_texts.get(input_code)
             out_text = word_texts.get(output_code)
 
@@ -271,28 +342,28 @@ class Database:
                 continue
 
             # words without a level are always kept
-            if levels is not None and db_word.level is not None \
-                    and db_word.level not in levels:
+            if levels is not None and level is not None \
+                    and level not in levels:
                 continue
 
-            word = Word(word_input=in_text.text, word_output=out_text.text,
-                       type=db_word.type, level=db_word.level)
+            word = Word(word_input=in_text[0], word_output=out_text[0],
+                        type=word_type, level=level)
             words.append(word)
-            word_ids[word] = db_word.id
+            word_ids[word] = word_id
 
-            if db_word.section_id is not None:
-                name = self._pick_text(
-                    section_texts.get(db_word.section_id, {}), display_code)
+            if section_id is not None:
+                name = Database._pick_text(
+                    section_texts.get(section_id, {}), display_code)
                 sections.append(name)
                 if name is not None:
-                    section_ids[name] = db_word.section_id
+                    section_ids[name] = section_id
             else:
                 sections.append(None)
 
-            if out_text.example is not None:
-                examples[word] = out_text.example
+            if out_text[1] is not None:
+                examples[word] = out_text[1]
 
-        title = self._pick_text(self._titles(voc_id), display_code)
+        title = Database._pick_text(titles, display_code)
         name = None if title is None else Word(word_input=title,
                                                word_output=title)
 
@@ -306,6 +377,17 @@ class Database:
             voc.set_example(word, example)
 
         return voc
+
+    def _load_vocabulary(self,
+                         voc_id: int,
+                         input_code: str,
+                         output_code: str,
+                         display_code: str = None,
+                         levels=None) -> Optional[Vocabulary]:
+        """Project one vocabulary for the ``input_code -> output_code``
+        direction, optionally restricted to the given levels."""
+        return self._load_vocabularies([voc_id], input_code, output_code,
+                                       display_code, levels).get(voc_id)
 
     def target_vocabulary_ids(self, input_code: str,
                               output_code: str) -> List[int]:
@@ -331,14 +413,10 @@ class Database:
         if input_code is None or output_code is None:
             return {}
 
-        vocs = {}
-        for voc_id in self.target_vocabulary_ids(input_code, output_code):
-            voc = self._load_vocabulary(voc_id, input_code, output_code,
-                                        levels=levels)
-            if len(voc) == 0:
-                continue
-            vocs[voc_id] = voc
-        return vocs
+        voc_ids = self.target_vocabulary_ids(input_code, output_code)
+        vocs = self._load_vocabularies(voc_ids, input_code, output_code,
+                                       levels=levels)
+        return {voc_id: voc for voc_id, voc in vocs.items() if len(voc) > 0}
 
     def get_vocabulary(self, user: User, voc_id: int,
                        target_language, levels=None) -> Optional[Vocabulary]:
@@ -913,6 +991,7 @@ def _add_level_column():
 def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
+    _AUTH_CACHE.clear()
     db.execute_sql('PRAGMA foreign_keys = OFF')
 
     if _legacy_database():
