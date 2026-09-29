@@ -275,8 +275,7 @@ class TestStore(unittest.TestCase):
             self.db.set_user_level('nobody@x.com', 'B1')
 
     def test_level_filtering(self):
-        words = [Word(word_input='fr_a2', word_output='de_a2', level='A2'),
-                 Word(word_input='fr_b1', word_output='de_b1', level='B1'),
+        words = [Word(word_input='fr_b1', word_output='de_b1', level='B1'),
                  Word(word_input='fr_b2', word_output='de_b2', level='B2'),
                  Word(word_input='fr_c1', word_output='de_c1', level='C1'),
                  # no level -> always included
@@ -292,22 +291,20 @@ class TestStore(unittest.TestCase):
                 levels=included_levels(level))
             return sorted(w.word_output for w in projection.words)
 
-        self.assertEqual(['de_a2', 'de_uk'], outputs('A2'))
-        self.assertEqual(['de_a2', 'de_b1', 'de_uk'], outputs('B1'))
-        self.assertEqual(['de_a2', 'de_b1', 'de_b2', 'de_uk'], outputs('B2'))
-        self.assertEqual(['de_a2', 'de_b1', 'de_b2', 'de_c1', 'de_uk'],
-                         outputs('C1'))
-        self.assertEqual(5, len(outputs(None)))
+        self.assertEqual(['de_b1', 'de_uk'], outputs('B1'))
+        self.assertEqual(['de_b1', 'de_b2', 'de_uk'], outputs('B2'))
+        self.assertEqual(['de_b1', 'de_b2', 'de_c1', 'de_uk'], outputs('C1'))
+        self.assertEqual(4, len(outputs(None)))
 
         # vocabularies without words at the level are not listed
         listed = self.db.list_vocabularies(self.user, Language.GERMAN,
-                                           levels=included_levels('A2'))
+                                           levels=included_levels('B1'))
         self.assertEqual([voc_id], list(listed.keys()))
 
     def test_session_keeps_level(self):
-        words = [Word(word_input='fr_a2', word_output='de_a2', level='A2'),
-                 Word(word_input='fr_b1', word_output='de_b1', level='B1'),
-                 Word(word_input='fr_b2', word_output='de_b2', level='B2')]
+        words = [Word(word_input='fr_b1', word_output='de_b1', level='B1'),
+                 Word(word_input='fr_b2', word_output='de_b2', level='B2'),
+                 Word(word_input='fr_c1', word_output='de_c1', level='C1')]
         voc = Vocabulary(None, words,
                          input_language='fr', output_language='de')
         voc_id = self.db.create_vocabulary(voc)
@@ -315,11 +312,11 @@ class TestStore(unittest.TestCase):
 
         projection = self.db.get_vocabulary(self.user, voc_id,
                                             Language.GERMAN,
-                                            levels=included_levels('B1'))
+                                            levels=included_levels('B2'))
         self.assertEqual(2, len(projection))
 
         session = self.db.create_new_session(self.user, projection,
-                                             level='B1')
+                                             level='B2')
         self.assertEqual(2, len(session.vocabulary))
 
         # even after the user changes level, the session keeps its set
@@ -328,7 +325,7 @@ class TestStore(unittest.TestCase):
         self.assertEqual(2, len(reloaded.vocabulary))
 
     def test_known_word_counts_by_level(self):
-        words = [Word(word_input='fr_a2', word_output='de_a2', level='A2'),
+        words = [Word(word_input='fr_b1', word_output='de_b1', level='B1'),
                  Word(word_input='fr_b2', word_output='de_b2', level='B2')]
         voc = Vocabulary(None, words,
                          input_language='fr', output_language='de')
@@ -345,7 +342,7 @@ class TestStore(unittest.TestCase):
 
         self.assertEqual(2, self.db.known_word_counts().get(voc_id))
         self.assertEqual(1, self.db.known_word_counts(
-            included_levels('A2')).get(voc_id))
+            included_levels('B1')).get(voc_id))
 
     def test_update_and_list_users(self):
         self._create_user()
@@ -371,6 +368,18 @@ class TestStore(unittest.TestCase):
 
         with self.assertRaises(DbException):
             self.db.update_user('nobody@x.com', level='B1')
+
+    def test_a2_level_is_remapped_to_b1(self):
+        from store import _remap_old_levels
+
+        word = Word(word_input='fr_1', word_output='de_1', level='A2')
+        self.db.create_vocabulary(Vocabulary(None, [word], 'fr', 'de'))
+        self.db.create_user('a2@x.com', 'abc', Language.FRENCH, level='A2')
+
+        _remap_old_levels()
+
+        self.assertEqual('B1', DbWord.get().level)
+        self.assertEqual('B1', DbUser.get(DbUser.email == 'a2@x.com').level)
 
     def test_word_level(self):
         self._create_vocabulary()

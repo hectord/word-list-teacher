@@ -190,11 +190,11 @@ if __name__ == '__main__':
                                        help='language the user knows',
                                        nargs=1)
     create_user_subparser.add_argument('--level', nargs=1,
-                                       help='level: A2, B1, B2 or C1')
+                                       help='level: B1, B2 or C1')
 
     set_level_subparser = db_subparser.add_parser('set-user-level')
     set_level_subparser.add_argument('email', help='user email', nargs=1)
-    set_level_subparser.add_argument('level', help='A2, B1, B2 or C1', nargs=1)
+    set_level_subparser.add_argument('level', help='B1, B2 or C1', nargs=1)
 
     db_subparser.add_parser('list-users')
 
@@ -203,7 +203,7 @@ if __name__ == '__main__':
     update_user_subparser.add_argument('--main-language', nargs='?',
                                        help='language the user knows')
     update_user_subparser.add_argument('--level', nargs='?',
-                                       help='A2, B1, B2 or C1')
+                                       help='B1, B2 or C1')
     update_user_subparser.add_argument('--password', action='store_true',
                                        help='prompt for a new password')
 
@@ -226,7 +226,7 @@ if __name__ == '__main__':
     update_word_subparser.add_argument('--type', dest='word_type', nargs='?',
                                        help='noun, verb, adjective, ...')
     update_word_subparser.add_argument('--level', dest='word_level', nargs='?',
-                                       help='A2, B1, B2 or C1')
+                                       help='B1, B2 or C1')
 
     add_word_subparser = db_subparser.add_parser('add-word')
     add_word_subparser.add_argument('voc-id', nargs=1, type=int)

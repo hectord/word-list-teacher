@@ -57,14 +57,14 @@ class User:
 
 
 # levels, ordered from the lowest to the highest
-LEVELS = ('A2', 'B1', 'B2', 'C1')
+LEVELS = ('B1', 'B2', 'C1')
 
 
 def included_levels(level: Optional[str]) -> Optional[frozenset]:
     """Levels a learner at ``level`` has to learn (cumulative), or None
     when no level is set.
 
-    Someone at B2 learns the words of A2, B1 and B2.
+    Someone at B2 learns the words of B1 and B2.
     """
     if level is None or level not in LEVELS:
         return None

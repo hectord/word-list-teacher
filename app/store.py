@@ -77,7 +77,7 @@ class DbWord(Model):
     vocabulary = ForeignKeyField(DbVocabulary, backref='words')
     section = ForeignKeyField(DbSection, null=True, backref='words')
     type = CharField(null=True)
-    # level of the word (A2, B1, B2, C1); same for every language
+    # level of the word (B1, B2, C1); same for every language
     level = CharField(null=True)
 
     class Meta:
@@ -1028,6 +1028,12 @@ def _add_level_column():
     db.execute_sql("UPDATE dbword SET level = 'B1'")
 
 
+def _remap_old_levels():
+    """A2 is no longer a level: keep those words/learners at B1."""
+    db.execute_sql("UPDATE dbword SET level = 'B1' WHERE level = 'A2'")
+    db.execute_sql("UPDATE dbuser SET level = 'B1' WHERE level = 'A2'")
+
+
 def load_database(name: str) -> Database:
     db.init(name)
     db.connect()
@@ -1043,6 +1049,7 @@ def load_database(name: str) -> Database:
         _add_level_column()
         _add_column_if_missing('dbuser', 'level', 'varchar(255)')
         _add_column_if_missing('dbvocabularysession', 'level', 'varchar(255)')
+        _remap_old_levels()
 
     db.execute_sql('PRAGMA foreign_keys = ON')
 

@@ -40,7 +40,7 @@ each of them has one text per language (plus an optional example sentence).
 myenv/bin/python app/cli.py database data/learn.db init
 
 # create a user with their main language (the language they know) and
-# their level (A2, B1, B2 or C1). On the index page they then pick the
+# their level (B1, B2 or C1). On the index page they then pick the
 # language to practise and the level (both saved in their profile for
 # the level)
 myenv/bin/python app/cli.py database data/learn.db \

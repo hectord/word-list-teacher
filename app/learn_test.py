@@ -145,12 +145,11 @@ class LearnTest(unittest.TestCase):
     def test_included_levels(self):
         from learn import included_levels
 
-        self.assertEqual(frozenset(['A2']), included_levels('A2'))
-        self.assertEqual(frozenset(['A2', 'B1']), included_levels('B1'))
-        self.assertEqual(frozenset(['A2', 'B1', 'B2']), included_levels('B2'))
-        self.assertEqual(frozenset(['A2', 'B1', 'B2', 'C1']),
-                         included_levels('C1'))
+        self.assertEqual(frozenset(['B1']), included_levels('B1'))
+        self.assertEqual(frozenset(['B1', 'B2']), included_levels('B2'))
+        self.assertEqual(frozenset(['B1', 'B2', 'C1']), included_levels('C1'))
         self.assertIsNone(included_levels(None))
+        self.assertIsNone(included_levels('A2'))
         self.assertIsNone(included_levels('X1'))
 
     def test_flip_keeps_type(self):
