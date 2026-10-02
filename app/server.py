@@ -233,7 +233,20 @@ async def index(request: Request,
 
         entries.append((voc_id, vocabulary))
 
-    entries.sort(key=lambda e: percentage_by_vocabulary.get(e[1], 0.0))
+    # practised vocabularies first, the weakest (least known, most
+    # errors) on top; vocabularies never practised come last
+    def sort_key(entry):
+        vocabulary = entry[1]
+        practised = (has_finished_session.get(vocabulary, False) or
+                     vocabulary in session_by_vocabulary)
+        return (
+            0 if practised else 1,
+            known_percentage_by_vocabulary.get(vocabulary, 0),
+            percentage_by_vocabulary.get(vocabulary, 0.0),
+            entry[0],
+        )
+
+    entries.sort(key=sort_key)
 
     known_percentage = \
         (100 * total_known // total_words) if total_words else 0
