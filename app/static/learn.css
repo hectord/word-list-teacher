@@ -2,7 +2,6 @@
 
 @media (min-resolution: 200dpi) {
   .centering-box {
-    width: 100%;
     max-width: 640px;
   }
 
@@ -27,7 +26,6 @@
 
 @media (max-resolution: 200dpi) {
   .centering-box {
-    width: 100%;
     max-width: 520px;
   }
 
@@ -55,6 +53,7 @@
   max-width: 620px;
   margin: 0 auto;
   padding: 0 8px 24px;
+  box-sizing: border-box;
 }
 
 .words {
@@ -149,7 +148,7 @@ input.field {
   color: #6B5D55;
 }
 
-.example-text { flex: 1; }
+.example-text { flex: 1; font-size: 14px; }
 
 .right-word .word-example {
   background: #F2F8F2;
@@ -167,7 +166,6 @@ input.field {
   /* let the words flow naturally instead of the absolute bottom-pinned box */
   .centering-box {
     position: static;
-    width: 100%;
     max-width: none;
     margin: 0;
     padding: 0 12px 16px;
@@ -175,20 +173,21 @@ input.field {
 
   body { overflow-y: auto; }
 
-  .word-box { height: 56px; }
+  .word-box { height: 46px; }
   .word-box .field,
   #current-output {
-    height: 56px;
-    font-size: 24px;
-    padding-left: 16px;
-    padding-right: 16px;
+    height: 46px;
+    font-size: 18px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .word-example {
-    font-size: 13px;
+    font-size: 12px;
     gap: 6px;
-    padding: 5px 12px;
+    padding: 4px 12px;
   }
+  .example-text { font-size: 12px; }
 
-  .word { margin-bottom: 16px; }
+  .word { margin-bottom: 14px; }
 }
