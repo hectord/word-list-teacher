@@ -133,7 +133,7 @@ async def vocabulary(request: Request,
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="vocabulary not found")
 
-    stats = db.vocabulary_stats(voc)
+    stats = db.vocabulary_stats(voc, user)
 
     word_count = len(voc.words)
     unknown_count = sum(
@@ -206,7 +206,7 @@ async def index(request: Request,
     has_finished_session = {}
     known_by_vocabulary = {}
     known_percentage_by_vocabulary = {}
-    known_counts = db.known_word_counts(levels)
+    known_counts = db.known_word_counts(user, levels)
     total_words = 0
     total_known = 0
     entries = []

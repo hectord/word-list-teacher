@@ -118,7 +118,7 @@ class TestStore(unittest.TestCase):
         attempt = new_session.guess(word, 'bla')
         self.db.add_word_attempt(new_session, attempt)
 
-        stats = self.db.vocabulary_stats(voc)
+        stats = self.db.vocabulary_stats(voc, self.user)
 
         self.assertEqual(100.0, stats.errors_prob_for(word))
 
@@ -225,6 +225,50 @@ class TestStore(unittest.TestCase):
         counts = self.db.known_word_counts_by_user()
         self.assertEqual(1, sum(counts[user_ids['test@hotmail.com']].values()))
         self.assertEqual(1, sum(counts[user_ids['other@x.com']].values()))
+
+    def test_known_word_counts_are_scoped_to_the_user(self):
+        # two users practising the same vocabulary must each see only the
+        # words they answered correctly (no leaking from other users)
+        self._create_vocabulary()
+        self._create_user()
+
+        other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
+        voc = self._projection()
+
+        def practice(user):
+            session = self.db.create_new_session(user, voc)
+            word = Word(word_input='fr_1', word_output='de_1')
+            attempt = session.guess(word, word.word_output)
+            self.db.add_word_attempt(session, attempt)
+
+        practice(self.user)
+        practice(other)
+
+        # both users answered the same single word correctly
+        self.assertEqual(1, self.db.known_word_counts(self.user).get(voc.id))
+        self.assertEqual(1, self.db.known_word_counts(other).get(voc.id))
+
+    def test_vocabulary_stats_are_scoped_to_the_user(self):
+        # the error rate of a word must not include other users' attempts
+        self._create_vocabulary()
+        self._create_user()
+
+        other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
+        voc = self._projection()
+
+        def fail(user):
+            session = self.db.create_new_session(user, voc)
+            word = session.current_word
+            attempt = session.guess(word, 'wrong-answer')
+            self.db.add_word_attempt(session, attempt)
+            return word
+
+        word = fail(other)   # another user gets this word wrong twice
+        fail(other)
+
+        # our user has no attempts at all -> no error for this word
+        stats = self.db.vocabulary_stats(voc, self.user)
+        self.assertEqual(0.0, stats.errors_prob_for(word))
 
     def test_load_dictionary(self):
         from cli import load_dictionary
@@ -340,9 +384,9 @@ class TestStore(unittest.TestCase):
             attempt = session.guess(word, word.word_output)
             self.db.add_word_attempt(session, attempt)
 
-        self.assertEqual(2, self.db.known_word_counts().get(voc_id))
+        self.assertEqual(2, self.db.known_word_counts(self.user).get(voc_id))
         self.assertEqual(1, self.db.known_word_counts(
-            included_levels('B1')).get(voc_id))
+            self.user, included_levels('B1')).get(voc_id))
 
     def test_update_and_list_users(self):
         self._create_user()

@@ -993,15 +993,27 @@ class Database:
         return ret
 
     # --------------------------------------------------------------- stats
-    def vocabulary_stats(self, voc: Vocabulary) -> Optional[VocabularyStats]:
+    def vocabulary_stats(self, voc: Vocabulary,
+                         user: Optional[User] = None) -> Optional[VocabularyStats]:
+        """Error probability per word of ``voc``, from the attempts of one
+        ``user``. Without a user, every user's attempts would be mixed
+        together, so the page always passes the current user."""
         success_by_word_id = defaultdict(int)
         error_by_word_id = defaultdict(int)
 
-        for attempt in (DbWordAttempt
-                        .select()
-                        .join(DbWord)
-                        .where(DbWord.vocabulary == voc.id)):
+        query = (DbWordAttempt
+                 .select()
+                 .join(DbWord)
+                 .where(DbWord.vocabulary == voc.id))
 
+        if user is not None:
+            db_user = self._get_db_user(user)
+            query = (query
+                     .switch(DbWordAttempt)
+                     .join(DbSession)
+                     .where(DbSession.user == db_user))
+
+        for attempt in query:
             if attempt.success:
                 success_by_word_id[attempt.word_id] += 1
             else:
@@ -1021,14 +1033,20 @@ class Database:
 
         return VocabularyStats(voc, ret)
 
-    def known_word_counts(self, levels=None) -> Dict[int, int]:
-        """Vocabulary id -> number of words guessed correctly at least once."""
+    def known_word_counts(self, user: User,
+                          levels=None) -> Dict[int, int]:
+        """Vocabulary id -> number of distinct words ``user`` has guessed
+        correctly at least once (e.g. for the vocabularies page)."""
+        db_user = self._get_db_user(user)
         counts = defaultdict(int)
         seen = set()
 
         query = (DbWordAttempt
                  .select(DbWordAttempt.word_id, DbWord.vocabulary_id)
                  .join(DbWord)
+                 .switch(DbWordAttempt)
+                 .join(DbSession)
+                 .where(DbSession.user == db_user)
                  .where(DbWordAttempt.success == True))
 
         if levels is not None:
