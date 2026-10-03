@@ -539,6 +539,58 @@ class TestStore(unittest.TestCase):
                                  (DbWordText.language == 'de')).example
         self.assertEqual('Hallo Welt.', example)
 
+    def test_import_changes(self):
+        # the --update preview lists every change but leaves out the
+        # words which would not change, and modifies nothing
+        self.db.import_vocabularies([
+            {'id': 10, 'vocabulary': 'Greetings', 'section': 'Basics',
+             'type': 'noun', 'level': 'B1',
+             'texts': {'de': 'Hallo', 'fr': 'bonjour'},
+             'examples': {'de': 'Hallo Welt.'}},
+            {'id': 11, 'vocabulary': 'Greetings', 'section': 'Basics',
+             'type': 'verb', 'level': 'B2',
+             'texts': {'de': 'gehen', 'fr': 'aller'}, 'examples': {}},
+        ])
+
+        changes = self.db.import_changes([
+            # 10 is unchanged: it must not appear in the preview
+            {'id': 10, 'vocabulary': 'Greetings', 'section': 'Basics',
+             'type': 'noun', 'level': 'B1',
+             'texts': {'de': 'Hallo', 'fr': 'bonjour'},
+             'examples': {'de': 'Hallo Welt.'}},
+            # level and translation change
+            {'id': 11, 'vocabulary': 'Greetings', 'section': 'Basics',
+             'type': 'verb', 'level': 'B1',
+             'texts': {'de': 'gehen', 'fr': 'aller maintenant'},
+             'examples': {}},
+            # a brand new word
+            {'id': 12, 'vocabulary': 'Greetings', 'section': 'Basics',
+             'type': 'noun', 'level': 'C1',
+             'texts': {'de': 'wiedersehen', 'fr': 'revoir'}, 'examples': {}},
+            # a new section inside the existing vocabulary
+            {'id': 13, 'vocabulary': 'Greetings', 'section': 'Travel',
+             'type': 'noun', 'level': 'B1',
+             'texts': {'de': 'Zug', 'fr': 'train'}, 'examples': {}},
+            # a brand new vocabulary with a new word
+            {'id': 14, 'vocabulary': 'Colors', 'section': '',
+             'type': 'adjective', 'level': 'B1',
+             'texts': {'de': 'rot', 'fr': 'rouge'}, 'examples': {}},
+        ])
+
+        joined = '\n'.join(changes)
+        self.assertNotIn('word 10', joined)
+        self.assertIn('word 11 (gehen):', joined)
+        self.assertIn('level B2 -> B1', joined)
+        self.assertIn('fr text "aller" -> "aller maintenant"', joined)
+        self.assertIn('add word 12: de "wiedersehen", fr "revoir"', joined)
+        self.assertIn('add section "Travel" (Greetings)', joined)
+        self.assertIn('add vocabulary "Colors"', joined)
+
+        # the preview must not modify the database
+        self.assertEqual(1, DbVocabulary.select().count())
+        self.assertEqual(2, DbWord.select().count())
+        self.assertEqual('B2', DbWord.get(DbWord.id == 11).level)
+
     def test_load_csv_dictionary(self):
         from cli import load_csv_dictionary
 

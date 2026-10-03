@@ -578,6 +578,121 @@ class Database:
         DbVocabularyTitle.delete().execute()
         DbVocabulary.delete().execute()
 
+    def import_changes(self, records, title_language: str = 'de') -> List[str]:
+        """Preview of an ``--update`` import: the changes that would be
+        applied to the database, one string per new vocabulary / new
+        section / changed word. Words which would not change are left
+        out. The database is not modified (matching is the same as
+        ``import_vocabularies(..., replace=False)``)."""
+        changes = []
+        reported = set()
+
+        vocabulary_ids = {}
+        for voc_id, title in (DbVocabularyTitle
+                              .select(DbVocabularyTitle.vocabulary_id,
+                                      DbVocabularyTitle.title)
+                              .where(DbVocabularyTitle.language ==
+                                     title_language)
+                              .tuples()):
+            vocabulary_ids.setdefault(title, voc_id)
+        title_by_id = {voc_id: title
+                       for title, voc_id in vocabulary_ids.items()}
+
+        section_ids = {}
+        for section_id, text, voc_id in (DbSectionText
+                                         .select(DbSectionText.section_id,
+                                                 DbSectionText.text,
+                                                 DbSection.vocabulary_id)
+                                         .join(DbSection)
+                                         .where(DbSectionText.language ==
+                                                title_language)
+                                         .tuples()):
+            section_ids.setdefault((voc_id, text), section_id)
+        section_name_by_id = {section: text
+                              for (voc_id, text), section
+                              in section_ids.items()}
+
+        for record in records:
+            name = record['vocabulary']
+            section_name = record['section']
+            voc_id = vocabulary_ids.get(name)
+            if voc_id is None:
+                section_id = None
+            else:
+                section_id = section_ids.get((voc_id, section_name))
+
+            if voc_id is None:
+                key = ('vocabulary', name)
+                if key not in reported:
+                    reported.add(key)
+                    changes.append('add vocabulary "%s"' % name)
+            elif section_name and section_id is None:
+                key = ('section', voc_id, section_name)
+                if key not in reported:
+                    reported.add(key)
+                    title = title_by_id.get(voc_id, voc_id)
+                    changes.append('add section "%s" (%s)'
+                                   % (section_name, title))
+
+            texts = record['texts']
+            examples = record['examples']
+            main = texts.get(title_language) or \
+                next(iter(texts.values()), '')
+
+            word_id = record.get('id')
+            db_word = None
+            if word_id is not None:
+                db_word = DbWord.get_or_none(DbWord.id == word_id)
+
+            if db_word is None:
+                detail = ', '.join('%s "%s"' % (lang, text)
+                                   for lang, text in texts.items())
+                if word_id is not None:
+                    changes.append('add word %s: %s' % (word_id, detail))
+                else:
+                    changes.append('add word: %s' % detail)
+                continue
+
+            deltas = []
+            if db_word.vocabulary_id != voc_id:
+                old = title_by_id.get(db_word.vocabulary_id) or \
+                    ('voc-id %s' % db_word.vocabulary_id)
+                new = name or ('voc-id %s' % voc_id)
+                deltas.append('vocabulary "%s" -> "%s"' % (old, new))
+            if db_word.section_id != section_id:
+                old_section = section_name_by_id.get(db_word.section_id)
+                deltas.append('section "%s" -> "%s"'
+                              % (old_section or '', section_name or ''))
+            if db_word.type != record['type']:
+                deltas.append('type %s -> %s'
+                              % (db_word.type or '-', record['type'] or '-'))
+            if db_word.level != record['level']:
+                deltas.append('level %s -> %s'
+                              % (db_word.level or '-', record['level'] or '-'))
+
+            for language, text in texts.items():
+                word_text = DbWordText.get_or_none(
+                    (DbWordText.word == db_word.id) &
+                    (DbWordText.language == language))
+                if word_text is None:
+                    deltas.append('%s text "%s" (new)'
+                                  % (language, text))
+                    continue
+                if word_text.text != text:
+                    deltas.append('%s text "%s" -> "%s"'
+                                  % (language, word_text.text, text))
+                example = examples.get(language)
+                if word_text.example != example:
+                    deltas.append('%s example "%s" -> "%s"'
+                                  % (language, word_text.example or '',
+                                     example or ''))
+
+            if deltas:
+                changes.append('word %s (%s): %s'
+                               % (word_id, main, '; '.join(deltas)))
+
+        return changes
+
     def import_vocabularies(self, records, title_language: str = 'de',
                             replace: bool = True) -> int:
         """Create or update vocabularies from ``records``.

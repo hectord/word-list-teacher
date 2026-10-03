@@ -60,7 +60,9 @@ myenv/bin/python app/cli.py database data/learn.db \
 
 # Re-import later to apply changes: with --update the words are matched by
 # their 'id' column and updated (texts, type, level, example), new words
-# are added, and sessions / practice history are kept.
+# are added, and sessions / practice history are kept. The changes are
+# first listed on the console and applied only after confirmation
+# (type y), so they can be validated before touching the database.
 myenv/bin/python app/cli.py database data/learn.db \
     import-dictionary data/german_vocabulary_exam_levels_irregular_verbs_with_id.csv --update
 ```

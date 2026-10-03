@@ -401,6 +401,25 @@ if __name__ == '__main__':
         database = load_database(database)
 
         records = load_csv_dictionary(args.file[0])
+
+        if args.update:
+            # first validate the changes, then apply them
+            changes = database.import_changes(records)
+            if changes:
+                print('Planned changes:')
+                for change in changes:
+                    print('  -', change)
+                print()
+                try:
+                    answer = input('Apply these changes? [y/N] ')
+                except EOFError:
+                    answer = ''
+                if answer.strip().lower() not in ('y', 'yes'):
+                    print('Import aborted, nothing changed.')
+                    sys.exit(0)
+            else:
+                print('No changes to apply.')
+
         vocabularies = database.import_vocabularies(
             records, replace=not args.update)
 
