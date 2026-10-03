@@ -3,7 +3,7 @@
 {% block title %}Vocabularies{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=10">
+    <link rel="stylesheet" href="/static/pages.css?v=11">
 {% endblock %}
 
 {% block body %}
@@ -55,11 +55,11 @@
         <div class="overall">
           <div class="overall-info">
             <span class="overall-title">Overall progress</span>
-            <span class="progress-stats">{{ total_known }} / {{ total_words }} words known</span>
+            <span class="progress-stats">{{ '%.0f' % overall_accuracy }}% accuracy</span>
           </div>
           <div class="bar big">
-            <div class="bar-fill {% if known_percentage < 40 %}danger{% elif known_percentage < 70 %}warn{% endif %}"
-                 style="width: {{ known_percentage }}%"></div>
+            <div class="bar-fill {% if overall_accuracy < 40.0 %}danger{% elif overall_accuracy < 70.0 %}warn{% endif %}"
+                 style="width: {{ overall_accuracy | round }}%"></div>
           </div>
         </div>
       {% endif %}
@@ -81,19 +81,22 @@
           <div class="voc-meta">
             <span class="lang">{{ language.name }} <b>→</b> {{ target.name }}</span>
             <span class="count">{{ vocabulary | length }} words</span>
-            {% if has_finished_session[vocabulary] %}
-              <span class="accuracy-chip {% if percentage_by_vocabulary[vocabulary] >= 70.0 %}good{% elif percentage_by_vocabulary[vocabulary] >= 40.0 %}shaky{% else %}unknown{% endif %}">
-                {{ '%.0f' % percentage_by_vocabulary[vocabulary] }}% accuracy
-              </span>
-            {% endif %}
           </div>
 
           <div class="voc-progress">
             <div class="bar">
-              <div class="bar-fill {% if known_percentage_by_vocabulary[vocabulary] < 40 %}danger{% elif known_percentage_by_vocabulary[vocabulary] < 70 %}warn{% endif %}"
-                   style="width: {{ known_percentage_by_vocabulary[vocabulary] }}%"></div>
+              {% if has_finished_session[vocabulary] %}
+              <div class="bar-fill {% if percentage_by_vocabulary[vocabulary] < 40.0 %}danger{% elif percentage_by_vocabulary[vocabulary] < 70.0 %}warn{% endif %}"
+                   style="width: {{ percentage_by_vocabulary[vocabulary] | round }}%"></div>
+              {% endif %}
             </div>
-            <span class="progress-stats">{{ known_by_vocabulary[vocabulary] }} / {{ vocabulary | length }} words known</span>
+            {% if has_finished_session[vocabulary] %}
+              <span class="progress-stats">{{ '%.0f' % percentage_by_vocabulary[vocabulary] }}% accuracy</span>
+            {% elif vocabulary in session_by_vocabulary %}
+              <span class="progress-stats muted">in progress</span>
+            {% else %}
+              <span class="progress-stats muted">not practised yet</span>
+            {% endif %}
           </div>
         </div>
       {% endfor %}

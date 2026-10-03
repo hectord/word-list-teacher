@@ -204,11 +204,7 @@ async def index(request: Request,
     session_by_vocabulary = {}
     percentage_by_vocabulary = {}
     has_finished_session = {}
-    known_by_vocabulary = {}
-    known_percentage_by_vocabulary = {}
-    known_counts = db.known_word_counts(user, levels)
     total_words = 0
-    total_known = 0
     entries = []
 
     for voc_id, vocabulary in vocabularies.items():
@@ -223,33 +219,34 @@ async def index(request: Request,
             percentage_by_vocabulary[vocabulary] = finished_session.accuracy
             has_finished_session[vocabulary] = True
 
-        size = len(vocabulary)
-        known = known_counts.get(voc_id, 0)
-        known_by_vocabulary[vocabulary] = known
-        known_percentage_by_vocabulary[vocabulary] = \
-            (100 * known // size) if size else 0
-        total_words += size
-        total_known += known
-
+        total_words += len(vocabulary)
         entries.append((voc_id, vocabulary))
 
-    # practised vocabularies first, the weakest (least known, most
-    # errors) on top; vocabularies never practised come last
+    # practised vocabularies first, the weakest (least accurate) on
+    # top; vocabularies never practised come last
     def sort_key(entry):
         vocabulary = entry[1]
         practised = (has_finished_session.get(vocabulary, False) or
                      vocabulary in session_by_vocabulary)
         return (
             0 if practised else 1,
-            known_percentage_by_vocabulary.get(vocabulary, 0),
             percentage_by_vocabulary.get(vocabulary, 0.0),
             entry[0],
         )
 
     entries.sort(key=sort_key)
 
-    known_percentage = \
-        (100 * total_known // total_words) if total_words else 0
+    # overall accuracy = average of the per-vocabulary accuracies,
+    # weighted by the number of words of each vocabulary
+    finished_words = 0
+    accuracy_sum = 0.0
+    for voc_id, vocabulary in vocabularies.items():
+        if has_finished_session[vocabulary]:
+            finished_words += len(vocabulary)
+            accuracy_sum += (percentage_by_vocabulary[vocabulary]
+                             * len(vocabulary))
+    overall_accuracy = \
+        (accuracy_sum / finished_words) if finished_words else 0.0
 
     return TEMPLATES.TemplateResponse(
         request, "index.html",
@@ -264,11 +261,8 @@ async def index(request: Request,
             'session_by_vocabulary': session_by_vocabulary,
             'percentage_by_vocabulary': percentage_by_vocabulary,
             'has_finished_session': has_finished_session,
-            'known_by_vocabulary': known_by_vocabulary,
-            'known_percentage_by_vocabulary': known_percentage_by_vocabulary,
             'total_words': total_words,
-            'total_known': total_known,
-            'known_percentage': known_percentage
+            'overall_accuracy': overall_accuracy,
         },
         headers={'Cache-Control': 'no-store'}
     )

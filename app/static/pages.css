@@ -148,6 +148,7 @@ a.signout:hover { text-decoration: underline; }
 
 .overall-title { font-size: 18px; color: #3B2F2A; }
 .progress-stats { font-size: 14px; color: #6B5D55; }
+.progress-stats.muted { color: #B4A398; }
 
 .bar.big { width: 100%; height: 16px; }
 
@@ -206,15 +207,6 @@ a.signout:hover { text-decoration: underline; }
   color: #A08B7F;
 }
 .voc-meta .lang b { color: #6B5D55; }
-
-.accuracy-chip {
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-}
-.accuracy-chip.good { background: #E1F1E2; color: #2F7D5B; }
-.accuracy-chip.shaky { background: #FCEFD8; color: #B97B1E; }
-.accuracy-chip.unknown { background: #FFE8E8; color: #C0392B; }
 
 .unknown-text { color: #C0392B; }
 
