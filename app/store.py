@@ -431,6 +431,7 @@ class Database:
         sections = []
         section_ids = {}
         examples = {}
+        input_examples = {}
 
         for word_id, section_id, word_type, level in db_words:
             word_texts = texts_by_word.get(word_id, {})
@@ -461,6 +462,8 @@ class Database:
 
             if out_text[1] is not None:
                 examples[word] = out_text[1]
+            if in_text[1] is not None:
+                input_examples[word] = in_text[1]
 
         title = Database._pick_text(titles, display_code)
         name = None if title is None else Word(word_input=title,
@@ -474,6 +477,8 @@ class Database:
             voc.set_word_id(word, word_id)
         for word, example in examples.items():
             voc.set_example(word, example)
+        for word, example in input_examples.items():
+            voc.set_input_example(word, example)
 
         return voc
 
@@ -830,7 +835,8 @@ class Database:
                                     level=word.level)
             DbWordText.create(word=db_word,
                               language=input_code,
-                              text=word.word_input)
+                              text=word.word_input,
+                              example=voc.input_example(word))
             DbWordText.create(word=db_word,
                               language=output_code,
                               text=word.word_output,
@@ -1097,7 +1103,8 @@ class Database:
                                         typed_word=attempt.typed_word,
                                         success=attempt.success,
                                         time=attempt.time,
-                                        example=v.example(word)))
+                                        example=v.example(word),
+                                        input_example=v.input_example(word)))
 
         current_word = None
         if db_session.current_word is not None:

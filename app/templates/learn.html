@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% macro word_ok(word_input, word_output, word_example='') -%}
+{% macro word_ok(word_input, word_output, word_example='', word_input_example='') -%}
   <div class="word-box input">
     <span class="field">
       {{ word_input }}
@@ -11,14 +11,19 @@
       {{ word_output }}
     </span>
   </div>
-  <div class="word-example"{% if not word_example %} style="display:none"{% endif %}>
+  <div class="word-example{% if word_input_example %} with-input{% endif %}"
+       {% if not word_example and not word_input_example %}style="display:none"{% endif %}>
     <span class="example-text">
       {{ word_example }}
+    </span>
+    <span class="example-toggle{% if not word_input_example %} hidden{% endif %}">translate</span>
+    <span class="example-input hidden">
+      {{ word_input_example }}
     </span>
   </div>
 {%- endmacro %}
 
-{% macro word_nok(word_input, word_output, word_result, word_example='') -%}
+{% macro word_nok(word_input, word_output, word_result, word_example='', word_input_example='') -%}
   <div class="word-box input">
     <span class="field">
       {{ word_input }}
@@ -34,9 +39,14 @@
       {{ word_result }}
     </span>
   </div>
-  <div class="word-example"{% if not word_example %} style="display:none"{% endif %}>
+  <div class="word-example{% if word_input_example %} with-input{% endif %}"
+       {% if not word_example and not word_input_example %}style="display:none"{% endif %}>
     <span class="example-text">
       {{ word_example }}
+    </span>
+    <span class="example-toggle{% if not word_input_example %} hidden{% endif %}">translate</span>
+    <span class="example-input hidden">
+      {{ word_input_example }}
     </span>
   </div>
 {%- endmacro %}
@@ -45,9 +55,9 @@
 {% block title %}Learn{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/learn.css?v=15">
+    <link rel="stylesheet" href="/static/learn.css?v=16">
 
-    <script src="/static/script.js?v=8"></script>
+    <script src="/static/script.js?v=9"></script>
 
 {% endblock %}
 
@@ -75,14 +85,16 @@
         <div class="word right-word">
           {{ word_ok(attempt.word.word_input,
                      attempt.word.word_output,
-                     attempt.example or '') }}
+                     attempt.example or '',
+                     attempt.input_example or '') }}
         </div>
         {% else %}
           <div class="word wrong-word">
             {{ word_nok(attempt.word.word_input,
                         attempt.typed_word,
                         attempt.word.word_output,
-                        attempt.example or '') }}
+                        attempt.example or '',
+                        attempt.input_example or '') }}
           </div>
         {% endif %}
       {% endfor %}

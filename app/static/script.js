@@ -20,6 +20,13 @@ $(document).ready(function() {
     });
   }
 
+  // click on an example sentence to show/hide its translation in the
+  // learner's own language (when available)
+  $(".words").on("click", ".word-example.with-input", function () {
+    $(this).find(".example-input").toggleClass("hidden");
+    $(this).toggleClass("open");
+  });
+
   $("#current-output").keyup(function(e) {
 
     if($(this).attr('readonly'))
@@ -54,11 +61,21 @@ $(document).ready(function() {
         new_node.find(".output .field").text(result.word_output.word);
         new_node.find(".result .field").text(result.hint);
 
-        // show the example sentence of the practised word (when any)
+        // show the example sentence of the practised word (when any),
+        // with a click-to-translate version in the learner's language
         var example = new_node.find(".word-example");
-        if (result.example) {
-          example.find(".example-text").text(result.example);
+        if (result.example || result.input_example) {
           example.attr("style", "");
+          if (result.example) {
+            example.find(".example-text").text(result.example);
+          }
+          var translated = result.input_example ? true : false;
+          example.toggleClass("with-input", translated);
+          example.find(".example-toggle").toggleClass("hidden", !translated);
+          // the translation stays hidden until the learner clicks it
+          example.find(".example-input")
+                 .addClass("hidden")
+                 .text(translated ? result.input_example : "");
         } else {
           example.hide();
         }

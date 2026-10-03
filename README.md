@@ -54,6 +54,10 @@ myenv/bin/python app/cli.py database data/learn.db \
 
 # import a full dictionary from a CSV with a header, e.g.
 # id,vocabulary,section,type,cefr_level,german,french,english,german_example
+# any extra "<language>_example" column (e.g. french_example) is import-
+# ed as well: while learning, clicking the example sentence shows it
+# translated into the learner's own language (when available).
+
 # By default this REPLACES every existing vocabulary (users are kept).
 myenv/bin/python app/cli.py database data/learn.db \
     import-dictionary data/german_vocabulary_exam_levels_irregular_verbs_with_id.csv

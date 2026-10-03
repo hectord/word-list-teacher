@@ -135,8 +135,9 @@ input.field {
 /* example sentence of the practised word (kept small: it is often long) */
 .word-example {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  gap: 2px 10px;
 
   padding: 6px 16px;
 
@@ -148,7 +149,28 @@ input.field {
   color: #6B5D55;
 }
 
-.example-text { flex: 1; font-size: 14px; }
+.example-text { flex: 1 1 auto; font-size: 14px; min-width: 0; }
+
+/* click an example with a translation to reveal it */
+.word-example.with-input { cursor: pointer; }
+
+.example-toggle {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-style: normal;
+  color: #A08B7F;
+  text-decoration: underline dotted;
+}
+
+.example-input {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: #8A7A70;
+  border-top: 1px dashed #E5D9C9;
+  padding-top: 4px;
+}
+
+.hidden { display: none; }
 
 .right-word .word-example {
   background: #F2F8F2;

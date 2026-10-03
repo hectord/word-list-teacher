@@ -52,6 +52,10 @@ class WordResult(BaseModel):
     # a sentence using the answer word (in the answer's language)
     example: Optional[str] = None
 
+    # the same sentence translated into the learner's own language
+    # (the session's input language), when available
+    input_example: Optional[str] = None
+
     # if None => no more word
     next_word: Optional[WordInput]
 
@@ -370,6 +374,7 @@ async def post_word(word_output: WordOutput):
     current_word = vocabulary.word(word_output.word_id)
     hint_word = current_word.word_output
     example = vocabulary.example(current_word)
+    input_example = vocabulary.input_example(current_word)
 
     result = session.guess(current_word, word_output.word)
 
@@ -387,6 +392,7 @@ async def post_word(word_output: WordOutput):
     return WordResult(success=success,
                       hint=hint_word,
                       example=example,
+                      input_example=input_example,
                       word_input=WordInput(word=current_word.word_input,
                                            word_id=word_output.word_id),
                       word_output=word_output,

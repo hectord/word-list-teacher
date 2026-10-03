@@ -196,6 +196,7 @@ class WordAttempt:
     typed_word: str
     time: datetime
     example: Optional[str] = None
+    input_example: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -227,6 +228,7 @@ class Vocabulary:
         self._output_language = output_language
         self._section_ids = dict(section_ids or {})
         self._examples = {}
+        self._input_examples = {}
 
         for i, word in enumerate(words or []):
             section = sections[i] if sections is not None else None
@@ -293,6 +295,15 @@ class Vocabulary:
     def example(self, word: Word) -> Optional[str]:
         return self._examples.get(word)
 
+    def set_input_example(self, word: Word, example: Optional[str]):
+        """Example sentence in the vocabulary's input language (the
+        learner's own language), shown on request while learning."""
+        if example is not None:
+            self._input_examples[word] = example
+
+    def input_example(self, word: Word) -> Optional[str]:
+        return self._input_examples.get(word)
+
     def section(self, name: str) -> Optional['Vocabulary']:
         """Return a vocabulary restricted to one section (with word IDs)."""
         words = []
@@ -319,6 +330,7 @@ class Vocabulary:
             if word_id is not None:
                 voc.set_word_id(word, word_id)
             voc.set_example(word, self.example(word))
+            voc.set_input_example(word, self.input_example(word))
 
         return voc
 
@@ -359,6 +371,7 @@ class Vocabulary:
             if word_id is not None:
                 voc.set_word_id(word.flip(), word_id)
             voc.set_example(word.flip(), self.example(word))
+            voc.set_input_example(word.flip(), self.input_example(word))
 
         return voc
 
@@ -403,6 +416,7 @@ class Vocabulary:
         self._word_sections.extend(other._word_sections)
         self._section_ids.update(other._section_ids)
         self._examples.update(other._examples)
+        self._input_examples.update(other._input_examples)
         self._word_ids.update(other._word_ids)
 
         # the similar-words index is rebuilt lazily
@@ -618,7 +632,9 @@ class Session:
                               typed_word=word_output,
                               success=success,
                               time=datetime.now(),
-                              example=self.vocabulary.example(current_word))
+                              example=self.vocabulary.example(current_word),
+                              input_example=self.vocabulary.input_example(
+                                  current_word))
         self._attempts.append(attempt)
 
         if success:

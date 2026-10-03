@@ -591,6 +591,47 @@ class TestStore(unittest.TestCase):
         self.assertEqual(2, DbWord.select().count())
         self.assertEqual('B2', DbWord.get(DbWord.id == 11).level)
 
+    def test_input_example(self):
+        # examples in the learner's own language (the input language of
+        # the session) are kept per word and surface on the attempts
+        self.db.import_vocabularies([
+            {'id': 10, 'vocabulary': 'Greetings', 'section': '',
+             'type': 'noun', 'level': 'B1',
+             'texts': {'de': 'Hallo', 'fr': 'bonjour'},
+             'examples': {'de': 'Hallo Welt.', 'fr': 'Bonjour le monde.'}},
+        ])
+        self._create_user()   # main language: french
+
+        voc = self.db.get_vocabulary(self.user, 1, Language.GERMAN)
+        word = voc.words[0]
+        self.assertEqual('Hallo Welt.', voc.example(word))
+        self.assertEqual('Bonjour le monde.', voc.input_example(word))
+
+        # a session captures both examples on each attempt
+        session = self.db.create_new_session(self.user, voc)
+        attempt = session.guess(word, word.word_output)
+        self.db.add_word_attempt(session, attempt)
+        self.assertEqual('Hallo Welt.', attempt.example)
+        self.assertEqual('Bonjour le monde.', attempt.input_example)
+
+        # and reloading the session recomputes them
+        reloaded = self.db.load_session(session.id)
+        self.assertEqual('Bonjour le monde.',
+                         reloaded.attempts[-1].input_example)
+
+        # a section keeps the input examples too
+        self.db.import_vocabularies([
+            {'id': 11, 'vocabulary': 'Greetings', 'section': 'Basics',
+             'type': 'noun', 'level': 'B1',
+             'texts': {'de': 'gehen', 'fr': 'aller'},
+             'examples': {'de': 'Ich gehe.', 'fr': "J'y vais."}},
+        ], replace=False)
+        sectioned = db_voc = self.db.get_vocabulary(self.user, 1,
+                                                    Language.GERMAN)
+        sect = sectioned.section('Basics')
+        self.assertEqual("J'y vais.",
+                         sect.input_example(sect.words[0]))
+
     def test_load_csv_dictionary(self):
         from cli import load_csv_dictionary
 
