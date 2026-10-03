@@ -1035,8 +1035,9 @@ class Database:
 
     def known_word_counts(self, user: User,
                           levels=None) -> Dict[int, int]:
-        """Vocabulary id -> number of distinct words ``user`` has guessed
-        correctly at least once (e.g. for the vocabularies page)."""
+        """Vocabulary id -> number of distinct words ``user`` has mastered:
+        guessed correctly during a completed run (a single successful guess
+        in a session which was left unfinished does not count)."""
         db_user = self._get_db_user(user)
         counts = defaultdict(int)
         seen = set()
@@ -1047,6 +1048,7 @@ class Database:
                  .switch(DbWordAttempt)
                  .join(DbSession)
                  .where(DbSession.user == db_user)
+                 .where(DbSession.finished == True)
                  .where(DbWordAttempt.success == True))
 
         if levels is not None:
@@ -1062,7 +1064,7 @@ class Database:
         return dict(counts)
 
     def known_word_counts_by_user(self) -> Dict[int, Dict[int, int]]:
-        """User id -> (vocabulary id -> words guessed correctly at least once)."""
+        """User id -> (vocabulary id -> words mastered in a completed run)."""
         known = defaultdict(lambda: defaultdict(int))
         seen = set()
 
@@ -1072,6 +1074,7 @@ class Database:
                 .join(DbWord)
                 .switch(DbWordAttempt)
                 .join(DbSession)
+                .where(DbSession.finished == True)
                 .where(DbWordAttempt.success == True)
                 .tuples())
 

@@ -211,9 +211,10 @@ class TestStore(unittest.TestCase):
         def practice(user):
             voc = self.db.get_vocabulary(user, 1, Language.GERMAN)
             session = self.db.create_new_session(user, voc)
-            word = session.current_word
-            attempt = session.guess(word, word.word_output)
-            self.db.add_word_attempt(session, attempt)
+            while not session.is_finished:
+                word = session.current_word
+                attempt = session.guess(word, word.word_output)
+                self.db.add_word_attempt(session, attempt)
 
         practice(self.user)
         practice(other)
@@ -223,30 +224,62 @@ class TestStore(unittest.TestCase):
         user_ids = {email: user_id for user_id, email in users}
 
         counts = self.db.known_word_counts_by_user()
-        self.assertEqual(1, sum(counts[user_ids['test@hotmail.com']].values()))
-        self.assertEqual(1, sum(counts[user_ids['other@x.com']].values()))
+        self.assertEqual(2, sum(counts[user_ids['test@hotmail.com']].values()))
+        self.assertEqual(2, sum(counts[user_ids['other@x.com']].values()))
+
+    def test_unknown_after_abandoned_session(self):
+        # a right guess in a run which was never completed does not mark
+        # the word as known: only completed runs count
+        self._create_vocabulary()
+        self._create_user()
+
+        voc = self._projection()
+        session = self.db.create_new_session(self.user, voc)
+
+        word = session.current_word
+        attempt = session.guess(word, word.word_output)
+        self.db.add_word_attempt(session, attempt)
+
+        # the run is abandoned: the word is not known yet
+        self.assertFalse(session.is_finished)
+        self.assertEqual(
+            0, self.db.known_word_counts(self.user).get(voc.id, 0))
+
+        # finish the run -> the practised words become known
+        while not session.is_finished:
+            word = session.current_word
+            attempt = session.guess(word, word.word_output)
+            self.db.add_word_attempt(session, attempt)
+
+        self.assertEqual(
+            2, self.db.known_word_counts(self.user).get(voc.id, 0))
 
     def test_known_word_counts_are_scoped_to_the_user(self):
         # two users practising the same vocabulary must each see only the
-        # words they answered correctly (no leaking from other users)
+        # words they mastered (no leaking from other users)
         self._create_vocabulary()
         self._create_user()
 
         other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
         voc = self._projection()
 
-        def practice(user):
+        def finish(user):
             session = self.db.create_new_session(user, voc)
-            word = Word(word_input='fr_1', word_output='de_1')
-            attempt = session.guess(word, word.word_output)
-            self.db.add_word_attempt(session, attempt)
+            while not session.is_finished:
+                word = session.current_word
+                attempt = session.guess(word, word.word_output)
+                self.db.add_word_attempt(session, attempt)
 
-        practice(self.user)
-        practice(other)
+        # our user completes the whole run; the other one abandons after
+        # a single correct answer
+        finish(self.user)
+        abandoned = self.db.create_new_session(other, voc)
+        attempt = abandoned.guess(abandoned.current_word,
+                                  abandoned.current_word.word_output)
+        self.db.add_word_attempt(abandoned, attempt)
 
-        # both users answered the same single word correctly
-        self.assertEqual(1, self.db.known_word_counts(self.user).get(voc.id))
-        self.assertEqual(1, self.db.known_word_counts(other).get(voc.id))
+        self.assertEqual(2, self.db.known_word_counts(self.user).get(voc.id))
+        self.assertEqual(0, self.db.known_word_counts(other).get(voc.id, 0))
 
     def test_vocabulary_stats_are_scoped_to_the_user(self):
         # the error rate of a word must not include other users' attempts
