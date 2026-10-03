@@ -382,7 +382,8 @@ a.signout:hover { text-decoration: underline; }
 .row {
   display: grid;
   grid-template-columns: 1fr 1fr 180px;
-  gap: 16px;
+  column-gap: 16px;
+  row-gap: 4px;
   align-items: center;
   padding: 14px 24px;
   border-bottom: 1px solid #F3EBE5;
@@ -405,6 +406,14 @@ a.signout:hover { text-decoration: underline; }
 .col { font-size: 17px; color: #3B2F2A; }
 .col.out { font-weight: 600; }
 
+/* example sentence of the word (small, light grey) */
+.col.example {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-style: italic;
+  color: #9A8B82;
+}
+
 .col.err {
   display: flex;
   flex-direction: column;
@@ -421,6 +430,18 @@ a.signout:hover { text-decoration: underline; }
 .badge.good { background: #E1F1E2; color: #2F7D5B; }
 .badge.shaky { background: #FCEFD8; color: #B97B1E; }
 .badge.unknown { background: #FFE8E8; color: #C0392B; }
+
+/* the "N hard words" count filters the list when clicked */
+.hard-filter {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.hard-filter.active {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #FFE8E8;
+  text-decoration: none;
+}
 
 /* ============ smartphone rendering (< 700px) ============ */
 

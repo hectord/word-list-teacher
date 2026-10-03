@@ -3,8 +3,8 @@
 {% block title %}Vocabulary{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=10">
-    <script src="/static/vocabulary.js?v=4"></script>
+    <link rel="stylesheet" href="/static/pages.css?v=11">
+    <script src="/static/vocabulary.js?v=5"></script>
 {% endblock %}
 
 {% block body %}
@@ -33,7 +33,7 @@
 
     <div class="toolbar">
       <input id="word-filter" type="search" placeholder="Filter words…">
-      <span class="stats">{{ word_count }} words{% if unknown_count %} · <b class="unknown-text">{{ unknown_count }} hard words</b>{% endif %}<span id="filter-count"></span></span>
+      <span class="stats">{{ word_count }} words{% if unknown_count %} · <b class="unknown-text hard-filter" title="Show only the hard words">{{ unknown_count }} hard words</b>{% endif %}<span id="filter-count"></span></span>
     </div>
 
     {% if sections %}
@@ -78,7 +78,11 @@
       {% for word in voc.words %}
         {% set err = stats.errors_prob_for(word) %}
         {% set sec = sections_by_index[loop.index0] %}
-        <div class="row" data-search="{{ (word.word_output ~ ' ' ~ word.word_input) | lower }}" data-section="{{ sec }}">
+        {% set example = voc.example(word) %}
+        <div class="row"
+             data-search="{{ (word.word_output ~ ' ' ~ word.word_input ~ ' ' ~ (example or '')) | lower }}"
+             data-section="{{ sec }}"
+             data-hard="{% if err > 40.0 %}1{% else %}0{% endif %}">
           <span class="col out">{% if sec %}<span class="sec-badge">{{ sec }}</span>{% endif %}{% if word.type %}<span class="type-badge">{{ word.type }}</span>{% endif %}{{ word.word_output }}</span>
           <span class="col in">{{ word.word_input }}</span>
           <span class="col err">
@@ -90,6 +94,7 @@
                    style="width: {{ err | round }}%"></div>
             </div>
           </span>
+          {% if example %}<span class="col example">{{ example }}</span>{% endif %}
         </div>
       {% endfor %}
     </div>
