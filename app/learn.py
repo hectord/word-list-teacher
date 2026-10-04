@@ -10,11 +10,24 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from optimizer import (
+    AiStrategy,
     Attempt as StrategyAttempt,
     FullStrategy,
     Strategy,
     Word as StrategyWord,
 )
+
+
+# the word-selection strategies a user can follow ('full' is the
+# historical behaviour and the default)
+STRATEGIES = ('full', 'ai')
+
+
+def make_strategy(name: Optional[str]) -> Strategy:
+    """Build the selection strategy for a user settings value."""
+    if name == 'ai':
+        return AiStrategy()
+    return FullStrategy()
 
 
 class InvalidFileException(Exception):
@@ -61,6 +74,9 @@ class User:
     main_language: Optional[Language]
     level: Optional[str] = None
     target_language: Optional[Language] = None
+    # which word-selection strategy the runs of this user follow
+    # (see optimizer/): 'full' (default) or 'ai'
+    strategy: str = 'full'
 
 
 # levels, ordered from the lowest to the highest

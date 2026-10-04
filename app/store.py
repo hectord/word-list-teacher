@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 
 from learn import Vocabulary, Word, Session, WordAttempt
 from learn import Language, User, VocabularyStats, included_levels
+from learn import make_strategy
 
 db = SqliteDatabase(None)
 
@@ -36,6 +37,7 @@ class DbUser(Model):
     main_language = ForeignKeyField(DbLanguage, null=True)
     level = CharField(null=True)
     target_language = ForeignKeyField(DbLanguage, null=True, backref='+')
+    strategy = CharField(null=True)
 
     class Meta:
         database = db
@@ -198,7 +200,8 @@ class Database:
         user = User(email=email, password=password,
                     main_language=main_language,
                     level=db_user.level,
-                    target_language=target_language)
+                    target_language=target_language,
+                    strategy=db_user.strategy or 'full')
 
         _AUTH_CACHE[email] = (credentials, now + _AUTH_CACHE_TTL, user)
         return user
@@ -229,6 +232,25 @@ class Database:
                       target_language=target)
 
         return self.get_user(email, password)
+
+    def set_user_strategy(self, user, strategy: str):
+        """Choose which strategy the runs of ``user`` follow."""
+        email = user if isinstance(user, str) else user.email
+        updated = (DbUser.update(strategy=strategy)
+                   .where(DbUser.email == email).execute())
+        if not updated:
+            raise DbException('user not found')
+
+        # keep the cached profile in sync
+        cached = _AUTH_CACHE.get(email)
+        if cached is not None:
+            credentials, expires, previous = cached
+            _AUTH_CACHE[email] = (
+                credentials, expires,
+                User(email=previous.email, password=previous.password,
+                     main_language=previous.main_language, level=previous.level,
+                     target_language=previous.target_language,
+                     strategy=strategy))
 
     def set_user_level(self, user, level: Optional[str]):
         email = user if isinstance(user, str) else user.email
@@ -314,7 +336,8 @@ class Database:
                     main_language=None,
                     level: Optional[str] = None,
                     password: Optional[str] = None,
-                    target_language=None):
+                    target_language=None,
+                    strategy: Optional[str] = None):
         """Update the user profile. ``None`` means 'leave unchanged'."""
         update = {}
         if main_language is not None:
@@ -326,6 +349,8 @@ class Database:
             update['level'] = level
         if password is not None:
             update['password'] = get_hashed_password(password)
+        if strategy is not None:
+            update['strategy'] = strategy
 
         if not update:
             raise DbException('nothing to update')
@@ -953,7 +978,8 @@ class Database:
             scope_voc = section_voc
 
         db_user = self._get_db_user(user)
-        new_session = Session([], scope_voc)
+        new_session = Session([], scope_voc,
+                              strategy=make_strategy(user.strategy))
 
         new_db_session = DbSession.create(user=db_user.id,
                                           creation=datetime.now(),
@@ -1101,6 +1127,8 @@ class Database:
             if section_voc is not None:
                 v = section_voc
 
+        strategy = make_strategy(db_session.user.strategy)
+
         attempts = []
 
         for attempt in (DbWordAttempt
@@ -1123,7 +1151,8 @@ class Database:
         if db_session.current_word is not None:
             current_word = v.word(db_session.current_word_id)
 
-        ret = Session(attempts, v, current_word=current_word)
+        ret = Session(attempts, v, current_word=current_word,
+                      strategy=strategy)
         ret.set_id(session_id)
         return ret
 
@@ -1384,6 +1413,8 @@ def load_database(name: str) -> Database:
         migrated |= _add_level_column()
         migrated |= _add_column_if_missing('dbuser', 'level', 'varchar(255)')
         migrated |= _add_column_if_missing('dbuser', 'target_language_id',
+                                           'varchar(255)')
+        migrated |= _add_column_if_missing('dbuser', 'strategy',
                                            'varchar(255)')
         migrated |= _add_column_if_missing('dbvocabularysession', 'level',
                                            'varchar(255)')

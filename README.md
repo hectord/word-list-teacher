@@ -91,6 +91,11 @@ myenv/bin/python app/cli.py database data/learn.db \
 myenv/bin/python app/cli.py database data/learn.db \
     update-user you@example.com --password      # prompts for a new password
 
+# choose the word-selection strategy ('full' is the default, 'ai' is the
+# AI strategy). Also settable from the UI: the "Settings" link at the top.
+myenv/bin/python app/cli.py database data/learn.db \
+    update-user you@example.com --strategy ai
+
 # shortcut for the level only
 myenv/bin/python app/cli.py database data/learn.db set-user-level you@example.com C1
 

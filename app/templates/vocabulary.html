@@ -15,6 +15,7 @@
       <h1>{{ voc.name.word_input if voc.name else 'Vocabulary' }}</h1>
       <span class="subtitle">{{ voc.input_language or '?' }} → {{ voc.output_language or '?' }}</span>
       <a class="nav-link" href="/scoreboard">Scoreboard</a>
+      <a class="nav-link" href="/settings">Settings</a>
     </div>
     <div class="voc-actions">
       <a class="button new" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}">New session</a>

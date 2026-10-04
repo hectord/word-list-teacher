@@ -12,6 +12,7 @@ from store import (load_database, DbException,
                    DbWord, DbWordText, DbVocabularySession, DbWordAttempt,
                    DbUser, DbSession, db as store_db, _table_columns)
 from learn import Vocabulary, Word, Language, User, included_levels
+from optimizer import AiStrategy, FullStrategy
 
 
 class TestStore(unittest.TestCase):
@@ -334,6 +335,32 @@ class TestStore(unittest.TestCase):
         finally:
             if os.path.exists(path):
                 os.remove(path)
+
+    def test_user_strategy(self):
+        # the default strategy is 'full' (historical behaviour)
+        self._create_vocabulary()
+        self._create_user()
+        self.assertEqual('full', self.user.strategy)
+
+        # a new session follows the user's strategy
+        voc = self._projection()
+        default_session = self.db.create_new_session(self.user, voc)
+        self.assertIsInstance(default_session.strategy, FullStrategy)
+
+        # switching to the AI strategy applies to the next sessions
+        self.db.set_user_strategy(self.user, 'ai')
+        refreshed = self.db.get_user('test@hotmail.com', 'abc')
+        self.assertEqual('ai', refreshed.strategy)
+
+        ai_session = self.db.create_new_session(refreshed, voc)
+        self.assertIsInstance(ai_session.strategy, AiStrategy)
+
+        # resuming a session keeps the strategy of its owner
+        word = ai_session.current_word
+        self.db.add_word_attempt(
+            ai_session, ai_session.guess(word, word.word_output))
+        reloaded = self.db.load_session(ai_session.id)
+        self.assertIsInstance(reloaded.strategy, AiStrategy)
 
     def test_user_level(self):
         self._create_user()

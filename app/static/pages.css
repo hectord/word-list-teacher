@@ -242,6 +242,44 @@ a.signout:hover { text-decoration: underline; }
 .button.resume { background: #FCEFD8; color: #B97B1E; border: 1px solid #F3DFBC; }
 .button.resume:hover { background: #F7E3C0; }
 
+/* ---------- settings ---------- */
+
+.settings-form button.button {
+  border: none;
+  background: #2F7D5B;
+  color: #fff;
+  cursor: pointer;
+}
+.settings-form button.button:hover { background: #27694C; }
+
+.setting-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.setting-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: baseline;
+  padding: 12px 16px;
+  border: 1px solid #EDE3DB;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.setting-option:hover { border-color: #D8C8B8; }
+.setting-option input { margin-top: 2px; }
+
+.setting-name { font-size: 16px; color: #3B2F2A; font-weight: 600; }
+.setting-note { font-weight: 400; color: #A08B7F; font-size: 13px; }
+.setting-description {
+  grid-column: 2;
+  font-size: 13px;
+  color: #6B5D55;
+}
+
 /* ---------- empty state ---------- */
 
 .empty { color: #A08B7F; text-align: center; padding: 60px 0; }

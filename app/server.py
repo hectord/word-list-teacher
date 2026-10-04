@@ -4,7 +4,8 @@ import os
 from typing import Optional, List
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response, Depends, HTTPException, status
+from fastapi import (FastAPI, Form, Request, Response, Depends,
+                     HTTPException, status)
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -13,7 +14,7 @@ from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
 from learn import Vocabulary, Session, Word, Language, User
-from learn import LEVELS, included_levels
+from learn import LEVELS, STRATEGIES, included_levels
 from store import load_database, DbException
 
 
@@ -121,6 +122,32 @@ def logout():
         detail="Incorrect email or password",
         headers={"WWW-Authenticate": "Basic"},
     )
+
+
+@app.get("/settings")
+async def settings(request: Request,
+                   user: User = Depends(get_user)):
+    return TEMPLATES.TemplateResponse(
+        request, "settings.html",
+        {
+            'user': user,
+            'strategies': STRATEGIES,
+        },
+        headers={'Cache-Control': 'no-store'}
+    )
+
+
+@app.post("/settings")
+async def save_settings(request: Request,
+                        strategy: str = Form(...),
+                        user: User = Depends(get_user)):
+
+    if strategy not in STRATEGIES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="unknown strategy")
+
+    db.set_user_strategy(user, strategy)
+    return RedirectResponse(url='/settings')
 
 
 @app.get("/vocabulary")

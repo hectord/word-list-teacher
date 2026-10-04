@@ -317,6 +317,9 @@ if __name__ == '__main__':
                                        help='B1, B2 or C1')
     update_user_subparser.add_argument('--target-language', nargs='?',
                                        help='language to practise')
+    update_user_subparser.add_argument('--strategy', nargs='?',
+                                       choices=('full', 'ai'),
+                                       help='word selection strategy')
     update_user_subparser.add_argument('--password', action='store_true',
                                        help='prompt for a new password')
 
@@ -505,10 +508,13 @@ if __name__ == '__main__':
                 print("invalid language code", file=sys.stderr)
                 sys.exit(-1)
 
+        strategy = args.strategy if args.strategy else None
+
         try:
             database.update_user(email, main_language=main_language,
                                  level=level, password=password,
-                                 target_language=target_language)
+                                 target_language=target_language,
+                                 strategy=strategy)
         except DbException as e:
             print(e, file=sys.stderr)
             sys.exit(1)

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block header %}
+    <link rel="stylesheet" href="/static/pages.css?v=12">
+{% endblock %}
+
+{% block body %}
+
+  <header class="page-header">
+    <div class="brand-line">
+      <a class="back" href="/index">&larr; All vocabularies</a>
+      <h1>Settings</h1>
+      <span class="subtitle">how words are selected for your runs</span>
+    </div>
+  </header>
+
+  <div class="center">
+
+    <form class="settings-form" method="post" action="/settings">
+      <div class="vocabulary">
+        <div class="voc-top">
+          <span class="voc-name">Selection strategy</span>
+        </div>
+
+        <div class="setting-options">
+          {% for option in strategies %}
+            <label class="setting-option">
+              <input type="radio" name="strategy" value="{{ option }}"
+                     {% if user.strategy == option %}checked{% endif %}>
+              <span class="setting-name">
+                {{ 'full' if option == 'full' else 'ai' }}
+                {% if option == 'full' %}<span class="setting-note">(default)</span>{% endif %}
+              </span>
+              {% if option == 'full' %}
+                <span class="setting-description">
+                  The historical behaviour: words are picked at random among
+                  the remaining words, skipping the most recently tried ones.
+                </span>
+              {% else %}
+                <span class="setting-description">
+                  The AI strategy: words are ranked by a recency-weighted
+                  understanding model and picked with weighted randomness.
+                </span>
+              {% endif %}
+            </label>
+          {% endfor %}
+        </div>
+
+        <div class="voc-actions">
+          <button class="button" type="submit">Save</button>
+        </div>
+      </div>
+    </form>
+
+  </div>
+
+{% endblock %}
