@@ -327,6 +327,9 @@ if __name__ == '__main__':
     list_words_subparser = db_subparser.add_parser('list-words')
     list_words_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
+    list_word_attempts_subparser = db_subparser.add_parser('list-word-attempts')
+    list_word_attempts_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
+
     list_sections_subparser = db_subparser.add_parser('list-sections')
     list_sections_subparser.add_argument('voc-id', help='vocabulary ID', nargs=1, type=int)
 
@@ -563,6 +566,25 @@ if __name__ == '__main__':
                   % (word_id,
                      ' | '.join('%s: %s' % (code, data['text'])
                                 for code, data in texts.items())))
+
+    elif args.db_cmd == 'list-word-attempts':
+        database = args.database[0]
+        database = load_database(database)
+
+        voc_id = vars(args)['voc-id'][0]
+        word_texts = database.list_word_texts(voc_id)
+        attempts = database.word_attempts(voc_id)
+
+        if not attempts:
+            print('no attempts for vocabulary %d' % voc_id)
+
+        for word_id, success, typed_word, when in attempts:
+            texts = word_texts.get(word_id, {})
+            label = ' / '.join(data['text'] for data in texts.values())
+            print('%s  %-5s  %-20s  %s'
+                  % (when.strftime('%Y-%m-%d %H:%M:%S'),
+                     'right' if success else 'wrong',
+                     typed_word or '', label))
 
     elif args.db_cmd == 'remove-vocabulary':
         database = args.database[0]

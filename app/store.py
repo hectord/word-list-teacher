@@ -555,6 +555,19 @@ class Database:
             })
         return summaries
 
+    def word_attempts(self, voc_id: int) -> List[tuple]:
+        """Practice attempts of a vocabulary, most recent first:
+        (word id, success, typed word, timestamp of the guess)."""
+        return [(attempt.word_id, attempt.success, attempt.typed_word,
+                 attempt.time)
+                for attempt in
+                (DbWordAttempt
+                 .select()
+                 .join(DbWord)
+                 .where(DbWord.vocabulary == voc_id)
+                 .order_by(DbWordAttempt.time.desc(),
+                           DbWordAttempt.id.desc()))]
+
     def list_word_texts(self, voc_id: int) -> Dict[int, Dict[str, dict]]:
         texts = defaultdict(dict)
         for text in (DbWordText
@@ -1018,7 +1031,7 @@ class Database:
         DbWordAttempt.create(word=db_word.id,
                              typed_word=word_attempt.typed_word,
                              session=session_id,
-                             time=datetime.now(),
+                             time=word_attempt.time,
                              success=word_attempt.success)
 
     def last_session(self,
@@ -1366,6 +1379,8 @@ def load_database(name: str) -> Database:
         # columns added after the first releases
         migrated = False
         migrated |= _add_column_if_missing('dbword', 'type', 'varchar(255)')
+        migrated |= _add_column_if_missing('dbwordattempt', 'time',
+                                           'datetime')
         migrated |= _add_level_column()
         migrated |= _add_column_if_missing('dbuser', 'level', 'varchar(255)')
         migrated |= _add_column_if_missing('dbuser', 'target_language_id',

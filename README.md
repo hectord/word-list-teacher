@@ -72,7 +72,9 @@ myenv/bin/python app/cli.py database data/learn.db \
 ```
 
 Useful commands: `list-vocabularies`, `list-sections <voc-id>`,
-`list-words <voc-id>`, `add-vocabulary <file>`, `remove-vocabulary <voc-id>`,
+`list-words <voc-id>`, `list-word-attempts <voc-id>` (practice history
+with the timestamp of every attempt), `add-vocabulary <file>`,
+`remove-vocabulary <voc-id>`,
 `add-word <voc-id> --input-language fr --output-language de <in> <out>`,
 `update-word <word-id> --language de [--text <text>] [--example <sentence>] [--type noun] [--level B1]`.
 

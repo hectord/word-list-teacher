@@ -632,6 +632,26 @@ class TestStore(unittest.TestCase):
         self.assertEqual("J'y vais.",
                          sect.input_example(sect.words[0]))
 
+    def test_attempt_keeps_its_timestamp(self):
+        # the stored timestamp is the moment the word was tried, not the
+        # moment the attempt row was saved
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+        session = self.db.create_new_session(self.user, voc)
+
+        word = session.current_word
+        attempt = session.guess(word, word.word_output)
+        self.db.add_word_attempt(session, attempt)
+
+        stored = DbWordAttempt.get(DbWordAttempt.session == session.id)
+        self.assertEqual(attempt.time, stored.time)
+
+        # the helper returns the same timestamp, most recent first
+        rows = self.db.word_attempts(voc.id)
+        self.assertEqual(1, len(rows))
+        self.assertEqual(stored.time, rows[0][3])
+
     def test_load_csv_dictionary(self):
         from cli import load_csv_dictionary
 
