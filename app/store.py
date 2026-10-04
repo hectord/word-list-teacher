@@ -148,6 +148,18 @@ def _code(language) -> Optional[str]:
 _AUTH_CACHE = {}
 _AUTH_CACHE_TTL = 300.0
 
+# the AI run scope of a session is a fixed historical fact: cache it per
+# session id so per-answer reloads (POST /word) do not recompute the
+# whole selection model. It is a purely in-memory cache (not persisted).
+_AI_SCOPE_CACHE = {}
+_AI_SCOPE_CACHE_MAX = 1000
+
+
+def _cache_ai_scope(session_id: int, vocabulary):
+    if len(_AI_SCOPE_CACHE) >= _AI_SCOPE_CACHE_MAX:
+        _AI_SCOPE_CACHE.clear()
+    _AI_SCOPE_CACHE[session_id] = vocabulary
+
 
 def _credentials_hash(email: str, password: str) -> str:
     return hashlib.sha256(('%s\0%s' % (email, password))
@@ -637,7 +649,8 @@ class Database:
         db_user = self._get_db_user(user)
 
         query = (DbWordAttempt
-                 .select()
+                 .select(DbWordAttempt.word_id, DbWordAttempt.session_id,
+                         DbWordAttempt.success, DbWordAttempt.time)
                  .join(DbWord)
                  .switch(DbWordAttempt)
                  .join(DbSession)
@@ -647,11 +660,9 @@ class Database:
         if exclude_session is not None:
             query = query.where(DbWordAttempt.session != exclude_session)
 
-        return [HistoricalAttempt(word_id=attempt.word_id,
-                                  run_id=attempt.session_id,
-                                  success=attempt.success,
-                                  tested_at=attempt.time)
-                for attempt in query]
+        return [HistoricalAttempt(word_id=word_id, run_id=session_id,
+                                  success=success, tested_at=tested_at)
+                for word_id, session_id, success, tested_at in query.tuples()]
 
     def list_word_texts(self, voc_id: int) -> Dict[int, Dict[str, dict]]:
         texts = defaultdict(dict)
@@ -671,6 +682,7 @@ class Database:
     def clear_vocabularies(self):
         """Remove every vocabulary (and the sessions/attempts which
         belong to them). Users and languages are kept."""
+        _AI_SCOPE_CACHE.clear()
         DbWordAttempt.delete().execute()
         DbVocabularySession.delete().execute()
         DbSession.delete().execute()
@@ -992,6 +1004,7 @@ class Database:
                            DbSection.vocabulary == voc_id)]
 
         if word_ids:
+            _AI_SCOPE_CACHE.clear()
             (DbWordAttempt.delete()
              .where(DbWordAttempt.word.in_(word_ids)).execute())
 
@@ -1106,6 +1119,8 @@ class Database:
                                           creation=created_at,
                                           finished=len(scope_voc) == 0)
         new_session.set_id(new_db_session.id)
+        if strategy_name == 'ai':
+            _cache_ai_scope(new_db_session.id, scope_voc)
         DbVocabularySession.create(session=new_db_session,
                                    vocabulary=scope_voc.id,
                                    input_language=voc.input_language,
@@ -1255,25 +1270,31 @@ class Database:
         strategy = make_strategy(strategy_name)
 
         if strategy_name == 'ai':
-            # reproduce the word set chosen when the run started (seeded
-            # selection, same history as then) and keep its own attempts
-            attempted_ids = [
-                attempt.word_id
-                for attempt in DbWordAttempt
-                    .select(DbWordAttempt.word_id)
-                    .where(DbWordAttempt.session == session_id)
-            ]
-            words_per_run = db_session.user.words_per_run
-            if words_per_run is None:
-                words_per_run = 30
-            v = self._ai_words(
-                db_session.user.email, words_per_run,
-                v, db_voc_session.section_id,
-                must_include=attempted_ids,
-                exclude_session=session_id,
-                history_user=User(email=db_session.user.email, password='',
-                                  main_language=None),
-                now=db_session.creation)
+            cached = _AI_SCOPE_CACHE.get(session_id)
+            if cached is not None:
+                v = cached
+            else:
+                # reproduce the word set chosen when the run started
+                # (seeded selection, same history as then) and keep its
+                # own attempts
+                attempted_ids = [
+                    attempt.word_id
+                    for attempt in DbWordAttempt
+                        .select(DbWordAttempt.word_id)
+                        .where(DbWordAttempt.session == session_id)
+                ]
+                words_per_run = db_session.user.words_per_run
+                if words_per_run is None:
+                    words_per_run = 30
+                v = self._ai_words(
+                    db_session.user.email, words_per_run,
+                    v, db_voc_session.section_id,
+                    must_include=attempted_ids,
+                    exclude_session=session_id,
+                    history_user=User(email=db_session.user.email,
+                                      password='', main_language=None),
+                    now=db_session.creation)
+                _cache_ai_scope(session_id, v)
 
         attempts = []
 
@@ -1308,92 +1329,86 @@ class Database:
         """Error probability per word of ``voc``, from the attempts of one
         ``user``. Without a user, every user's attempts would be mixed
         together, so the page always passes the current user."""
-        success_by_word_id = defaultdict(int)
-        error_by_word_id = defaultdict(int)
-
-        query = (DbWordAttempt
-                 .select()
-                 .join(DbWord)
-                 .where(DbWord.vocabulary == voc.id))
-
-        if user is not None:
-            db_user = self._get_db_user(user)
-            query = (query
-                     .switch(DbWordAttempt)
-                     .join(DbSession)
-                     .where(DbSession.user == db_user))
-
-        for attempt in query:
-            if attempt.success:
-                success_by_word_id[attempt.word_id] += 1
-            else:
-                error_by_word_id[attempt.word_id] += 1
-
         ret = {}
 
-        for word_id in set(success_by_word_id) | set(error_by_word_id):
+        # one grouped pull instead of scanning every attempt row
+        sql = '''
+            SELECT a.word_id,
+                   SUM(CASE WHEN a.success THEN 1 ELSE 0 END) AS successes,
+                   COUNT(*) AS attempts
+            FROM dbwordattempt a
+            JOIN dbsession s ON s.id = a.session_id
+            JOIN dbword w ON w.id = a.word_id
+            WHERE w.vocabulary_id = ? AND s.user_id = ?
+            GROUP BY a.word_id
+        '''
+        db_user = None
+        if user is not None:
+            db_user = self._get_db_user(user)
+
+        for word_id, successes, attempts in \
+                db.execute_sql(sql, (voc.id, db_user.id)).fetchall():
             word = voc.word(word_id)
             if word is None:
                 continue
 
-            success = success_by_word_id[word_id]
-            error = error_by_word_id[word_id]
-
-            ret[word] = error / (error + success) * 100
+            ret[word] = (attempts - successes) / attempts * 100
 
         return VocabularyStats(voc, ret)
 
     def known_word_counts(self, user: User,
                           levels=None) -> Dict[int, int]:
-        """Vocabulary id -> number of distinct words ``user`` has mastered:
-        guessed correctly during a completed run (a single successful guess
-        in a session which was left unfinished does not count)."""
+        """Vocabulary id -> number of distinct words ``user`` is
+        currently known: the last run which included the word answered it
+        correctly (its most recent attempt was a success)."""
         db_user = self._get_db_user(user)
         counts = defaultdict(int)
-        seen = set()
 
-        query = (DbWordAttempt
-                 .select(DbWordAttempt.word_id, DbWord.vocabulary_id)
-                 .join(DbWord)
-                 .switch(DbWordAttempt)
-                 .join(DbSession)
-                 .where(DbSession.user == db_user)
-                 .where(DbSession.finished == True)
-                 .where(DbWordAttempt.success == True))
-
+        # attempt ids grow with time, so the most recent attempt of a
+        # word is the one with the max id: one grouped pull instead of
+        # scanning and sorting the whole history
+        sql = '''
+            SELECT t.word_id, w.vocabulary_id, t.success
+            FROM dbwordattempt t
+            JOIN dbword w ON w.id = t.word_id
+            JOIN (SELECT word_id, MAX(id) AS id
+                  FROM dbwordattempt
+                  WHERE session_id IN
+                      (SELECT id FROM dbsession WHERE user_id = ?)
+                  GROUP BY word_id) last ON last.id = t.id
+        '''
+        params = [db_user.id]
         if levels is not None:
-            query = query.where((DbWord.level.in_(list(levels))) |
-                                DbWord.level.is_null())
+            sql += (' WHERE (w.level IN (%s) OR w.level IS NULL)'
+                    % ','.join('?' * len(levels)))
+            params += list(levels)
 
-        for word_id, vocabulary_id in query.tuples():
-            if word_id in seen:
-                continue
-            seen.add(word_id)
-            counts[vocabulary_id] += 1
+        for word_id, vocabulary_id, success in \
+                db.execute_sql(sql, params).fetchall():
+            if success:
+                counts[vocabulary_id] += 1
 
         return dict(counts)
 
     def known_word_counts_by_user(self) -> Dict[int, Dict[int, int]]:
-        """User id -> (vocabulary id -> words mastered in a completed run)."""
+        """User id -> (vocabulary id -> words currently known: last run
+        which included them answered them correctly)."""
         known = defaultdict(lambda: defaultdict(int))
-        seen = set()
 
-        rows = (DbWordAttempt
-                .select(DbWordAttempt.word_id, DbWord.vocabulary_id,
-                        DbSession.user_id)
-                .join(DbWord)
-                .switch(DbWordAttempt)
-                .join(DbSession)
-                .where(DbSession.finished == True)
-                .where(DbWordAttempt.success == True)
-                .tuples())
-
-        for word_id, vocabulary_id, user_id in rows:
-            key = (user_id, word_id)
-            if key in seen:
-                continue
-            seen.add(key)
-            known[user_id][vocabulary_id] += 1
+        sql = '''
+            SELECT s.user_id, w.vocabulary_id, t.success
+            FROM dbwordattempt t
+            JOIN dbsession s ON s.id = t.session_id
+            JOIN dbword w ON w.id = t.word_id
+            JOIN (SELECT s2.user_id, t2.word_id, MAX(t2.id) AS id
+                  FROM dbwordattempt t2
+                  JOIN dbsession s2 ON s2.id = t2.session_id
+                  GROUP BY s2.user_id, t2.word_id) last
+              ON last.id = t.id
+        '''
+        for user_id, vocabulary_id, success in db.execute_sql(sql):
+            if success:
+                known[user_id][vocabulary_id] += 1
 
         return {user_id: dict(counts)
                 for user_id, counts in known.items()}

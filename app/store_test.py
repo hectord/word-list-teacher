@@ -234,30 +234,40 @@ class TestStore(unittest.TestCase):
         self.assertEqual(2, sum(counts[user_ids['test@hotmail.com']].values()))
         self.assertEqual(2, sum(counts[user_ids['other@x.com']].values()))
 
-    def test_unknown_after_abandoned_session(self):
-        # a right guess in a run which was never completed does not mark
-        # the word as known: only completed runs count
+    def test_known_follows_the_last_run(self):
+        # a word is known when the last run which included it answered it
+        # correctly (its most recent attempt was a success)
         self._create_vocabulary()
         self._create_user()
 
         voc = self._projection()
+
+        def answer(word, success):
+            session = self.db.create_new_session(self.user, voc)
+            self.db.add_word_attempt(
+                session, session.guess(word,
+                                       word.word_output if success else 'zz'))
+
+        # a right answer in the latest run marks the word known (partial
+        # runs count too)
         session = self.db.create_new_session(self.user, voc)
-
         word = session.current_word
-        attempt = session.guess(word, word.word_output)
-        self.db.add_word_attempt(session, attempt)
+        self.db.add_word_attempt(session,
+                                 session.guess(word, word.word_output))
+        self.assertEqual(
+            1, self.db.known_word_counts(self.user).get(voc.id, 0))
 
-        # the run is abandoned: the word is not known yet
-        self.assertFalse(session.is_finished)
+        # a later run failing the same word marks it unknown again
+        answer(word, False)
         self.assertEqual(
             0, self.db.known_word_counts(self.user).get(voc.id, 0))
 
-        # finish the run -> the practised words become known
+        # finishing a run where every word succeeds makes them known
+        session = self.db.create_new_session(self.user, voc)
         while not session.is_finished:
             word = session.current_word
-            attempt = session.guess(word, word.word_output)
-            self.db.add_word_attempt(session, attempt)
-
+            self.db.add_word_attempt(session,
+                                     session.guess(word, word.word_output))
         self.assertEqual(
             2, self.db.known_word_counts(self.user).get(voc.id, 0))
 
@@ -278,7 +288,8 @@ class TestStore(unittest.TestCase):
                 self.db.add_word_attempt(session, attempt)
 
         # our user completes the whole run; the other one abandons after
-        # a single correct answer
+        # a single correct answer (its word still counts as known: the
+        # last run which included it answered it correctly)
         finish(self.user)
         abandoned = self.db.create_new_session(other, voc)
         attempt = abandoned.guess(abandoned.current_word,
@@ -286,7 +297,7 @@ class TestStore(unittest.TestCase):
         self.db.add_word_attempt(abandoned, attempt)
 
         self.assertEqual(2, self.db.known_word_counts(self.user).get(voc.id))
-        self.assertEqual(0, self.db.known_word_counts(other).get(voc.id, 0))
+        self.assertEqual(1, self.db.known_word_counts(other).get(voc.id, 0))
 
     def test_vocabulary_stats_are_scoped_to_the_user(self):
         # the error rate of a word must not include other users' attempts
