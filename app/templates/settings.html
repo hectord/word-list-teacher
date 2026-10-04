@@ -48,6 +48,18 @@
           {% endfor %}
         </div>
 
+        <label class="setting-option words-per-run">
+          <span>
+            <span class="setting-name">Words per run</span>
+            <span class="setting-description">
+              Number of words the AI strategy puts in each run
+              (the full strategy always uses the whole vocabulary).
+            </span>
+          </span>
+          <input type="number" name="words_per_run" min="1"
+                 value="{{ user.words_per_run or 30 }}">
+        </label>
+
         <div class="voc-actions">
           <button class="button" type="submit">Save</button>
         </div>

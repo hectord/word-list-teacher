@@ -10,9 +10,10 @@ from datetime import datetime
 from peewee import *
 
 # note: import typing after peewee (peewee shadows its own ``Tuple`` helper)
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
-from optimizer import HistoricalAttempt
+from optimizer import HistoricalAttempt, VocabularySelector
+from optimizer import Word as StrategyWord
 
 from learn import Vocabulary, Word, Session, WordAttempt
 from learn import Language, User, VocabularyStats, included_levels
@@ -40,6 +41,7 @@ class DbUser(Model):
     level = CharField(null=True)
     target_language = ForeignKeyField(DbLanguage, null=True, backref='+')
     strategy = CharField(null=True)
+    words_per_run = IntegerField(null=True)
 
     class Meta:
         database = db
@@ -204,7 +206,8 @@ class Database:
                     main_language=main_language,
                     level=db_user.level,
                     target_language=target_language,
-                    strategy=db_user.strategy or 'full')
+                    strategy=db_user.strategy or 'full',
+                    words_per_run=db_user.words_per_run or 30)
 
         _AUTH_CACHE[email] = (credentials, now + _AUTH_CACHE_TTL, user)
         return user
@@ -235,6 +238,26 @@ class Database:
                       target_language=target)
 
         return self.get_user(email, password)
+
+    def set_user_words_per_run(self, user, words_per_run: int):
+        """How many words the AI strategy puts in a run of ``user``."""
+        email = user if isinstance(user, str) else user.email
+        updated = (DbUser.update(words_per_run=words_per_run)
+                   .where(DbUser.email == email).execute())
+        if not updated:
+            raise DbException('user not found')
+
+        # keep the cached profile in sync
+        cached = _AUTH_CACHE.get(email)
+        if cached is not None:
+            credentials, expires, previous = cached
+            _AUTH_CACHE[email] = (
+                credentials, expires,
+                User(email=previous.email, password=previous.password,
+                     main_language=previous.main_language, level=previous.level,
+                     target_language=previous.target_language,
+                     strategy=previous.strategy,
+                     words_per_run=words_per_run))
 
     def set_user_strategy(self, user, strategy: str):
         """Choose which strategy the runs of ``user`` follow."""
@@ -271,7 +294,8 @@ class Database:
                 User(email=previous.email, password=previous.password,
                      main_language=previous.main_language, level=level,
                      target_language=previous.target_language,
-                     strategy=previous.strategy))
+                     strategy=previous.strategy,
+                     words_per_run=previous.words_per_run))
 
     def set_user_target_language(self, user, target_language):
         email = user if isinstance(user, str) else user.email
@@ -290,7 +314,8 @@ class Database:
                      main_language=previous.main_language,
                      level=previous.level,
                      target_language=Language.from_code(code),
-                     strategy=previous.strategy))
+                     strategy=previous.strategy,
+                     words_per_run=previous.words_per_run))
 
     def list_users(self) -> List[Tuple[int, str]]:
         """All users as (id, email) pairs."""
@@ -342,7 +367,8 @@ class Database:
                     level: Optional[str] = None,
                     password: Optional[str] = None,
                     target_language=None,
-                    strategy: Optional[str] = None):
+                    strategy: Optional[str] = None,
+                    words_per_run: Optional[int] = None):
         """Update the user profile. ``None`` means 'leave unchanged'."""
         update = {}
         if main_language is not None:
@@ -356,6 +382,8 @@ class Database:
             update['password'] = get_hashed_password(password)
         if strategy is not None:
             update['strategy'] = strategy
+        if words_per_run is not None:
+            update['words_per_run'] = words_per_run
 
         if not update:
             raise DbException('nothing to update')
@@ -599,23 +627,30 @@ class Database:
                            DbWordAttempt.id.desc()))]
 
     def historical_attempts(self, user: User,
-                            voc_id: int) -> List[HistoricalAttempt]:
+                            voc_id: int,
+                            exclude_session: int = None) -> List[HistoricalAttempt]:
         """The attempts of one user on a vocabulary, tagged with their
-        run id (for the AI understanding model)."""
+        run id (for the AI understanding model). When ``exclude_session``
+        is given, that run's own attempts are left out (used to recompute
+        a run's word set the same way as when it started)."""
         db_user = self._get_db_user(user)
 
-        return [HistoricalAttempt(word_id=attempt.word_id,
-                                  run_id=attempt.session_id,
-                                  success=attempt.success,
-                                  tested_at=attempt.time)
-                for attempt in
-                (DbWordAttempt
+        query = (DbWordAttempt
                  .select()
                  .join(DbWord)
                  .switch(DbWordAttempt)
                  .join(DbSession)
                  .where(DbSession.user == db_user)
-                 .where(DbWord.vocabulary == voc_id))]
+                 .where(DbWord.vocabulary == voc_id))
+
+        if exclude_session is not None:
+            query = query.where(DbWordAttempt.session != exclude_session)
+
+        return [HistoricalAttempt(word_id=attempt.word_id,
+                                  run_id=attempt.session_id,
+                                  success=attempt.success,
+                                  tested_at=attempt.time)
+                for attempt in query]
 
     def list_word_texts(self, voc_id: int) -> Dict[int, Dict[str, dict]]:
         texts = defaultdict(dict)
@@ -985,6 +1020,48 @@ class Database:
          .where(DbVocabularyTitle.vocabulary == voc_id).execute())
         DbVocabulary.delete().where(DbVocabulary.id == voc_id).execute()
 
+    def _ai_words(self, email: str, words_per_run: Optional[int],
+                  scope_voc: Vocabulary, section_id: Optional[int],
+                  must_include: Sequence = (),
+                  exclude_session: int = None,
+                  history_user: User = None) -> Vocabulary:
+        """The words the AI strategy puts in a run.
+
+        The selection is seeded (stable across processes) and based only
+        on the history before the run started, so a resumed run is
+        recomputed identically without persisting the word list. Words
+        already practised in the run (``must_include``) always stay in.
+        """
+        n = words_per_run or 30
+        n = min(n, len(scope_voc)) if n > 0 else len(scope_voc)
+
+        user = history_user or User(email=email, password='',
+                                    main_language=None)
+        seed = _selection_seed(email, scope_voc.id, section_id)
+
+        history = []
+        if scope_voc.id is not None:
+            history = self.historical_attempts(user, scope_voc.id,
+                                               exclude_session=exclude_session)
+
+        optimizer_words = [
+            StrategyWord(id=scope_voc.word_id(word), text=word.word_output,
+                         level=word.level or 'B1')
+            for word in scope_voc.words
+            if scope_voc.word_id(word) is not None
+        ]
+
+        selected_ids = []
+        if optimizer_words:
+            selector = VocabularySelector(history, seed=seed)
+            picked = selector.select_words(optimizer_words, n=n,
+                                           weighted_random=True)
+            selected_ids = [word.id for word in picked]
+
+        ids = selected_ids + [word_id for word_id in must_include
+                              if word_id not in selected_ids]
+        return scope_voc.select_ids(ids)
+
     # ------------------------------------------------------------- sessions
     def create_new_session(self,
                            user: User,
@@ -1004,6 +1081,11 @@ class Database:
         db_user = self._get_db_user(user)
         # the session records the algorithm which drives its run
         strategy_name = user.strategy or 'full'
+
+        if strategy_name == 'ai':
+            scope_voc = self._ai_words(
+                user.email, user.words_per_run, scope_voc, section_id)
+
         new_session = Session([], scope_voc,
                               strategy=make_strategy(strategy_name),
                               strategy_name=strategy_name)
@@ -1159,6 +1241,23 @@ class Database:
         # session (existing sessions predating the column are 'full')
         strategy_name = db_voc_session.strategy or 'full'
         strategy = make_strategy(strategy_name)
+
+        if strategy_name == 'ai':
+            # reproduce the word set chosen when the run started (seeded
+            # selection, same history as then) and keep its own attempts
+            attempted_ids = [
+                attempt.word_id
+                for attempt in DbWordAttempt
+                    .select(DbWordAttempt.word_id)
+                    .where(DbWordAttempt.session == session_id)
+            ]
+            v = self._ai_words(
+                db_session.user.email, db_session.user.words_per_run,
+                v, db_voc_session.section_id,
+                must_include=attempted_ids,
+                exclude_session=session_id,
+                history_user=User(email=db_session.user.email, password='',
+                                  main_language=None))
 
         attempts = []
 
@@ -1403,6 +1502,15 @@ def _migrate_legacy_vocabularies(vocabularies, words, vocabulary_sessions):
             (vs_id, session_id, voc_id, input_code, output_code, section_id))
 
 
+def _selection_seed(email: str, voc_id: Optional[int],
+                    section_id: Optional[int]) -> int:
+    """Stable, process-independent seed for the AI word selection of a
+    run (user + vocabulary + section), so a run can be recomputed at
+    resume without persisting the chosen word list."""
+    key = '%s:%s:%s' % (email, voc_id, section_id or '')
+    return int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], 'big')
+
+
 def _add_column_if_missing(table: str, column: str, definition: str) -> bool:
     if column in _table_columns(table):
         return False
@@ -1451,6 +1559,8 @@ def load_database(name: str) -> Database:
                                            'varchar(255)')
         migrated |= _add_column_if_missing('dbvocabularysession', 'strategy',
                                            'varchar(255)')
+        migrated |= _add_column_if_missing('dbuser', 'words_per_run',
+                                           'INTEGER')
         _remap_old_levels()
 
         if migrated:

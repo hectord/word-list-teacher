@@ -320,6 +320,8 @@ if __name__ == '__main__':
     update_user_subparser.add_argument('--strategy', nargs='?',
                                        choices=('full', 'ai'),
                                        help='word selection strategy')
+    update_user_subparser.add_argument('--words-per-run', type=int,
+                                       help='words per run for the AI strategy')
     update_user_subparser.add_argument('--password', action='store_true',
                                        help='prompt for a new password')
 
@@ -509,12 +511,14 @@ if __name__ == '__main__':
                 sys.exit(-1)
 
         strategy = args.strategy if args.strategy else None
+        words_per_run = args.words_per_run
 
         try:
             database.update_user(email, main_language=main_language,
                                  level=level, password=password,
                                  target_language=target_language,
-                                 strategy=strategy)
+                                 strategy=strategy,
+                                 words_per_run=words_per_run)
         except DbException as e:
             print(e, file=sys.stderr)
             sys.exit(1)

@@ -77,6 +77,8 @@ class User:
     # which word-selection strategy the runs of this user follow
     # (see optimizer/): 'full' (default) or 'ai'
     strategy: str = 'full'
+    # how many words the AI strategy puts in a run (0/None = all)
+    words_per_run: int = 30
 
 
 # levels, ordered from the lowest to the highest
@@ -325,6 +327,34 @@ class Vocabulary:
 
     def input_example(self, word: Word) -> Optional[str]:
         return self._input_examples.get(word)
+
+    def select_ids(self, ids) -> 'Vocabulary':
+        """A copy restricted to the given word ids (the AI strategy
+        selects which words compose a run). The section of each kept word
+        and all metadata (ids, examples) are preserved."""
+        wanted = set(ids)
+        words = []
+        sub_sections = []
+
+        for word, section in zip(self._words, self._word_sections):
+            if self._word_ids.get(word) in wanted:
+                words.append(word)
+                sub_sections.append(section)
+
+        voc = Vocabulary(self._name, words, self._input_language,
+                         self._output_language, self._flipped,
+                         sections=sub_sections,
+                         section_ids=self._section_ids)
+        voc.set_id(self._id)
+
+        for word in words:
+            word_id = self._word_ids.get(word)
+            if word_id is not None:
+                voc.set_word_id(word, word_id)
+            voc.set_example(word, self.example(word))
+            voc.set_input_example(word, self.input_example(word))
+
+        return voc
 
     def section(self, name: str) -> Optional['Vocabulary']:
         """Return a vocabulary restricted to one section (with word IDs)."""

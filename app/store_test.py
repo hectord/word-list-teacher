@@ -405,6 +405,46 @@ class TestStore(unittest.TestCase):
         self.assertEqual('full', self.db.load_session(session.id)
                          .strategy_name)
 
+    def test_ai_run_uses_words_per_run(self):
+        # the AI strategy composes a run with a limited, deterministically
+        # selected word set; loading it again reproduces the same set
+        words = [Word('fr_%d' % i, 'de_%d' % i) for i in range(40)]
+        voc = Vocabulary(None, words, 'fr', 'de')
+        voc_id = self.db.create_vocabulary(voc)
+        self._create_user()
+
+        projection = self.db.get_vocabulary(self.user, voc_id,
+                                            Language.GERMAN)
+
+        # full strategy: the whole vocabulary
+        full = self.db.create_new_session(self.user, projection)
+        self.assertEqual(40, len(full.vocabulary))
+
+        # ai strategy: only the selected words (default 30 per run)
+        self.assertEqual(30, self.user.words_per_run)
+        self.db.set_user_strategy(self.user, 'ai')
+        ai_user = self.db.get_user('test@hotmail.com', 'abc')
+        ai_projection = self.db.get_vocabulary(ai_user, voc_id,
+                                               Language.GERMAN)
+        ai_session = self.db.create_new_session(ai_user, ai_projection)
+        self.assertEqual(30, len(ai_session.vocabulary))
+        self.assertNotEqual(40, len(ai_session.vocabulary))
+
+        # resuming recomputes exactly the same word set (seeded, no
+        # per-session word list stored)
+        reloaded = self.db.load_session(ai_session.id)
+        self.assertEqual(30, len(reloaded.vocabulary))
+        self.assertEqual(
+            [w.word_input for w in ai_session.vocabulary.words],
+            [w.word_input for w in reloaded.vocabulary.words])
+
+        # the number of words per run is configurable
+        self.db.set_user_words_per_run(ai_user, 10)
+        small = self.db.create_new_session(
+            self.db.get_user('test@hotmail.com', 'abc'),
+            ai_projection)
+        self.assertEqual(10, len(small.vocabulary))
+
     def test_user_level(self):
         self._create_user()
         self.assertIsNone(self.user.level)

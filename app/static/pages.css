@@ -280,6 +280,20 @@ a.signout:hover { text-decoration: underline; }
   color: #6B5D55;
 }
 
+.setting-option.words-per-run {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+.setting-option.words-per-run .setting-description { grid-column: auto; }
+.setting-option.words-per-run input {
+  width: 90px;
+  padding: 8px 10px;
+  border: 1px solid #D8C8B8;
+  border-radius: 8px;
+  font-size: 15px;
+  text-align: right;
+}
+
 /* ---------- empty state ---------- */
 
 .empty { color: #A08B7F; text-align: center; padding: 60px 0; }

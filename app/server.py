@@ -145,6 +145,7 @@ async def settings(request: Request,
 @app.post("/settings")
 async def save_settings(request: Request,
                         strategy: str = Form(...),
+                        words_per_run: Optional[int] = Form(None),
                         user: User = Depends(get_user)):
 
     if strategy not in STRATEGIES:
@@ -152,6 +153,13 @@ async def save_settings(request: Request,
                             detail="unknown strategy")
 
     db.set_user_strategy(user, strategy)
+
+    if words_per_run is not None:
+        if words_per_run <= 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="words_per_run must be positive")
+        db.set_user_words_per_run(user, words_per_run)
+
     # 303 (instead of the 307 default): the browser must re-send the
     # form as a GET, otherwise it would re-POST here and loop forever
     return RedirectResponse(url='/index', status_code=303)
