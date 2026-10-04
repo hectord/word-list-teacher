@@ -3,7 +3,7 @@
 {% block title %}Settings{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=12">
+    <link rel="stylesheet" href="/static/pages.css?v=13">
 {% endblock %}
 
 {% block body %}
@@ -48,23 +48,41 @@
           {% endfor %}
         </div>
 
-        <label class="setting-option words-per-run">
+        <div class="setting-option words-per-run">
           <span>
             <span class="setting-name">Words per run</span>
             <span class="setting-description">
               Number of words the AI strategy puts in each run
-              (the full strategy always uses the whole vocabulary).
+              (Unlimited = the whole vocabulary; the full strategy always
+              uses the whole vocabulary).
             </span>
           </span>
-          <input type="number" name="words_per_run" min="1"
-                 value="{{ user.words_per_run or 30 }}">
-        </label>
+          <span class="wpr-controls">
+            <label class="wpr-unlimited">
+              <input type="checkbox" id="wpr-unlimited" name="unlimited"
+                     {% if user.words_per_run == 0 %}checked{% endif %}>
+              Unlimited
+            </label>
+            <input type="number" name="words_per_run" min="1"
+                   value="{{ user.words_per_run or 30 }}"
+                   {% if user.words_per_run == 0 %}disabled{% endif %}>
+          </span>
+        </div>
 
         <div class="voc-actions">
           <button class="button" type="submit">Save</button>
         </div>
       </div>
     </form>
+
+    <script>
+      (function () {
+        var box = document.getElementById('wpr-unlimited');
+        var number = document.querySelector('input[name="words_per_run"]');
+        function sync() { number.disabled = box.checked; }
+        box.addEventListener('change', sync);
+      })();
+    </script>
 
   </div>
 

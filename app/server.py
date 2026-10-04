@@ -145,6 +145,7 @@ async def settings(request: Request,
 @app.post("/settings")
 async def save_settings(request: Request,
                         strategy: str = Form(...),
+                        unlimited: Optional[str] = Form(None),
                         words_per_run: Optional[int] = Form(None),
                         user: User = Depends(get_user)):
 
@@ -154,7 +155,10 @@ async def save_settings(request: Request,
 
     db.set_user_strategy(user, strategy)
 
-    if words_per_run is not None:
+    if unlimited == 'on':
+        # the whole vocabulary in each run
+        db.set_user_words_per_run(user, 0)
+    elif words_per_run is not None:
         if words_per_run <= 0:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="words_per_run must be positive")

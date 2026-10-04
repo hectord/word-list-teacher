@@ -445,6 +445,16 @@ class TestStore(unittest.TestCase):
             ai_projection)
         self.assertEqual(10, len(small.vocabulary))
 
+        # 0 = unlimited: the whole vocabulary goes into the run
+        self.db.set_user_words_per_run(ai_user, 0)
+        unlimited_user = self.db.get_user('test@hotmail.com', 'abc')
+        self.assertEqual(0, unlimited_user.words_per_run)
+        unlimited = self.db.create_new_session(
+            unlimited_user, ai_projection)
+        self.assertEqual(40, len(unlimited.vocabulary))
+        self.assertEqual(
+            40, len(self.db.load_session(unlimited.id).vocabulary))
+
     def test_user_level(self):
         self._create_user()
         self.assertIsNone(self.user.level)

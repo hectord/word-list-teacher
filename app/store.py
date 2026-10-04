@@ -207,7 +207,8 @@ class Database:
                     level=db_user.level,
                     target_language=target_language,
                     strategy=db_user.strategy or 'full',
-                    words_per_run=db_user.words_per_run or 30)
+                    words_per_run=db_user.words_per_run
+                    if db_user.words_per_run is not None else 30)
 
         _AUTH_CACHE[email] = (credentials, now + _AUTH_CACHE_TTL, user)
         return user
@@ -1032,8 +1033,11 @@ class Database:
         recomputed identically without persisting the word list. Words
         already practised in the run (``must_include``) always stay in.
         """
-        n = words_per_run or 30
-        n = min(n, len(scope_voc)) if n > 0 else len(scope_voc)
+        # 0 (or None) = unlimited: the whole vocabulary is in the run
+        if words_per_run:
+            n = min(words_per_run, len(scope_voc))
+        else:
+            n = len(scope_voc)
 
         user = history_user or User(email=email, password='',
                                     main_language=None)
@@ -1251,8 +1255,11 @@ class Database:
                     .select(DbWordAttempt.word_id)
                     .where(DbWordAttempt.session == session_id)
             ]
+            words_per_run = db_session.user.words_per_run
+            if words_per_run is None:
+                words_per_run = 30
             v = self._ai_words(
-                db_session.user.email, db_session.user.words_per_run,
+                db_session.user.email, words_per_run,
                 v, db_voc_session.section_id,
                 must_include=attempted_ids,
                 exclude_session=session_id,

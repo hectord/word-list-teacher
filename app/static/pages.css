@@ -285,7 +285,20 @@ a.signout:hover { text-decoration: underline; }
   align-items: center;
 }
 .setting-option.words-per-run .setting-description { grid-column: auto; }
-.setting-option.words-per-run input {
+.setting-option.words-per-run .wpr-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.setting-option.words-per-run .wpr-unlimited {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #3B2F2A;
+  cursor: pointer;
+}
+.setting-option.words-per-run input[type="number"] {
   width: 90px;
   padding: 8px 10px;
   border: 1px solid #D8C8B8;

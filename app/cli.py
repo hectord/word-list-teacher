@@ -321,7 +321,7 @@ if __name__ == '__main__':
                                        choices=('full', 'ai'),
                                        help='word selection strategy')
     update_user_subparser.add_argument('--words-per-run', type=int,
-                                       help='words per run for the AI strategy')
+                                       help='words per run for the AI strategy (0 = unlimited)')
     update_user_subparser.add_argument('--password', action='store_true',
                                        help='prompt for a new password')
 
