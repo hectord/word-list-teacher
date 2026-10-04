@@ -8,7 +8,13 @@ from typing import List, Dict, Tuple, Set, Generator, Optional
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-import random
+
+from optimizer import (
+    Attempt as StrategyAttempt,
+    FullStrategy,
+    Strategy,
+    Word as StrategyWord,
+)
 
 
 class InvalidFileException(Exception):
@@ -518,31 +524,47 @@ class VocabularyStats:
 
 
 class Session:
-    SKIP_LAST_WORDS_COUNT = 4
+    # the run mechanics (which word to ask next) come from the strategy
+    # in optimizer/ (the full strategy keeps the historical behaviour:
+    # cooldown of 4, uniform random among the remaining words)
 
     def __init__(self,
                  attempts: List[WordAttempt],
                  vocabulary: Vocabulary,
-                 current_word: Word = None):
+                 current_word: Word = None,
+                 strategy: "Strategy" = None):
         self._attempts = attempts
         self._vocabulary = vocabulary
+        self.strategy = strategy or FullStrategy()
 
-        self._error_count_by_word = defaultdict(int)
+        # map the application words to the strategy words (real word ids
+        # when available, a stable per-position id otherwise)
+        self._word_to_id = {}
+        self._id_to_word = {}
+        for index, word in enumerate(vocabulary.words):
+            word_id = vocabulary.word_id(word)
+            if word_id is None:
+                word_id = '#%d' % index
+            self._word_to_id[word] = word_id
+            self._id_to_word[word_id] = word
 
-        self._nok_words = vocabulary.words
-        for attempt in attempts:
-            word = attempt.word
-
-            if attempt.success:
-                if word in self._nok_words:
-                    self._nok_words.remove(word)
-            else:
-                self._error_count_by_word[word] += 1
+        self._run = self.strategy.create_run(
+            [StrategyWord(id=self._word_to_id[w],
+                          text=w.word_output,
+                          level=w.level or 'B1')
+             for w in self._word_to_id],
+            [StrategyAttempt(word_id=self._word_to_id[a.word],
+                             success=a.success,
+                             tested_at=a.time)
+             for a in attempts],
+        )
 
         self._current_word = current_word
         if self._current_word is None:
             self._pick_next_word()
-        assert self._current_word is None or self._current_word in self._nok_words
+        assert self._current_word is None or \
+            self._word_to_id[self._current_word] in \
+            self._run.remaining_word_ids
         self._id = None
 
     @property
@@ -565,30 +587,15 @@ class Session:
         self._id = id
 
     def _pick_next_word(self):
-
-        if self._nok_words:
-            possible_words = list(self._nok_words)
-
-            for attempt in self._attempts[:-self.SKIP_LAST_WORDS_COUNT:-1]:
-
-                if len(possible_words) == 1:
-                    break
-
-                if attempt.word in possible_words:
-                    possible_words.remove(attempt.word)
-
-            self._current_word = random.choice(possible_words)
-        else:
-            self._current_word = None
+        selected = self._run.next_word()
+        self._current_word = None if selected is None \
+            else self._id_to_word[selected.id]
 
     @property
     def vocabulary_left(self) -> Vocabulary:
-        word_count_list = list(self._error_count_by_word.items())
-        word_count_list.sort(key=lambda x: -x[1])
-        words = set()
-
-        for word, _ in word_count_list:
-            words.add(word)
+        errors = self._run.error_counts()
+        ranked = sorted(errors.items(), key=lambda item: -item[1])
+        words = [self._id_to_word[word_id] for word_id, _ in ranked]
 
         return Vocabulary(None, words,
                           self.vocabulary.input_language,
@@ -596,14 +603,11 @@ class Session:
 
     @property
     def new_words_learned(self) -> int:
-        return len(self._vocabulary) - len(self._error_count_by_word)
+        return len(self._vocabulary) - len(self._run.error_counts())
 
     @property
     def accuracy(self) -> float:
-        word_in_error = len(self._error_count_by_word)
-
-        untested_words = set(self._nok_words) - set(self._error_count_by_word)
-        return 100.0 - word_in_error / (len(self._vocabulary) - len(untested_words)) * 100.0
+        return self._run.accuracy()
 
     @property
     def current_word(self) -> Optional[Word]:
@@ -613,10 +617,11 @@ class Session:
 
         current_word = self.current_word
         if word != self._current_word:
-            if word in self._nok_words:
-                current_word = word
-            else:
+            word_id = self._word_to_id.get(word)
+            if word_id is None or \
+                    word_id not in self._run.remaining_word_ids:
                 return None
+            current_word = word
 
         # find a word which matches (the answer is written in the
         # vocabulary's output language, so use its comparison rules)
@@ -637,13 +642,8 @@ class Session:
                                   current_word))
         self._attempts.append(attempt)
 
-        if success:
-            self._nok_words.remove(current_word)
-            self._current_word = None
-            self._pick_next_word()
-        else:
-            self._error_count_by_word[current_word] += 1
-            self._pick_next_word()
+        self._run.answer(self._word_to_id[current_word], success)
+        self._pick_next_word()
 
         return attempt
 

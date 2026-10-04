@@ -18,7 +18,7 @@ class FullRun:
     - every word of the run is asked until it succeeds once;
     - the next word is chosen at random among the remaining words,
       temporarily skipping the most recently attempted words
-      (``cooldown``, default 4, like ``Session.SKIP_LAST_WORDS_COUNT``);
+      (``cooldown``, default 4, the behaviour of the historical session);
     - failures are counted per word.
 
     Like ``VocabularyRun``, it is fully reconstructible from the words of
