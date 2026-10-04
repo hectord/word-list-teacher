@@ -548,10 +548,16 @@ class Session:
                  attempts: List[WordAttempt],
                  vocabulary: Vocabulary,
                  current_word: Word = None,
-                 strategy: "Strategy" = None):
+                 strategy: "Strategy" = None,
+                 strategy_name: str = None):
         self._attempts = attempts
         self._vocabulary = vocabulary
         self.strategy = strategy or FullStrategy()
+        if strategy_name is None:
+            strategy_name = ('ai' if isinstance(self.strategy, AiStrategy)
+                             else 'full')
+        # which algorithm drives this run ('full' or 'ai')
+        self.strategy_name = strategy_name
 
         # map the application words to the strategy words (real word ids
         # when available, a stable per-position id otherwise)

@@ -373,6 +373,38 @@ class TestStore(unittest.TestCase):
         reloaded = self.db.load_session(ai_session.id)
         self.assertIsInstance(reloaded.strategy, AiStrategy)
 
+    def test_session_logs_strategy(self):
+        # every session records the algorithm which drives its run
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        # default: 'full' is recorded on the session row and the object
+        session = self.db.create_new_session(self.user, voc)
+        self.assertEqual('full', session.strategy_name)
+        self.assertEqual(
+            'full', DbVocabularySession.get(
+                DbVocabularySession.session == session.id).strategy)
+
+        # 'ai' is recorded too, and kept when the session is reloaded
+        self.db.set_user_strategy(self.user, 'ai')
+        ai_user = self.db.get_user('test@hotmail.com', 'abc')
+        ai_session = self.db.create_new_session(ai_user, voc)
+        self.assertEqual('ai', ai_session.strategy_name)
+        self.assertEqual(
+            'ai', DbVocabularySession.get(
+                DbVocabularySession.session == ai_session.id).strategy)
+        self.assertEqual('ai', self.db.load_session(ai_session.id)
+                         .strategy_name)
+
+        # sessions predating the column are read back as 'full'
+        (DbVocabularySession
+         .update(strategy=None)
+         .where(DbVocabularySession.session == session.id)
+         .execute())
+        self.assertEqual('full', self.db.load_session(session.id)
+                         .strategy_name)
+
     def test_user_level(self):
         self._create_user()
         self.assertIsNone(self.user.level)

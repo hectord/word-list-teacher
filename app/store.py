@@ -114,6 +114,7 @@ class DbVocabularySession(Model):
     output_language = ForeignKeyField(DbLanguage)
     section = ForeignKeyField(DbSection, null=True)
     level = CharField(null=True)
+    strategy = CharField(null=True)
 
     class Meta:
         database = db
@@ -980,8 +981,11 @@ class Database:
             scope_voc = section_voc
 
         db_user = self._get_db_user(user)
+        # the session records the algorithm which drives its run
+        strategy_name = user.strategy or 'full'
         new_session = Session([], scope_voc,
-                              strategy=make_strategy(user.strategy))
+                              strategy=make_strategy(strategy_name),
+                              strategy_name=strategy_name)
 
         new_db_session = DbSession.create(user=db_user.id,
                                           creation=datetime.now(),
@@ -992,7 +996,8 @@ class Database:
                                    input_language=voc.input_language,
                                    output_language=voc.output_language,
                                    section=section_id,
-                                   level=level)
+                                   level=level,
+                                   strategy=strategy_name)
 
         db_session = DbSession.get(new_db_session.id)
         current_db_word = None
@@ -1129,7 +1134,10 @@ class Database:
             if section_voc is not None:
                 v = section_voc
 
-        strategy = make_strategy(db_session.user.strategy)
+        # the algorithm used for this run is the one stored on the
+        # session (existing sessions predating the column are 'full')
+        strategy_name = db_voc_session.strategy or 'full'
+        strategy = make_strategy(strategy_name)
 
         attempts = []
 
@@ -1154,7 +1162,7 @@ class Database:
             current_word = v.word(db_session.current_word_id)
 
         ret = Session(attempts, v, current_word=current_word,
-                      strategy=strategy)
+                      strategy=strategy, strategy_name=strategy_name)
         ret.set_id(session_id)
         return ret
 
@@ -1419,6 +1427,8 @@ def load_database(name: str) -> Database:
         migrated |= _add_column_if_missing('dbuser', 'strategy',
                                            'varchar(255)')
         migrated |= _add_column_if_missing('dbvocabularysession', 'level',
+                                           'varchar(255)')
+        migrated |= _add_column_if_missing('dbvocabularysession', 'strategy',
                                            'varchar(255)')
         _remap_old_levels()
 
