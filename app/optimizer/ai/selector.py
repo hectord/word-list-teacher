@@ -8,6 +8,9 @@ from typing import Iterable, Sequence
 
 from optimizer.models import HistoricalAttempt, Word
 
+# reference for words never attempted (sorted before everything)
+_MIN_TIME = datetime.min.replace(tzinfo=timezone.utc)
+
 
 class VocabularySelector:
     """
@@ -32,6 +35,8 @@ class VocabularySelector:
         unseen_understanding: float = 0.0,
         level_weights: dict[str, float] | None = None,
         audit_floor: float = 0.05,
+        mastery_streak: int = 3,
+        validation_fraction: float = 0.10,
         seed: int | None = None,
     ):
         if recency_half_life_days <= 0:
@@ -44,6 +49,10 @@ class VocabularySelector:
             raise ValueError("unseen_understanding must be between 0 and 1")
         if not 0.0 <= audit_floor <= 1.0:
             raise ValueError("audit_floor must be between 0 and 1")
+        if mastery_streak < 1:
+            raise ValueError("mastery_streak must be >= 1")
+        if not 0.0 <= validation_fraction <= 1.0:
+            raise ValueError("validation_fraction must be between 0 and 1")
 
         self.history = list(history)
         self.recency_half_life_days = recency_half_life_days
@@ -51,6 +60,13 @@ class VocabularySelector:
         self.confidence_rate = confidence_rate
         self.unseen_understanding = unseen_understanding
         self.audit_floor = audit_floor
+
+        # a word answered correctly on the first try in that many
+        # consecutive runs is considered known for sure: it is left out
+        # of the practice runs and only re-asked periodically (a share of
+        # the vocabulary per run, the least recently checked ones)
+        self.mastery_streak = mastery_streak
+        self.validation_fraction = validation_fraction
 
         self.level_weights = level_weights or {
             "B1": 1.20,
@@ -129,6 +145,76 @@ class VocabularySelector:
             key=lambda attempts: self._normalized_time(attempts[0].tested_at),
         )
         return [attempts[0].success for attempts in ordered if attempts]
+
+    # ------------------------------------------------------ sure knowledge
+    def consecutive_successes(self, word_id: int | str) -> int:
+        """Number of most recent consecutive runs where the word was
+        answered right on the first attempt (any failure breaks it)."""
+        count = 0
+        for success in reversed(self.first_try_history(word_id)):
+            if not success:
+                break
+            count += 1
+        return count
+
+    def known_for_sure(self, word_id: int | str) -> bool:
+        """True when the word has been answered correctly on the first
+        try in ``mastery_streak`` consecutive runs: it is considered
+        known and can be left out of the practice runs."""
+        return self.consecutive_successes(word_id) >= self.mastery_streak
+
+    def last_attempt_time(self, word_id: int | str) -> datetime | None:
+        attempts = self.attempts_for_word(word_id)
+        if not attempts:
+            return None
+        return self._normalized_time(attempts[-1].tested_at)
+
+    def compose_run(
+        self,
+        words: Sequence[Word],
+        n: int | None = None,
+        *,
+        now: datetime | None = None,
+    ) -> list[Word]:
+        """The words of a run: everything that needs practice (weakest
+        first) plus a periodic sample of the words known for sure.
+
+        ``n`` caps the number of practice words (``None`` = unlimited,
+        all practice words). The validation sample scales with the size
+        of the vocabulary: the ``validation_fraction`` (share) of the
+        words, taken among the known-for-sure words least recently
+        checked, so they keep rotating in and out of the runs.
+        """
+        if now is None:
+            now = datetime.now(timezone.utc)
+        now = self._normalized_time(now)
+
+        practice = [
+            word for word in words if not self.known_for_sure(word.id)
+        ]
+        known = [
+            word for word in words if self.known_for_sure(word.id)
+        ]
+
+        # hardest (weakest) practice words first, capped by n
+        practice.sort(
+            key=lambda word: -self.selection_priority(word, now=now)
+        )
+        if n is not None:
+            practice = practice[:n]
+
+        # re-ask a share of the known words, least recently checked first
+        sample_size = min(
+            len(known),
+            max(1, round(len(words) * self.validation_fraction)),
+        )
+        timed = [
+            (self.last_attempt_time(word.id) or _MIN_TIME, word)
+            for word in known
+        ]
+        timed.sort(key=lambda item: item[0])
+
+        return list(practice) + [word for _, word in timed[:sample_size]]
 
     def understanding(
         self,

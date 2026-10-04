@@ -455,6 +455,65 @@ class TestStore(unittest.TestCase):
         self.assertEqual(
             40, len(self.db.load_session(unlimited.id).vocabulary))
 
+    def test_ai_skips_known_words(self):
+        # words answered correctly on the first try in 3 consecutive runs
+        # are known for sure: they leave the practice runs, and only a
+        # share of them (validation) is re-asked per run, rotating to the
+        # least recently checked ones
+        words = [Word('fr_%d' % i, 'de_%d' % i) for i in range(20)]
+        known = {'fr_%d' % i for i in range(10)}          # mastered words
+        practise = {'fr_%d' % i for i in range(10, 20)}  # weak words
+        voc = Vocabulary(None, words, 'fr', 'de')
+        voc_id = self.db.create_vocabulary(voc)
+        self._create_user()
+
+        self.db.set_user_strategy(self.user, 'ai')
+        self.db.set_user_words_per_run(self.user, 0)   # unlimited
+        user = self.db.get_user('test@hotmail.com', 'abc')
+        projection = self.db.get_vocabulary(user, voc_id,
+                                            Language.GERMAN)
+
+        def practice_run():
+            session = self.db.create_new_session(user, projection)
+            attempted = set()
+            while not session.is_finished:
+                word = session.current_word
+                first = word not in attempted
+                attempted.add(word)
+                if word.word_output in known or not first:
+                    result = session.guess(word, word.word_output)
+                else:
+                    result = session.guess(word, 'zz-wrong')  # fail once
+                self.db.add_word_attempt(session, result)
+
+        # 3 runs: mastered words succeed first-try every time, the
+        # others fail once in each run
+        for _ in range(3):
+            practice_run()
+
+        # next run: the 10 practice words + 10% of the vocabulary = 2
+        # validation words; the 8 other known words are skipped
+        next_run = self.db.create_new_session(user, projection)
+        outs = {w.word_output for w in next_run.vocabulary.words}
+        self.assertEqual(12, len(outs))
+        self.assertTrue(practise <= outs)
+        self.assertEqual(2, len(outs & known))
+
+        # reload reproduces the exact same word set
+        reloaded = self.db.load_session(next_run.id)
+        self.assertEqual(12, len(reloaded.vocabulary))
+        self.assertEqual({w.word_output
+                          for w in reloaded.vocabulary.words}, outs)
+
+        # practising that run makes its 2 validation words recent, so the
+        # next run re-checks 2 different known words (rotation)
+        practice_run()
+        later = self.db.create_new_session(user, projection)
+        later_known = \
+            {w.word_output for w in later.vocabulary.words} & known
+        self.assertEqual(2, len(later_known))
+        self.assertFalse(later_known & (outs & known))
+
     def test_user_level(self):
         self._create_user()
         self.assertIsNone(self.user.level)

@@ -43,6 +43,18 @@ class AiStrategy(Strategy):
     ) -> VocabularyRun:
         return VocabularyRun(words, attempts, **kwargs)
 
+    def compose_run(
+        self,
+        words: Sequence[Word],
+        n: int | None = None,
+        *,
+        now: datetime | None = None,
+    ) -> list[Word]:
+        """The words the AI strategy puts in a run: everything that needs
+        practice (weakest first, capped by ``n``) plus a small periodic
+        sample of the words known for sure (validation)."""
+        return self._selector.compose_run(words, n=n, now=now)
+
     def understanding(
         self,
         word_id: int | str,

@@ -1025,19 +1025,22 @@ class Database:
                   scope_voc: Vocabulary, section_id: Optional[int],
                   must_include: Sequence = (),
                   exclude_session: int = None,
-                  history_user: User = None) -> Vocabulary:
+                  history_user: User = None,
+                  now: datetime = None) -> Vocabulary:
         """The words the AI strategy puts in a run.
 
         The selection is seeded (stable across processes) and based only
-        on the history before the run started, so a resumed run is
-        recomputed identically without persisting the word list. Words
-        already practised in the run (``must_include``) always stay in.
+        on the history before the run started (and a fixed ``now``), so a
+        resumed run is recomputed identically without persisting the word
+        list. Words already practised in the run (``must_include``) always
+        stay in. Words known for sure are left out and only re-asked
+        periodically (validation).
         """
-        # 0 (or None) = unlimited: the whole vocabulary is in the run
+        # 0 (or None) = unlimited: every word that needs practice
         if words_per_run:
             n = min(words_per_run, len(scope_voc))
         else:
-            n = len(scope_voc)
+            n = None
 
         user = history_user or User(email=email, password='',
                                     main_language=None)
@@ -1058,8 +1061,7 @@ class Database:
         selected_ids = []
         if optimizer_words:
             selector = VocabularySelector(history, seed=seed)
-            picked = selector.select_words(optimizer_words, n=n,
-                                           weighted_random=True)
+            picked = selector.compose_run(optimizer_words, n=n, now=now)
             selected_ids = [word.id for word in picked]
 
         ids = selected_ids + [word_id for word_id in must_include
@@ -1086,16 +1088,22 @@ class Database:
         # the session records the algorithm which drives its run
         strategy_name = user.strategy or 'full'
 
+        # the AI word selection uses a fixed timestamp (also stored as
+        # the session creation time), so a resumed run recomputes the
+        # exact same word set
+        created_at = datetime.now()
+
         if strategy_name == 'ai':
             scope_voc = self._ai_words(
-                user.email, user.words_per_run, scope_voc, section_id)
+                user.email, user.words_per_run, scope_voc, section_id,
+                now=created_at)
 
         new_session = Session([], scope_voc,
                               strategy=make_strategy(strategy_name),
                               strategy_name=strategy_name)
 
         new_db_session = DbSession.create(user=db_user.id,
-                                          creation=datetime.now(),
+                                          creation=created_at,
                                           finished=len(scope_voc) == 0)
         new_session.set_id(new_db_session.id)
         DbVocabularySession.create(session=new_db_session,
@@ -1264,7 +1272,8 @@ class Database:
                 must_include=attempted_ids,
                 exclude_session=session_id,
                 history_user=User(email=db_session.user.email, password='',
-                                  main_language=None))
+                                  main_language=None),
+                now=db_session.creation)
 
         attempts = []
 
