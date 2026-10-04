@@ -67,6 +67,12 @@
 
     <div class="words">
 
+      {% if summary %}
+        <!-- server-rendered: the run was already finished on load; the
+             summary sits at the top, above the answered words -->
+        <script type="application/json" id="session-summary-data">{{ summary | tojson }}</script>
+      {% endif %}
+
       {% if first_word %}
         <div id="current-word" class="word current">
           <div class="word-box input">
@@ -98,11 +104,6 @@
           </div>
         {% endif %}
       {% endfor %}
-
-      {% if summary %}
-        <!-- server-rendered: the run was already finished on load -->
-        <script type="application/json" id="session-summary-data">{{ summary | tojson }}</script>
-      {% endif %}
     </div>
 
   </div>

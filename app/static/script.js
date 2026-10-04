@@ -136,11 +136,12 @@ $(document).ready(function() {
           current_output.val("");
         } else {
           $("#current-word").hide();
-          // the run is over: show the strategy-based statistics
+          // the run is over: show the strategy-based statistics as a
+          // block at the top of the page
           var node = summaryElement(result.summary);
           if (node) {
-            $(".words").append(node);
-            node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            $(".words").prepend(node);
+            node.scrollIntoView({ behavior: "smooth", block: "start" });
           }
         }
 
