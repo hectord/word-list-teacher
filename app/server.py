@@ -147,7 +147,9 @@ async def save_settings(request: Request,
                             detail="unknown strategy")
 
     db.set_user_strategy(user, strategy)
-    return RedirectResponse(url='/settings')
+    # 303 (instead of the 307 default): the browser must re-send the
+    # form as a GET, otherwise it would re-POST here and loop forever
+    return RedirectResponse(url='/index', status_code=303)
 
 
 @app.get("/vocabulary")
