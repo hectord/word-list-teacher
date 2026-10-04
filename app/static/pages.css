@@ -267,30 +267,29 @@ a.signout:hover { text-decoration: underline; }
   padding: 12px 16px;
   border: 1px solid #EDE3DB;
   border-radius: 12px;
-  cursor: pointer;
+}
+.setting-option.with-controls {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
 }
 .setting-option:hover { border-color: #D8C8B8; }
-.setting-option input { margin-top: 2px; }
+.setting-option input[type="radio"] { margin-top: 2px; cursor: pointer; }
+.setting-option .setting-text { cursor: pointer; }
 
 .setting-name { font-size: 16px; color: #3B2F2A; font-weight: 600; }
 .setting-note { font-weight: 400; color: #A08B7F; font-size: 13px; }
 .setting-description {
-  grid-column: 2;
+  display: block;
   font-size: 13px;
   color: #6B5D55;
 }
 
-.setting-option.words-per-run {
-  grid-template-columns: 1fr auto;
-  align-items: center;
-}
-.setting-option.words-per-run .setting-description { grid-column: auto; }
-.setting-option.words-per-run .wpr-controls {
+.setting-option .wpr-controls {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.setting-option.words-per-run .wpr-unlimited {
+.setting-option .wpr-unlimited {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -298,7 +297,7 @@ a.signout:hover { text-decoration: underline; }
   color: #3B2F2A;
   cursor: pointer;
 }
-.setting-option.words-per-run input[type="number"] {
+.setting-option input[type="number"] {
   width: 90px;
   padding: 8px 10px;
   border: 1px solid #D8C8B8;

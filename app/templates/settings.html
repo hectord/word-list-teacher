@@ -3,7 +3,7 @@
 {% block title %}Settings{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=13">
+    <link rel="stylesheet" href="/static/pages.css?v=14">
 {% endblock %}
 
 {% block body %}
@@ -26,47 +26,42 @@
 
         <div class="setting-options">
           {% for option in strategies %}
-            <label class="setting-option">
+            <div class="setting-option{% if option == 'ai' %} with-controls{% endif %}">
               <input type="radio" name="strategy" value="{{ option }}"
+                     id="strategy-{{ option }}"
                      {% if user.strategy == option %}checked{% endif %}>
-              <span class="setting-name">
-                {{ 'full' if option == 'full' else 'ai' }}
-                {% if option == 'full' %}<span class="setting-note">(default)</span>{% endif %}
-              </span>
-              {% if option == 'full' %}
-                <span class="setting-description">
-                  The historical behaviour: words are picked at random among
-                  the remaining words, skipping the most recently tried ones.
+              <label class="setting-text" for="strategy-{{ option }}">
+                <span class="setting-name">
+                  {{ 'full' if option == 'full' else 'ai' }}
+                  {% if option == 'full' %}<span class="setting-note">(default)</span>{% endif %}
                 </span>
-              {% else %}
-                <span class="setting-description">
-                  The AI strategy: words are ranked by a recency-weighted
-                  understanding model and picked with weighted randomness.
+                {% if option == 'full' %}
+                  <span class="setting-description">
+                    The historical behaviour: words are picked at random among
+                    the remaining words, skipping the most recently tried ones.
+                  </span>
+                {% else %}
+                  <span class="setting-description">
+                    The AI strategy: words are ranked by a recency-weighted
+                    understanding model and picked with weighted randomness.
+                  </span>
+                {% endif %}
+              </label>
+
+              {% if option == 'ai' %}
+                <span class="wpr-controls">
+                  <label class="wpr-unlimited">
+                    <input type="checkbox" id="wpr-unlimited" name="unlimited"
+                           {% if user.words_per_run == 0 %}checked{% endif %}>
+                    Unlimited
+                  </label>
+                  <input type="number" name="words_per_run" min="1"
+                         value="{{ user.words_per_run or 30 }}"
+                         {% if user.words_per_run == 0 %}disabled{% endif %}>
                 </span>
               {% endif %}
-            </label>
+            </div>
           {% endfor %}
-        </div>
-
-        <div class="setting-option words-per-run">
-          <span>
-            <span class="setting-name">Words per run</span>
-            <span class="setting-description">
-              Number of words the AI strategy puts in each run
-              (Unlimited = the whole vocabulary; the full strategy always
-              uses the whole vocabulary).
-            </span>
-          </span>
-          <span class="wpr-controls">
-            <label class="wpr-unlimited">
-              <input type="checkbox" id="wpr-unlimited" name="unlimited"
-                     {% if user.words_per_run == 0 %}checked{% endif %}>
-              Unlimited
-            </label>
-            <input type="number" name="words_per_run" min="1"
-                   value="{{ user.words_per_run or 30 }}"
-                   {% if user.words_per_run == 0 %}disabled{% endif %}>
-          </span>
         </div>
 
         <div class="voc-actions">
