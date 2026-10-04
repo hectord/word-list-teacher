@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import os
+
+# bcrypt hashing is intentionally slow at 12 rounds; the tests only need
+# the store logic, so use a cheap factor (the test hashes are still real
+# bcrypt hashes, they just cost milliseconds instead of seconds).
+os.environ.setdefault('WLT_BCRYPT_ROUNDS', '4')
+
 import sqlite3
 import tempfile
 import unittest

@@ -2,6 +2,14 @@
 #source: https://stackoverflow.com/questions/9594125/salt-and-hash-a-password-in-python
 
 import bcrypt
+import os
+
+
+# bcrypt is intentionally slow: the default 12 rounds take ~0.4s per
+# operation. Tests set WLT_BCRYPT_ROUNDS to a lower value (e.g. 4) to
+# keep the suite fast; the round count is embedded in the hash itself, so
+# verification always works regardless of the current value.
+_BCRYPT_ROUNDS = int(os.environ.get('WLT_BCRYPT_ROUNDS', '12'))
 
 
 def _as_bytes(value):
@@ -17,9 +25,10 @@ def get_hashed_password(plain_text_password):
     # always store the hash as str.
     try:
         hashed = bcrypt.hashpw(_as_bytes(plain_text_password),
-                               bcrypt.gensalt())
+                               bcrypt.gensalt(rounds=_BCRYPT_ROUNDS))
     except (TypeError, UnicodeError):
-        hashed = bcrypt.hashpw(plain_text_password, bcrypt.gensalt())
+        hashed = bcrypt.hashpw(plain_text_password,
+                               bcrypt.gensalt(rounds=_BCRYPT_ROUNDS))
 
     return hashed.decode('utf-8') if isinstance(hashed, bytes) else hashed
 
