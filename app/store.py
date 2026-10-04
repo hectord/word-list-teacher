@@ -12,6 +12,8 @@ from peewee import *
 # note: import typing after peewee (peewee shadows its own ``Tuple`` helper)
 from typing import Dict, List, Optional, Tuple
 
+from optimizer import HistoricalAttempt
+
 from learn import Vocabulary, Word, Session, WordAttempt
 from learn import Language, User, VocabularyStats, included_levels
 from learn import make_strategy
@@ -595,6 +597,25 @@ class Database:
                  .where(DbWord.vocabulary == voc_id)
                  .order_by(DbWordAttempt.time.desc(),
                            DbWordAttempt.id.desc()))]
+
+    def historical_attempts(self, user: User,
+                            voc_id: int) -> List[HistoricalAttempt]:
+        """The attempts of one user on a vocabulary, tagged with their
+        run id (for the AI understanding model)."""
+        db_user = self._get_db_user(user)
+
+        return [HistoricalAttempt(word_id=attempt.word_id,
+                                  run_id=attempt.session_id,
+                                  success=attempt.success,
+                                  tested_at=attempt.time)
+                for attempt in
+                (DbWordAttempt
+                 .select()
+                 .join(DbWord)
+                 .switch(DbWordAttempt)
+                 .join(DbSession)
+                 .where(DbSession.user == db_user)
+                 .where(DbWord.vocabulary == voc_id))]
 
     def list_word_texts(self, voc_id: int) -> Dict[int, Dict[str, dict]]:
         texts = defaultdict(dict)

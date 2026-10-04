@@ -13,6 +13,8 @@ from fastapi.templating import Jinja2Templates
 from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
+from optimizer import VocabularySelector
+
 from learn import Vocabulary, Session, Word, Language, User
 from learn import LEVELS, STRATEGIES, included_levels
 from store import load_database, DbException
@@ -59,6 +61,9 @@ class WordResult(BaseModel):
 
     # if None => no more word
     next_word: Optional[WordInput]
+
+    # end-of-run statistics, present when the session just finished
+    summary: Optional[dict] = None
 
 
 def get_user(creds: HTTPBasicCredentials = Depends(security)) -> User:
@@ -370,10 +375,29 @@ async def new_session(request: Request,
     return RedirectResponse(url=f'/learn?session_id={session.id}')
 
 
+def _session_summary(session: Session, user: User) -> Optional[dict]:
+    """End-of-run statistics (numbers only). For the AI strategy the
+    understanding model statistics are added."""
+    if not session.is_finished:
+        return None
+
+    understand = None
+    if session.strategy_name == 'ai':
+        history = db.historical_attempts(user, session.vocabulary.id)
+        selector = VocabularySelector(history)
+        understand = {
+            word.id: selector.understanding(word.id)
+            for word in session.run.words
+        }
+
+    return session.summary(understand)
+
+
 @app.get("/learn")
 async def learn(request: Request,
                 response: Response,
-                session_id: int):
+                session_id: int,
+                user: User = Depends(get_user)):
     session = db.load_session(session_id)
 
     first_word = None
@@ -388,6 +412,7 @@ async def learn(request: Request,
         {
             'session': session,
             'first_word': first_word,
+            'summary': _session_summary(session, user),
         },
         headers={'Cache-Control': 'no-store'}
     )
@@ -396,7 +421,8 @@ async def learn(request: Request,
 
 
 @app.post("/word")
-async def post_word(word_output: WordOutput):
+async def post_word(word_output: WordOutput,
+                    user: User = Depends(get_user)):
     session = db.load_session(word_output.session_id)
     vocabulary = session.vocabulary
 
@@ -425,4 +451,5 @@ async def post_word(word_output: WordOutput):
                       word_input=WordInput(word=current_word.word_input,
                                            word_id=word_output.word_id),
                       word_output=word_output,
-                      next_word=next_word_input)
+                      next_word=next_word_input,
+                      summary=_session_summary(session, user))

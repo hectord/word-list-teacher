@@ -64,6 +64,32 @@ class LearnTest(unittest.TestCase):
         self.assertEqual(50.0, session.accuracy)
         self.assertTrue(session.is_finished)
 
+    def test_summary_statistics(self):
+        session = Session([], self.voc, self.word1)
+
+        session.guess(self.word1, 'blabla')              # wrong
+        session.guess(self.word2, self.word2.word_output)  # right
+        session.guess(self.word1, self.word1.word_output)  # right -> done
+
+        summary = session.summary()
+        self.assertEqual({
+            'strategy': 'full',
+            'words': 2,
+            'attempts': 3,
+            'successes': 2,
+            'failures': 1,
+            'accuracy': 50.0,
+            'new_words': 1,
+            'words_to_review': 1,
+        }, summary)
+
+        # the AI strategy adds model statistics (numbers only)
+        summary_ai = session.summary({1: 0.8, 2: 0.2})
+        self.assertEqual(50.0, summary_ai['avg_understanding'])
+        self.assertEqual(20.0, summary_ai['min_understanding'])
+        self.assertEqual(1, summary_ai['weak_words'])
+        self.assertEqual(1, summary_ai['mastered_words'])
+
     def test_flip_vocabulary(self):
         new_voc = self.voc.flip()
 

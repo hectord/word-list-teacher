@@ -656,6 +656,48 @@ class Session:
         return 100.0 - word_in_error / tested * 100.0
 
     @property
+    def run(self):
+        """The strategy run behind this session (stats, per-word info)."""
+        return self._run
+
+    def summary(self, understand: Dict = None) -> Dict:
+        """Numeric summary of the run (statistics only, no word lists).
+
+        ``understand`` is an optional {strategy word id: understanding}
+        map (the AI strategy): the summary then also reports the model
+        statistics.
+        """
+        status = self._run.status()
+
+        failures = self._failure_counts()
+
+        ret = {
+            'strategy': self.strategy_name,
+            'words': status.total_words,
+            'attempts': status.attempts,
+            'successes': status.successes,
+            'failures': status.failures,
+            'accuracy': round(self.accuracy, 1),
+            'new_words': sum(1 for count in failures.values()
+                             if count == 0),
+            'words_to_review': sum(1 for count in failures.values()
+                                   if count > 0),
+        }
+
+        if understand:
+            scores = list(understand.values())
+            if scores:
+                ret['avg_understanding'] = \
+                    round(100.0 * sum(scores) / len(scores), 1)
+                ret['min_understanding'] = round(100.0 * min(scores), 1)
+                ret['weak_words'] = sum(1 for score in scores
+                                        if score < 0.5)
+                ret['mastered_words'] = sum(1 for score in scores
+                                            if score >= 0.7)
+
+        return ret
+
+    @property
     def current_word(self) -> Optional[Word]:
         return self._current_word
 

@@ -55,9 +55,9 @@
 {% block title %}Learn{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/learn.css?v=16">
+    <link rel="stylesheet" href="/static/learn.css?v=17">
 
-    <script src="/static/script.js?v=9"></script>
+    <script src="/static/script.js?v=11"></script>
 
 {% endblock %}
 
@@ -98,6 +98,11 @@
           </div>
         {% endif %}
       {% endfor %}
+
+      {% if summary %}
+        <!-- server-rendered: the run was already finished on load -->
+        <script type="application/json" id="session-summary-data">{{ summary | tojson }}</script>
+      {% endif %}
     </div>
 
   </div>

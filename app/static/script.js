@@ -11,6 +11,53 @@ $(document).ready(function() {
 
   keep_focus();
 
+  // end-of-run statistics (numbers only)
+  function summaryElement(summary) {
+    if (!summary) { return null; }
+
+    var strategy = summary.strategy === "ai" ? "AI" : "Full";
+    var cells = [
+      [summary.words, "words"],
+      [summary.attempts, "attempts"],
+      [summary.successes, "right"],
+      [summary.failures, "wrong"],
+      [summary.accuracy, "accuracy %"],
+      [summary.new_words, "new words"],
+      [summary.words_to_review, "to review"],
+    ];
+    if (summary.avg_understanding !== undefined) {
+      cells.push([summary.avg_understanding, "avg understanding %"]);
+      cells.push([summary.min_understanding, "weakest word %"]);
+      cells.push([summary.weak_words, "weak words"]);
+      cells.push([summary.mastered_words, "mastered"]);
+    }
+
+    var div = document.createElement("div");
+    div.className = "session-summary";
+    var cellsHtml = "";
+    for (var i = 0; i < cells.length; i++) {
+      cellsHtml += "<div class=\"summary-cell\"><span class=\"summary-value\">" +
+                   cells[i][0] +
+                   "</span><span class=\"summary-label\">" +
+                   cells[i][1] +
+                   "</span></div>";
+    }
+    div.innerHTML =
+      "<div class=\"summary-title\">Session summary</div>" +
+      "<div class=\"summary-strategy\">strategy: <b>" +
+        strategy + "</b></div>" +
+      "<div class=\"summary-grid\">" + cellsHtml + "</div>";
+    return div;
+  }
+
+  // a finished session loaded directly still shows its summary
+  var embeddedSummary = document.getElementById("session-summary-data");
+  if (embeddedSummary) {
+    var summary = JSON.parse(embeddedSummary.textContent);
+    var node = summaryElement(summary);
+    if (node) { embeddedSummary.replaceWith(node); }
+  }
+
   // on touch devices, keep the keyboard/input focused while practicing
   if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     current_output.on("focusout", function() {
@@ -89,6 +136,12 @@ $(document).ready(function() {
           current_output.val("");
         } else {
           $("#current-word").hide();
+          // the run is over: show the strategy-based statistics
+          var node = summaryElement(result.summary);
+          if (node) {
+            $(".words").append(node);
+            node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
         }
 
         keep_focus();
