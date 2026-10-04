@@ -607,11 +607,22 @@ class Session:
         self._current_word = None if selected is None \
             else self._id_to_word[selected.id]
 
+    def _failure_counts(self) -> dict:
+        """Number of failures per run word (any strategy: both runs
+        expose ``stats(word_id).failures``)."""
+        return {
+            word.id: self._run.stats(word.id).failures
+            for word in self._run.words
+        }
+
     @property
     def vocabulary_left(self) -> Vocabulary:
-        errors = self._run.error_counts()
-        ranked = sorted(errors.items(), key=lambda item: -item[1])
-        words = [self._id_to_word[word_id] for word_id, _ in ranked]
+        failures = self._failure_counts()
+        ranked = sorted(
+            (word_id for word_id, count in failures.items() if count > 0),
+            key=lambda word_id: -failures[word_id],
+        )
+        words = [self._id_to_word[word_id] for word_id in ranked]
 
         return Vocabulary(None, words,
                           self.vocabulary.input_language,
@@ -619,11 +630,24 @@ class Session:
 
     @property
     def new_words_learned(self) -> int:
-        return len(self._vocabulary) - len(self._run.error_counts())
+        """Words without any failure in this run."""
+        failures = self._failure_counts()
+        return sum(1 for count in failures.values() if count == 0)
 
     @property
     def accuracy(self) -> float:
-        return self._run.accuracy()
+        """Share of the tested words without any error (0..100)."""
+        failures = self._failure_counts()
+        remaining = set(self._run.remaining_word_ids)
+
+        word_in_error = sum(1 for count in failures.values() if count > 0)
+        untested = sum(1 for word_id, count in failures.items()
+                       if count == 0 and word_id in remaining)
+
+        tested = len(failures) - untested
+        if not tested:
+            return 100.0
+        return 100.0 - word_in_error / tested * 100.0
 
     @property
     def current_word(self) -> Optional[Word]:

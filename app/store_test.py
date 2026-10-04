@@ -352,6 +352,11 @@ class TestStore(unittest.TestCase):
         refreshed = self.db.get_user('test@hotmail.com', 'abc')
         self.assertEqual('ai', refreshed.strategy)
 
+        # other profile updates must not silently reset the strategy
+        self.db.set_user_level(refreshed, 'C1')
+        after_level = self.db.get_user('test@hotmail.com', 'abc')
+        self.assertEqual('ai', after_level.strategy)
+
         ai_session = self.db.create_new_session(refreshed, voc)
         self.assertIsInstance(ai_session.strategy, AiStrategy)
 

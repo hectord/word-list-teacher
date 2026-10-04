@@ -42,6 +42,28 @@ class LearnTest(unittest.TestCase):
         self.assertEqual(50.0, words.accuracy)
         self.assertTrue(words.is_finished)
 
+    def test_ai_strategy_session_stats(self):
+        # the run stats (accuracy, words learned, words left) must work
+        # with the ai strategy too, not only the full strategy
+        from optimizer import AiStrategy
+
+        session = Session([], self.voc, strategy=AiStrategy())
+        first = session.current_word
+        other = self.word2 if first is self.word1 else self.word1
+
+        session.guess(first, 'blabla')          # wrong
+        self.assertEqual(0.0, session.accuracy)
+        # the failed word is recent: the next word must be the other one
+        self.assertEqual(other, session.current_word)
+        self.assertFalse(session.is_finished)
+
+        session.guess(other, other.word_output)  # right
+        self.assertEqual(50.0, session.accuracy)
+
+        session.guess(first, first.word_output)  # right -> last one
+        self.assertEqual(50.0, session.accuracy)
+        self.assertTrue(session.is_finished)
+
     def test_flip_vocabulary(self):
         new_voc = self.voc.flip()
 

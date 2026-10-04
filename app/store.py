@@ -267,7 +267,8 @@ class Database:
                 credentials, expires,
                 User(email=previous.email, password=previous.password,
                      main_language=previous.main_language, level=level,
-                     target_language=previous.target_language))
+                     target_language=previous.target_language,
+                     strategy=previous.strategy))
 
     def set_user_target_language(self, user, target_language):
         email = user if isinstance(user, str) else user.email
@@ -285,7 +286,8 @@ class Database:
                 User(email=previous.email, password=previous.password,
                      main_language=previous.main_language,
                      level=previous.level,
-                     target_language=Language.from_code(code)))
+                     target_language=Language.from_code(code),
+                     strategy=previous.strategy))
 
     def list_users(self) -> List[Tuple[int, str]]:
         """All users as (id, email) pairs."""
