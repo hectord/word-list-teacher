@@ -2,6 +2,7 @@
 
 import os
 from typing import Optional, List
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import (FastAPI, Form, Request, Response, Depends,
@@ -147,6 +148,7 @@ async def save_settings(request: Request,
                         strategy: str = Form(...),
                         unlimited: Optional[str] = Form(None),
                         words_per_run: Optional[int] = Form(None),
+                        hard_runs: Optional[int] = Form(None),
                         user: User = Depends(get_user)):
 
     if strategy not in STRATEGIES:
@@ -163,6 +165,12 @@ async def save_settings(request: Request,
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="words_per_run must be positive")
         db.set_user_words_per_run(user, words_per_run)
+
+    if hard_runs is not None:
+        if not 1 <= hard_runs <= 50:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="hard_runs must be between 1 and 50")
+        db.set_user_hard_runs(user, hard_runs)
 
     # 303 (instead of the 307 default): the browser must re-send the
     # form as a GET, otherwise it would re-POST here and loop forever
@@ -186,8 +194,9 @@ async def vocabulary(request: Request,
     stats = db.vocabulary_stats(voc, user)
 
     word_count = len(voc.words)
-    unknown_count = sum(
-        1 for word in voc.words if stats.errors_prob_for(word) > 40.0)
+    # a word is hard when it was answered wrongly at least once during
+    # the last N runs which included it (N = the user's setting)
+    unknown_count = sum(1 for word in voc.words if stats.hard_for(word))
 
     sections = []
     for section in voc.sections:
@@ -253,11 +262,16 @@ async def index(request: Request,
     vocabularies = db.list_vocabularies(user, target, levels=levels)
     session_by_vocabulary = {}
     has_finished_session = {}
-    known_by_vocabulary = {}
-    known_percentage_by_vocabulary = {}
-    known_counts = db.known_word_counts(user, levels)
+    included_by_vocabulary = {}
+    mastered_by_vocabulary = {}
+    seen_by_vocabulary = {}
+    never_by_vocabulary = {}
+    mastered_percentage_by_vocabulary = {}
+    seen_percentage_by_vocabulary = {}
+    progress = db.progress_word_counts(user, levels)
     total_words = 0
-    total_known = 0
+    total_included = 0
+    total_mastered = 0
     entries = []
 
     for voc_id, vocabulary in vocabularies.items():
@@ -269,15 +283,24 @@ async def index(request: Request,
         has_finished_session[vocabulary] = finished_session is not None
 
         size = len(vocabulary)
-        known = known_counts.get(voc_id, 0)
-        known_by_vocabulary[vocabulary] = known
-        known_percentage_by_vocabulary[vocabulary] = \
-            (100 * known // size) if size else 0
+        included, mastered = progress.get(voc_id, (0, 0))
+        seen = included - mastered
+        never = size - included
+
+        included_by_vocabulary[vocabulary] = included
+        mastered_by_vocabulary[vocabulary] = mastered
+        seen_by_vocabulary[vocabulary] = seen
+        never_by_vocabulary[vocabulary] = never
+        mastered_percentage_by_vocabulary[vocabulary] = \
+            (100 * mastered // size) if size else 0
+        seen_percentage_by_vocabulary[vocabulary] = \
+            (100 * seen // size) if size else 0
         total_words += size
-        total_known += known
+        total_included += included
+        total_mastered += mastered
         entries.append((voc_id, vocabulary))
 
-    # practised vocabularies first, the weakest (least known) on top;
+    # practised vocabularies first, the weakest (least mastered) on top;
     # vocabularies never practised come last
     def sort_key(entry):
         vocabulary = entry[1]
@@ -285,14 +308,19 @@ async def index(request: Request,
                      vocabulary in session_by_vocabulary)
         return (
             0 if practised else 1,
-            known_percentage_by_vocabulary.get(vocabulary, 0),
+            mastered_percentage_by_vocabulary.get(vocabulary, 0),
             entry[0],
         )
 
     entries.sort(key=sort_key)
 
-    known_percentage = \
-        (100 * total_known // total_words) if total_words else 0
+    total_seen = total_included - total_mastered
+    total_never = total_words - total_included
+    mastered_percentage = \
+        (100 * total_mastered // total_words) if total_words else 0
+    seen_percentage = (100 * total_seen // total_words) if total_words else 0
+    # exact: never = whatever the first two segments do not cover
+    never_percentage = 100 - mastered_percentage - seen_percentage
 
     return TEMPLATES.TemplateResponse(
         request, "index.html",
@@ -306,11 +334,20 @@ async def index(request: Request,
             'vocabularies': entries,
             'session_by_vocabulary': session_by_vocabulary,
             'has_finished_session': has_finished_session,
-            'known_by_vocabulary': known_by_vocabulary,
-            'known_percentage_by_vocabulary': known_percentage_by_vocabulary,
+            'included_by_vocabulary': included_by_vocabulary,
+            'mastered_by_vocabulary': mastered_by_vocabulary,
+            'seen_by_vocabulary': seen_by_vocabulary,
+            'never_by_vocabulary': never_by_vocabulary,
+            'mastered_percentage_by_vocabulary': mastered_percentage_by_vocabulary,
+            'seen_percentage_by_vocabulary': seen_percentage_by_vocabulary,
             'total_words': total_words,
-            'total_known': total_known,
-            'known_percentage': known_percentage,
+            'total_included': total_included,
+            'total_mastered': total_mastered,
+            'total_seen': total_seen,
+            'total_never': total_never,
+            'mastered_percentage': mastered_percentage,
+            'seen_percentage': seen_percentage,
+            'never_percentage': never_percentage,
         },
         headers={'Cache-Control': 'no-store'}
     )
@@ -323,29 +360,29 @@ async def scoreboard(request: Request,
     sizes = db.all_vocabulary_sizes()
     total_words = sum(sizes.values())
 
-    known_by_user = db.known_word_counts_by_user()
+    mastered_by_user = db.mastered_counts_by_user()
 
     entries = []
     for user_id, email in db.list_users():
-        per_vocabulary = known_by_user.get(user_id, {})
-        known = sum(per_vocabulary.get(voc_id, 0) for voc_id in sizes)
-        percentage = (100 * known // total_words) if total_words else 0
+        per_vocabulary = mastered_by_user.get(user_id, {})
+        mastered = sum(per_vocabulary.get(voc_id, 0) for voc_id in sizes)
+        percentage = (100 * mastered // total_words) if total_words else 0
         entries.append({
             'email': email,
-            'known': known,
+            'mastered': mastered,
             'total': total_words,
             'percentage': percentage,
             'is_me': email == user.email,
         })
 
-    entries.sort(key=lambda e: (e['percentage'], e['known']),
+    entries.sort(key=lambda e: (e['percentage'], e['mastered']),
                  reverse=True)
 
     # bars are relative to the best user so they are readable at any scale
-    best = entries[0]['known'] if entries else 0
+    best = entries[0]['mastered'] if entries else 0
     for entry in entries:
         entry['bar_percentage'] = \
-            (100 * entry['known'] // best) if best else 0
+            (100 * entry['mastered'] // best) if best else 0
 
     return TEMPLATES.TemplateResponse(
         request, "scoreboard.html",
@@ -353,6 +390,117 @@ async def scoreboard(request: Request,
             'user': user,
             'entries': entries,
             'total_words': total_words,
+        },
+        headers={'Cache-Control': 'no-store'}
+    )
+
+
+def _pick_title(summary: dict) -> str:
+    titles = summary.get('titles', {})
+    for code in ('en', 'de', 'fr', 'es', 'it', 'nl', 'pt'):
+        if code in titles:
+            return titles[code]
+    if titles:
+        return next(iter(titles.values()))
+    return f"vocabulary {summary['id']}"
+
+
+def _over_time_chart(daily) -> dict:
+    """Turn ``{date: (mastered, learned)}`` into an SVG line chart."""
+    W, H = 940, 300
+    PL, PR, PT, PB = 46, 18, 18, 30
+    ordered = sorted(daily)
+    first, last = ordered[0], ordered[-1]
+    days = (last - first).days + 1
+
+    # fill empty days by carrying the last value forward
+    series = []
+    carried_k = carried_l = 0
+    d = first
+    for _ in range(days):
+        if d in daily:
+            carried_k, carried_l = daily[d]
+        series.append((carried_k, carried_l))
+        d += timedelta(days=1)
+
+    ymax = max((max(k, l) for k, l in series), default=1) or 1
+    plot_w, plot_h = W - PL - PR, H - PT - PB
+
+    def xpx(i):
+        return PL + plot_w * i / (days - 1) if days > 1 else PL + plot_w / 2
+
+    def ypx(v):
+        return PT + plot_h * (1 - v / ymax)
+
+    points_mastered = ' '.join(
+        f'{xpx(i):.1f},{ypx(k):.1f}' for i, (k, _) in enumerate(series))
+    points_learned = ' '.join(
+        f'{xpx(i):.1f},{ypx(l):.1f}' for i, (_, l) in enumerate(series))
+
+    gridlines = []
+    for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
+        value = fraction * ymax
+        gridlines.append({'y': f'{ypx(value):.1f}',
+                          'label': f'{round(value)}'})
+
+    x_labels = []
+    for i in {0, days // 2, days - 1}:
+        x_labels.append({'x': f'{xpx(i):.1f}',
+                         'text': str(first + timedelta(days=i))})
+
+    last_x = f'{xpx(days - 1):.1f}'
+    return {
+        'has_data': True,
+        'points_mastered': points_mastered,
+        'points_learned': points_learned,
+        'gridlines': gridlines,
+        'x_labels': x_labels,
+        'last_x': last_x,
+        'last_mastered_y': f'{ypx(series[-1][0]):.1f}',
+        'last_learned_y': f'{ypx(series[-1][1]):.1f}',
+        'last_mastered': series[-1][0],
+        'last_learned': series[-1][1],
+        'ymax': ymax,
+        'days': days,
+        'first_day': str(first),
+    }
+
+
+@app.get("/stats")
+async def stats(request: Request,
+                voc: Optional[int] = None,
+                user: User = Depends(get_user)):
+
+    # stats are always about the signed-in user
+    summaries = db.vocabulary_summaries()
+
+    voc_options = [{'id': s['id'], 'title': _pick_title(s), 'size': s['size']}
+                   for s in summaries]
+    selected_voc = voc if voc is not None and \
+        any(o['id'] == voc for o in voc_options) else None
+
+    total_words = sum(s['size'] for s in summaries
+                      if selected_voc is None or s['id'] == selected_voc)
+    daily = db.mastered_over_time(user, voc_id=selected_voc)
+
+    mastered_now = learned_now = days_practised = 0
+    chart = {'has_data': False}
+    if daily:
+        mastered_now, learned_now = daily[sorted(daily)[-1]]
+        days_practised = len(daily)
+        chart = _over_time_chart(daily)
+
+    return TEMPLATES.TemplateResponse(
+        request, "stats.html",
+        {
+            'user': user,
+            'voc_options': voc_options,
+            'selected_voc': selected_voc,
+            'total_words': total_words,
+            'mastered_now': mastered_now,
+            'learned_now': learned_now,
+            'days_practised': days_practised,
+            'chart': chart,
         },
         headers={'Cache-Control': 'no-store'}
     )

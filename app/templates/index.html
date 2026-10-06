@@ -15,6 +15,7 @@
     </div>
     <div class="user-box">
       <span class="user">{{ user.email }}</span>
+      <a class="nav-link" href="/stats">Stats</a>
       <a class="nav-link" href="/scoreboard">Scoreboard</a>
       <a class="nav-link" href="/settings">Settings</a>
       <a class="signout" href="/logout">sign&nbsp;out</a>
@@ -56,11 +57,22 @@
         <div class="overall">
           <div class="overall-info">
             <span class="overall-title">Overall progress</span>
-            <span class="progress-stats">{{ known_percentage }}% known</span>
+            <span class="progress-stats">{{ mastered_percentage }}% mastered · {{ total_seen }} seen · {{ total_never }} never</span>
           </div>
-          <div class="bar big">
-            <div class="bar-fill {% if known_percentage < 40 %}danger{% elif known_percentage < 70 %}warn{% endif %}"
-                 style="width: {{ known_percentage }}%"></div>
+          <div class="bar big seg-bar">
+            {% if mastered_percentage %}
+              <div class="seg seg-mastered"
+                   style="width: {{ mastered_percentage }}%"></div>
+            {% endif %}
+            {% if seen_percentage %}
+              <div class="seg seg-seen"
+                   style="width: {{ seen_percentage }}%"></div>
+            {% endif %}
+          </div>
+          <div class="bar-legend">
+            <span class="lg lg-mastered">mastered</span>
+            <span class="lg lg-seen">seen</span>
+            <span class="lg lg-never">never seen</span>
           </div>
         </div>
       {% endif %}
@@ -85,12 +97,18 @@
           </div>
 
           <div class="voc-progress">
-            <div class="bar">
-              <div class="bar-fill {% if known_percentage_by_vocabulary[vocabulary] < 40 %}danger{% elif known_percentage_by_vocabulary[vocabulary] < 70 %}warn{% endif %}"
-                   style="width: {{ known_percentage_by_vocabulary[vocabulary] }}%"></div>
+            <div class="bar seg-bar">
+              {% if mastered_percentage_by_vocabulary[vocabulary] %}
+                <div class="seg seg-mastered"
+                     style="width: {{ mastered_percentage_by_vocabulary[vocabulary] }}%"></div>
+              {% endif %}
+              {% if seen_percentage_by_vocabulary[vocabulary] %}
+                <div class="seg seg-seen"
+                     style="width: {{ seen_percentage_by_vocabulary[vocabulary] }}%"></div>
+              {% endif %}
             </div>
-            {% if known_by_vocabulary[vocabulary] %}
-              <span class="progress-stats">{{ known_percentage_by_vocabulary[vocabulary] }}% known · {{ known_by_vocabulary[vocabulary] }} / {{ vocabulary | length }} words</span>
+            {% if included_by_vocabulary[vocabulary] %}
+              <span class="progress-stats">{{ mastered_percentage_by_vocabulary[vocabulary] }}% mastered · {{ seen_by_vocabulary[vocabulary] }} seen · {{ never_by_vocabulary[vocabulary] }} never</span>
             {% elif vocabulary in session_by_vocabulary %}
               <span class="progress-stats muted">in progress</span>
             {% else %}

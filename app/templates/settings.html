@@ -64,6 +64,21 @@
           {% endfor %}
         </div>
 
+        <div class="setting-option hard-runs">
+          <span class="setting-text">
+            <span class="setting-name">Hard-word window</span>
+            <span class="setting-description">
+              A word is flagged as hard when it was answered wrongly at
+              least once during the last N runs which included it.
+            </span>
+          </span>
+          <label class="hr-control">
+            <span class="hr-label">N</span>
+            <input type="number" name="hard_runs" min="1" max="50"
+                   value="{{ user.hard_runs }}">
+          </label>
+        </div>
+
         <div class="voc-actions">
           <button class="button" type="submit">Save</button>
         </div>

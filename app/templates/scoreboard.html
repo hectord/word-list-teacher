@@ -34,7 +34,7 @@
       <div class="score-row head">
         <span class="col rank">#</span>
         <span class="col user">user</span>
-        <span class="col pct">words known</span>
+        <span class="col pct">words mastered</span>
         <span class="col bar">progress</span>
       </div>
 
@@ -42,7 +42,7 @@
         <div class="score-row{% if entry.is_me %} me{% endif %}">
           <span class="col rank{% if loop.index == 1 %} rank-1{% elif loop.index == 2 %} rank-2{% elif loop.index == 3 %} rank-3{% endif %}">{{ loop.index }}</span>
           <span class="col user">{{ entry.email }}{% if entry.is_me %} <span class="badge-you">you</span>{% endif %}</span>
-          <span class="col pct">{{ entry.known }} / {{ entry.total }}</span>
+          <span class="col pct">{{ entry.mastered }} / {{ entry.total }}</span>
           <span class="col bar">
             <div class="bar">
               <div class="bar-fill {% if entry.bar_percentage < 40 %}danger{% elif entry.bar_percentage < 70 %}warn{% endif %}"

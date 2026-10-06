@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Stats{% endblock %}
+
+{% block header %}
+    <link rel="stylesheet" href="/static/pages.css?v=14">
+    <link rel="stylesheet" href="/static/stats.css?v=1">
+{% endblock %}
+
+{% block body %}
+
+  <header class="page-header">
+    <div class="brand-line">
+      <a class="back" href="/index">&larr; All vocabularies</a>
+      <h1>Stats</h1>
+      <span class="subtitle">words learned over time</span>
+    </div>
+    <div class="user-box">
+      <span class="user">{{ user.email }}</span>
+      <a class="signout" href="/logout">sign&nbsp;out</a>
+    </div>
+  </header>
+
+  <div class="center">
+
+    <form class="stats-filter" method="get" action="/stats">
+      <label class="filter-field">
+        <span class="filter-label">vocabulary</span>
+        <select name="voc">
+          <option value="">All vocabularies</option>
+          {% for option in voc_options %}
+            <option value="{{ option.id }}"
+                    {% if option.id == selected_voc %}selected{% endif %}>
+              {{ option.title }} ({{ option.size }} words)
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="filter-apply" type="submit">Show</button>
+    </form>
+
+    <div class="stats-cards">
+      <div class="stats-card">
+        <span class="stats-value">{{ mastered_now }}</span>
+        <span class="stats-label">mastered now</span>
+      </div>
+      <div class="stats-card">
+        <span class="stats-value">{{ learned_now }}</span>
+        <span class="stats-label">words learned ever</span>
+      </div>
+      <div class="stats-card">
+        <span class="stats-value">{{ total_words }}</span>
+        <span class="stats-label">words in scope</span>
+      </div>
+      <div class="stats-card">
+        <span class="stats-value">{{ days_practised }}</span>
+        <span class="stats-label">days practised</span>
+      </div>
+    </div>
+
+    {% if chart.has_data %}
+      <div class="stats-chart">
+        <div class="chart-legend">
+          <span class="legend-item">
+            <span class="legend-dot mastered"></span> mastered
+            <span class="legend-end">{{ chart.last_mastered }}</span>
+          </span>
+          <span class="legend-item">
+            <span class="legend-dot learned"></span> learned ever
+            <span class="legend-end">{{ chart.last_learned }}</span>
+          </span>
+          <span class="legend-range">{{ chart.first_day }} &rarr;
+            {{ chart.days }} day(s)</span>
+        </div>
+        <svg viewBox="0 0 940 300" role="img"
+             aria-label="Word counts over time">
+          {% for line in chart.gridlines %}
+            <line class="grid" x1="46" y1="{{ line.y }}"
+                  x2="922" y2="{{ line.y }}"></line>
+            <text class="grid-label" x="42" y="{{ line.y }}"
+                  text-anchor="end" dy=".35em">{{ line.label }}</text>
+          {% endfor %}
+          <polyline class="trace learned"
+                    points="{{ chart.points_learned }}"></polyline>
+          <polyline class="trace mastered"
+                    points="{{ chart.points_mastered }}"></polyline>
+          <circle class="dot learned" cx="{{ chart.last_x }}"
+                  cy="{{ chart.last_learned_y }}" r="4"></circle>
+          <circle class="dot mastered" cx="{{ chart.last_x }}"
+                  cy="{{ chart.last_mastered_y }}" r="4"></circle>
+          {% for label in chart.x_labels %}
+            <text class="date-label" x="{{ label.x }}" y="292"
+                  text-anchor="middle">{{ label.text }}</text>
+          {% endfor %}
+        </svg>
+      </div>
+    {% else %}
+      <div class="stats-empty">
+        No practice data for this user yet — try a run on the
+        <a href="/index">vocabularies page</a> first.
+      </div>
+    {% endif %}
+
+  </div>
+
+{% endblock %}

@@ -79,6 +79,9 @@ class User:
     strategy: str = 'full'
     # how many words the AI strategy puts in a run (0/None = all)
     words_per_run: int = 30
+    # how many consecutive runs a word must be answered correctly in
+    # before it stops being flagged as hard
+    hard_runs: int = 2
 
 
 # levels, ordered from the lowest to the highest
@@ -558,15 +561,37 @@ class Vocabulary:
 
 
 class VocabularyStats:
+    """Per-word practice statistics: how reliably the learner knows each
+    word (mastery) and whether it is currently flagged as hard.
+
+    * mastery: share of runs where the word was answered correctly on
+      its first attempt (100 = never missed it, 0 = never got it
+      right);
+    * hard: the word was answered wrongly at least once during the
+      last ``hard_runs`` runs which included it.
+    """
 
     def __init__(self,
                  v: Vocabulary,
-                 errors_prob_by_word: Dict[Word, int]):
+                 mastery_by_word: Dict[Word, float],
+                 hard_words=()):
         self._v = v
-        self._errors_prob_by_word = errors_prob_by_word
+        self._mastery_by_word = mastery_by_word
+        self._hard_words = frozenset(hard_words)
 
-    def errors_prob_for(self, w: Word):
-        return self._errors_prob_by_word.get(w, 0.0)
+    def mastery_for(self, w: Word):
+        """The 0-100 mastery percentage of ``w`` (0.0 when it was never
+        part of a run)."""
+        return self._mastery_by_word.get(w, 0.0)
+
+    def included_for(self, w: Word):
+        """True when ``w`` was part of at least one run."""
+        return w in self._mastery_by_word
+
+    def hard_for(self, w: Word):
+        """True when ``w`` was answered wrongly during at least one of
+        the last ``hard_runs`` runs which included it."""
+        return w in self._hard_words
 
 
 class Session:

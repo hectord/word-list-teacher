@@ -12,12 +12,13 @@ import tempfile
 import unittest
 
 from typing import Set
+from datetime import date, datetime
 
 from store import (load_database, DbException,
                    DbVocabulary, DbVocabularyTitle, DbSection, DbSectionText,
                    DbWord, DbWordText, DbVocabularySession, DbWordAttempt,
                    DbUser, DbSession, db as store_db, _table_columns)
-from learn import Vocabulary, Word, Language, User, included_levels
+from learn import Vocabulary, Word, WordAttempt, Language, User, included_levels
 from optimizer import AiStrategy, FullStrategy
 
 
@@ -127,7 +128,11 @@ class TestStore(unittest.TestCase):
 
         stats = self.db.vocabulary_stats(voc, self.user)
 
-        self.assertEqual(100.0, stats.errors_prob_for(word))
+        # the answer 'bla' was wrong: mastery 0, and the word was missed
+        # during its only run, so it is hard
+        self.assertEqual(0.0, stats.mastery_for(word))
+        self.assertTrue(stats.included_for(word))
+        self.assertTrue(stats.hard_for(word))
 
     def test_target_languages(self):
         self._create_vocabulary()
@@ -317,9 +322,259 @@ class TestStore(unittest.TestCase):
         word = fail(other)   # another user gets this word wrong twice
         fail(other)
 
-        # our user has no attempts at all -> no error for this word
+        # our user has no attempts at all -> the word was never included
         stats = self.db.vocabulary_stats(voc, self.user)
-        self.assertEqual(0.0, stats.errors_prob_for(word))
+        self.assertEqual(0.0, stats.mastery_for(word))
+        self.assertFalse(stats.included_for(word))
+        self.assertFalse(stats.hard_for(word))
+
+    def test_known_over_time(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        def attempt(word_input, success, day):
+            session = self.db.create_new_session(self.user, voc)
+            word = Word(word_input=word_input,
+                        word_output='de_' + word_input[-1])
+            self.db.add_word_attempt(
+                session,
+                WordAttempt(word=word,
+                            typed_word='x',
+                            success=success,
+                            time=datetime(2026, 1, day, 9, 0)))
+
+        # day 1: both words answered correctly
+        attempt('fr_1', True, 5)
+        attempt('fr_2', True, 5)
+        # day 2: the first word is failed again -> no longer known
+        attempt('fr_1', False, 6)
+        # day 9: first word correct again -> known again, learned counts on
+        attempt('fr_1', True, 9)
+        attempt('fr_2', False, 9)
+
+        daily = self.db.known_over_time(self.user)
+
+        self.assertEqual({5: (2, 2)}, {d.day: v for d, v in daily.items()
+                                       if d.day == 5})
+        self.assertEqual((1, 2), daily[date(2026, 1, 6)])
+        # word 2 was failed again later that day: known dips to 1 but
+        # learned keeps counting it
+        self.assertEqual((1, 2), daily[date(2026, 1, 9)])
+
+        # restricted to the only vocabulary nothing changes
+        self.assertEqual(daily,
+                         self.db.known_over_time(self.user, voc_id=voc.id))
+
+        # attempts of another user are never counted
+        other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
+        self.assertEqual({}, self.db.known_over_time(other))
+
+    def test_hard_words_follow_the_last_runs(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def run(day, results):
+            """A session where every word is answered per ``results``."""
+            session = self.db.create_new_session(self.user, voc)
+            for word, success in results:
+                self.db.add_word_attempt(
+                    session, WordAttempt(word=word, typed_word='x',
+                                         success=success,
+                                         time=datetime(2026, 3, day, 10, 0)))
+
+        # run 1: word1 correct, word2 correct
+        run(1, [(word1, True), (word2, True)])
+        # run 2: word2 correct, word1 correct again
+        run(2, [(word2, True), (word1, True)])
+
+        # with the default N=2 both words were right in the last 2 runs
+        stats = self.db.vocabulary_stats(voc, self.user)
+        self.assertEqual(100.0, stats.mastery_for(word1))
+        self.assertFalse(stats.hard_for(word1))
+        self.assertFalse(stats.hard_for(word2))
+
+        # run 3: word1 is missed -> hard with N=2 (it is among the last
+        # two included runs), word2 still clean
+        run(3, [(word1, False)])
+        stats = self.db.vocabulary_stats(voc, self.user)
+        self.assertTrue(stats.hard_for(word1))
+        self.assertFalse(stats.hard_for(word2))
+        # mastery overall: 2 correct runs out of 3
+        self.assertEqual(100 * 2 / 3, stats.mastery_for(word1))
+
+        # run 4: word1 is right again. With N=1 a single clean run
+        # forgets the miss; with N=2 it is still among the last two runs
+        run(4, [(word1, True)])
+        self.db.set_user_hard_runs(self.user, 1)
+        stats = self.db.vocabulary_stats(voc, self.user)
+        self.assertFalse(stats.hard_for(word1))
+        self.db.set_user_hard_runs(self.user, 2)
+        stats = self.db.vocabulary_stats(voc, self.user)
+        self.assertTrue(stats.hard_for(word1))
+        # mastery overall: 3 correct runs out of 4
+        self.assertEqual(75.0, stats.mastery_for(word1))
+        self.assertEqual(100.0, stats.mastery_for(word2))
+
+        # hard flags are per user: nobody else has the word flagged
+        other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
+        stats_other = self.db.vocabulary_stats(voc, other)
+        self.assertFalse(stats_other.hard_for(word1))
+        self.assertFalse(stats_other.included_for(word1))
+
+    def test_mastered_word_counts(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def run(day, results):
+            session = self.db.create_new_session(self.user, voc)
+            for word, success in results:
+                self.db.add_word_attempt(
+                    session, WordAttempt(word=word, typed_word='x',
+                                         success=success,
+                                         time=datetime(2026, 4, day, 9, 0)))
+
+        # run 1: both correct; run 2: both correct again
+        run(1, [(word1, True), (word2, True)])
+        run(2, [(word1, True), (word2, True)])
+        # run 3: word2 answered wrongly -> no longer mastered with N=2
+        run(3, [(word2, False)])
+
+        counts = self.db.mastered_word_counts(self.user)
+        # word1: last two runs correct -> mastered; word2: missed one of
+        # the last two -> not mastered
+        self.assertEqual({1: 1}, counts)
+
+        # with N=1 the last run alone decides: word2 missed it, word1
+        # nailed it
+        self.db.set_user_hard_runs(self.user, 1)
+        self.assertEqual({1: 1}, self.db.mastered_word_counts(self.user))
+
+        # one clean run afterwards re-masters word2 (with N=1)
+        run(4, [(word2, True)])
+        self.assertEqual({1: 2}, self.db.mastered_word_counts(self.user))
+
+    def test_mastered_counts_by_user(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def practice(who, results):
+            session = self.db.create_new_session(who, voc)
+            for word, success in results:
+                self.db.add_word_attempt(
+                    session, WordAttempt(word=word, typed_word='x',
+                                         success=success,
+                                         time=datetime(2026, 5, 1, 9, 0)))
+
+        # our user: two clean runs on every word
+        practice(self.user, [(word1, True), (word2, True)])
+        practice(self.user, [(word1, True), (word2, True)])
+        # the other user: misses word1 in the second run
+        practice(other, [(word1, True), (word2, True)])
+        practice(other, [(word1, False), (word2, True)])
+
+        counts = self.db.mastered_counts_by_user()
+        users = {email: user_id for user_id, email in self.db.list_users()}
+        mine = counts[users['test@hotmail.com']]
+        others = counts[users['other@x.com']]
+
+        self.assertEqual({1: 2}, mine)
+        # our user masters both, the other masters only word2
+        self.assertEqual({1: 1}, others)
+
+        # the other user forgets the miss with N=1 after a clean run
+        self.db.set_user_hard_runs(other, 1)
+        practice(other, [(word1, True)])
+        counts = self.db.mastered_counts_by_user()
+        self.assertEqual({1: 2}, counts[users['other@x.com']])
+
+    def test_mastered_over_time(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def attempt(word_input, success, day):
+            session = self.db.create_new_session(self.user, voc)
+            self.db.add_word_attempt(
+                session,
+                WordAttempt(word=word_input,
+                            typed_word='x',
+                            success=success,
+                            time=datetime(2026, 6, day, 9, 0)))
+
+        attempt(word1, True, 1)
+        attempt(word2, True, 1)
+        attempt(word1, True, 2)    # still within the last two runs
+        attempt(word1, False, 3)   # miss: drops out of the last two runs
+        attempt(word1, True, 4)    # one clean run not enough yet (N=2)
+        attempt(word1, True, 5)    # two clean runs again -> mastered
+
+        daily = self.db.mastered_over_time(self.user)
+        self.assertEqual((2, 2), daily[date(2026, 6, 1)])
+        self.assertEqual((2, 2), daily[date(2026, 6, 2)])
+        self.assertEqual((1, 2), daily[date(2026, 6, 3)])
+        self.assertEqual((1, 2), daily[date(2026, 6, 4)])
+        self.assertEqual((2, 2), daily[date(2026, 6, 5)])
+
+        # restricted to the only vocabulary nothing changes
+        self.assertEqual(daily,
+                         self.db.mastered_over_time(self.user, voc_id=voc.id))
+
+    def test_progress_word_counts(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def run(day, results):
+            session = self.db.create_new_session(self.user, voc)
+            for word, success in results:
+                self.db.add_word_attempt(
+                    session, WordAttempt(word=word, typed_word='x',
+                                         success=success,
+                                         time=datetime(2026, 7, day, 9, 0)))
+
+        run(1, [(word1, True), (word2, True)])
+        run(2, [(word2, False)])            # word2 misses -> not mastered
+
+        progress = self.db.progress_word_counts(self.user)
+        # word1: included once, mastered; word2: included twice, not
+        # mastered (a miss is among the last two runs)
+        self.assertEqual({1: (2, 1)}, progress)
+        self.assertEqual({1: 1}, self.db.mastered_word_counts(self.user))
+
+        # a third run mastering word2: now both are mastered
+        run(3, [(word2, True)])
+        run(4, [(word2, True)])
+        progress = self.db.progress_word_counts(self.user)
+        self.assertEqual({1: (2, 2)}, progress)
+
+    def test_user_hard_runs_setting(self):
+        self._create_user()
+
+        # the default window is 2
+        self.assertEqual(2, self.user.hard_runs)
+
+        self.db.set_user_hard_runs(self.user, 5)
+        self.assertEqual(5, self.db.get_user(self.user.email, 'abc').hard_runs)
 
     def test_load_dictionary(self):
         from cli import load_dictionary

@@ -227,6 +227,30 @@ a.signout:hover { text-decoration: underline; }
 .bar-fill.warn { background: #E0A63C; }
 .bar-fill.danger { background: #C75B39; }
 
+/* three-state progress: mastered (green), seen (amber), never (track) */
+.seg-bar { display: flex; }
+.seg { height: 100%; }
+.seg-mastered { background: #2F7D5B; }
+.seg-seen { background: #E0A63C; }
+
+.bar-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #A08B7F;
+}
+.lg { display: inline-flex; align-items: center; gap: 5px; }
+.lg::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.lg-mastered::before { background: #2F7D5B; }
+.lg-seen::before { background: #E0A63C; }
+.lg-never::before { background: #F0E7E0; border: 1px solid #E4D8CE; }
+
 /* ---------- buttons ---------- */
 
 .button {
@@ -304,6 +328,23 @@ a.signout:hover { text-decoration: underline; }
   border-radius: 8px;
   font-size: 15px;
   text-align: right;
+}
+
+.setting-option.hard-runs {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+.setting-option.hard-runs .setting-text { cursor: default; }
+.setting-option .hr-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.setting-option .hr-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #B4A398;
 }
 
 /* ---------- empty state ---------- */
@@ -483,6 +524,7 @@ a.signout:hover { text-decoration: underline; }
   border-radius: 999px;
   font-size: 13px;
 }
+.badge.never { background: #F1EAE4; color: #B4A398; }
 .badge.good { background: #E1F1E2; color: #2F7D5B; }
 .badge.shaky { background: #FCEFD8; color: #B97B1E; }
 .badge.unknown { background: #FFE8E8; color: #C0392B; }

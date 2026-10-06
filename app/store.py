@@ -5,7 +5,7 @@ import hashlib
 import time
 
 from security import check_password, get_hashed_password
-from datetime import datetime
+from datetime import date, datetime
 
 from peewee import *
 
@@ -42,6 +42,7 @@ class DbUser(Model):
     target_language = ForeignKeyField(DbLanguage, null=True, backref='+')
     strategy = CharField(null=True)
     words_per_run = IntegerField(null=True)
+    hard_runs = IntegerField(null=True)
 
     class Meta:
         database = db
@@ -220,7 +221,9 @@ class Database:
                     target_language=target_language,
                     strategy=db_user.strategy or 'full',
                     words_per_run=db_user.words_per_run
-                    if db_user.words_per_run is not None else 30)
+                    if db_user.words_per_run is not None else 30,
+                    hard_runs=db_user.hard_runs
+                    if db_user.hard_runs is not None else 2)
 
         _AUTH_CACHE[email] = (credentials, now + _AUTH_CACHE_TTL, user)
         return user
@@ -270,7 +273,30 @@ class Database:
                      main_language=previous.main_language, level=previous.level,
                      target_language=previous.target_language,
                      strategy=previous.strategy,
-                     words_per_run=words_per_run))
+                     words_per_run=words_per_run,
+                     hard_runs=previous.hard_runs))
+
+    def set_user_hard_runs(self, user, hard_runs: int):
+        """How many recent runs a word must survive correctly before it
+        stops being flagged as hard."""
+        email = user if isinstance(user, str) else user.email
+        updated = (DbUser.update(hard_runs=hard_runs)
+                   .where(DbUser.email == email).execute())
+        if not updated:
+            raise DbException('user not found')
+
+        # keep the cached profile in sync
+        cached = _AUTH_CACHE.get(email)
+        if cached is not None:
+            credentials, expires, previous = cached
+            _AUTH_CACHE[email] = (
+                credentials, expires,
+                User(email=previous.email, password=previous.password,
+                     main_language=previous.main_language, level=previous.level,
+                     target_language=previous.target_language,
+                     strategy=previous.strategy,
+                     words_per_run=previous.words_per_run,
+                     hard_runs=hard_runs))
 
     def set_user_strategy(self, user, strategy: str):
         """Choose which strategy the runs of ``user`` follow."""
@@ -289,7 +315,9 @@ class Database:
                 User(email=previous.email, password=previous.password,
                      main_language=previous.main_language, level=previous.level,
                      target_language=previous.target_language,
-                     strategy=strategy))
+                     strategy=strategy,
+                     words_per_run=previous.words_per_run,
+                     hard_runs=previous.hard_runs))
 
     def set_user_level(self, user, level: Optional[str]):
         email = user if isinstance(user, str) else user.email
@@ -663,6 +691,115 @@ class Database:
         return [HistoricalAttempt(word_id=word_id, run_id=session_id,
                                   success=success, tested_at=tested_at)
                 for word_id, session_id, success, tested_at in query.tuples()]
+
+    def known_over_time(self, user,
+                        voc_id: int = None) -> Dict[date, tuple]:
+        """How many of the user's words are learned, day by day.
+
+        Returns ``{date: (known, learned)}`` for every day on which at
+        least one attempt happened:
+
+        * ``known``   - words whose most recent attempt on that day
+          succeeded (the site's definition of "known");
+        * ``learned`` - words ever answered correctly up to that day
+          (monotonic: keeps counting a word after later failures).
+
+        Optionally restricted to one vocabulary (``voc_id``)."""
+        db_user = self._get_db_user(user)
+
+        query = (DbWordAttempt
+                 .select(DbWordAttempt.word_id, DbWordAttempt.success,
+                         DbWordAttempt.time)
+                 .join(DbWord)
+                 .switch(DbWordAttempt)
+                 .join(DbSession)
+                 .where(DbSession.user == db_user))
+
+        if voc_id is not None:
+            query = query.where(DbWord.vocabulary == voc_id)
+
+        query = query.order_by(DbWordAttempt.time, DbWordAttempt.id)
+
+        last_success = {}
+        ever_success = set()
+        known, learned = 0, 0
+        daily = {}
+
+        for word_id, success, tested_at in query.tuples():
+            if word_id in last_success:
+                if last_success[word_id] != success:
+                    known += 1 if success else -1
+            elif success:
+                known += 1
+            last_success[word_id] = success
+
+            if success and word_id not in ever_success:
+                ever_success.add(word_id)
+                learned += 1
+
+            daily[tested_at.date()] = (known, learned)
+
+        return daily
+
+    def mastered_over_time(self, user,
+                           voc_id: int = None) -> Dict[date, tuple]:
+        """How many of the user's words are mastered, day by day.
+
+        Returns ``{date: (mastered, learned)}`` for every day on which
+        at least one attempt happened:
+
+        * ``mastered`` - words whose every one of the last ``hard_runs``
+          runs which included them was answered correctly (the same
+          definition as the vocabulary page's hard-word flag, negated);
+        * ``learned`` - words ever answered correctly up to that day
+          (monotonic: keeps counting a word after later failures).
+
+        Optionally restricted to one vocabulary (``voc_id``)."""
+        db_user = self._get_db_user(user)
+        hard_runs = db_user.hard_runs if db_user.hard_runs is not None else 2
+
+        query = (DbWordAttempt
+                 .select(DbWordAttempt.word_id, DbWordAttempt.session_id,
+                         DbWordAttempt.success, DbWordAttempt.time)
+                 .join(DbWord)
+                 .switch(DbWordAttempt)
+                 .join(DbSession)
+                 .where(DbSession.user == db_user))
+
+        if voc_id is not None:
+            query = query.where(DbWord.vocabulary == voc_id)
+
+        query = query.order_by(DbWordAttempt.time, DbWordAttempt.id)
+
+        def is_mastered(series):
+            return bool(series) and all(series[-hard_runs:])
+
+        outcomes_by_word = {}
+        seen_runs = set()
+        ever = set()
+        mastered = learned = 0
+        daily = {}
+
+        for word_id, session_id, success, tested_at in query.tuples():
+            key = (word_id, session_id)
+            if key in seen_runs:
+                continue
+            seen_runs.add(key)
+
+            outcomes = outcomes_by_word.setdefault(word_id, [])
+            was = is_mastered(outcomes)
+            outcomes.append(success)
+            is_now = is_mastered(outcomes)
+            if was != is_now:
+                mastered += 1 if is_now else -1
+
+            if success and word_id not in ever:
+                ever.add(word_id)
+                learned += 1
+
+            daily[tested_at.date()] = (mastered, learned)
+
+        return daily
 
     def list_word_texts(self, voc_id: int) -> Dict[int, Dict[str, dict]]:
         texts = defaultdict(dict)
@@ -1326,35 +1463,52 @@ class Database:
     # --------------------------------------------------------------- stats
     def vocabulary_stats(self, voc: Vocabulary,
                          user: Optional[User] = None) -> Optional[VocabularyStats]:
-        """Error probability per word of ``voc``, from the attempts of one
-        ``user``. Without a user, every user's attempts would be mixed
-        together, so the page always passes the current user."""
-        ret = {}
+        """Per-word practice statistics of ``voc``, from the attempts of
+        one ``user``: the mastery percentage (runs where the word was
+        answered correctly on its first attempt, over all runs which
+        included it) and the hard-word flag (the word was answered
+        wrongly at least once during the last ``hard_runs`` runs which
+        included it). Without a user, every user's attempts would be
+        mixed together, so the page always passes the current user."""
+        hard_runs = 2
+        db_user = None
+        if user is not None:
+            db_user = self._get_db_user(user)
+            if db_user.hard_runs is not None:
+                hard_runs = db_user.hard_runs
 
-        # one grouped pull instead of scanning every attempt row
+        # one row per attempt, chronologically per word and run; a word
+        # normally appears once per run, and when it does not we keep
+        # its first attempt ("known since the first attempt")
         sql = '''
-            SELECT a.word_id,
-                   SUM(CASE WHEN a.success THEN 1 ELSE 0 END) AS successes,
-                   COUNT(*) AS attempts
+            SELECT a.word_id, a.session_id, s.creation, a.success
             FROM dbwordattempt a
             JOIN dbsession s ON s.id = a.session_id
             JOIN dbword w ON w.id = a.word_id
             WHERE w.vocabulary_id = ? AND s.user_id = ?
-            GROUP BY a.word_id
+            ORDER BY a.word_id, s.creation, s.id, a.time, a.id
         '''
-        db_user = None
-        if user is not None:
-            db_user = self._get_db_user(user)
+        runs_by_word_id = defaultdict(list)
+        seen = set()
+        for word_id, session_id, _creation, success in \
+                db.execute_sql(sql, (voc.id, db_user.id)):
+            key = (word_id, session_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            runs_by_word_id[word_id].append(success)
 
-        for word_id, successes, attempts in \
-                db.execute_sql(sql, (voc.id, db_user.id)).fetchall():
+        mastery_by_word = {}
+        hard_words = set()
+        for word_id, outcomes in runs_by_word_id.items():
             word = voc.word(word_id)
             if word is None:
                 continue
+            mastery_by_word[word] = 100 * sum(outcomes) / len(outcomes)
+            if not all(outcomes[-hard_runs:]):
+                hard_words.add(word)
 
-            ret[word] = (attempts - successes) / attempts * 100
-
-        return VocabularyStats(voc, ret)
+        return VocabularyStats(voc, mastery_by_word, hard_words=hard_words)
 
     def known_word_counts(self, user: User,
                           levels=None) -> Dict[int, int]:
@@ -1390,6 +1544,63 @@ class Database:
 
         return dict(counts)
 
+    def progress_word_counts(self, user,
+                             levels=None) -> Dict[int, tuple]:
+        """Per vocabulary: how many words were ever part of a run and
+        how many of those are mastered.
+
+        Returns ``{vocabulary_id: (included, mastered)}`` where a word
+        is ``included`` once it was attempted in at least one run, and
+        ``mastered`` when every one of the last ``hard_runs`` runs which
+        included it was answered correctly (the same rule as the
+        vocabulary page's hard-word flag, negated). The optional
+        ``levels`` filter applies the same cumulative level rule as
+        ``known_word_counts``."""
+        db_user = self._get_db_user(user)
+        hard_runs = db_user.hard_runs if db_user.hard_runs is not None else 2
+
+        sql = '''
+            SELECT a.word_id, w.vocabulary_id, a.session_id, a.success
+            FROM dbwordattempt a
+            JOIN dbword w ON w.id = a.word_id
+            JOIN dbsession s ON s.id = a.session_id
+            WHERE s.user_id = ?
+        '''
+        params = [db_user.id]
+        if levels is not None:
+            sql += (' AND (w.level IN (%s) OR w.level IS NULL)'
+                    % ','.join('?' * len(levels)))
+            params += list(levels)
+        sql += ' ORDER BY a.word_id, s.creation, s.id, a.time, a.id'
+
+        outcomes_by_word = defaultdict(list)
+        vocabulary_of_word = {}
+        seen_runs = set()
+        for word_id, vocabulary_id, session_id, success in \
+                db.execute_sql(sql, params):
+            key = (word_id, session_id)
+            if key in seen_runs:
+                continue
+            seen_runs.add(key)
+            vocabulary_of_word[word_id] = vocabulary_id
+            outcomes_by_word[word_id].append(success)
+
+        progress = {}
+        for word_id, outcomes in outcomes_by_word.items():
+            voc_id = vocabulary_of_word[word_id]
+            included, mastered = progress.get(voc_id, (0, 0))
+            mastered += 1 if all(outcomes[-hard_runs:]) else 0
+            progress[voc_id] = (included + 1, mastered)
+
+        return dict(progress)
+
+    def mastered_word_counts(self, user,
+                             levels=None) -> Dict[int, int]:
+        """How many words of each vocabulary the user masters (see
+        ``progress_word_counts``)."""
+        return {voc_id: mastered for voc_id, (_included, mastered)
+                in self.progress_word_counts(user, levels).items()}
+
     def known_word_counts_by_user(self) -> Dict[int, Dict[int, int]]:
         """User id -> (vocabulary id -> words currently known: last run
         which included them answered them correctly)."""
@@ -1412,6 +1623,46 @@ class Database:
 
         return {user_id: dict(counts)
                 for user_id, counts in known.items()}
+
+    def mastered_counts_by_user(self) -> Dict[int, Dict[int, int]]:
+        """Mastered words per user and vocabulary (the definition used
+        on the vocabulary page: all of the last ``hard_runs`` runs which
+        included the word were answered correctly). Every user counts
+        with their own ``hard_runs`` setting."""
+        hard_runs = {}
+        for db_user in DbUser.select():
+            hard_runs[db_user.id] = \
+                db_user.hard_runs if db_user.hard_runs is not None else 2
+
+        sql = '''
+            SELECT s.user_id, a.word_id, w.vocabulary_id,
+                   a.session_id, a.success
+            FROM dbwordattempt a
+            JOIN dbsession s ON s.id = a.session_id
+            JOIN dbword w ON w.id = a.word_id
+            ORDER BY s.user_id, a.word_id, s.creation, s.id,
+                     a.time, a.id
+        '''
+        outcomes = defaultdict(list)
+        vocabulary_of = {}
+        seen = set()
+        for user_id, word_id, vocabulary_id, session_id, success in \
+                db.execute_sql(sql):
+            key = (user_id, word_id, session_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            pair = (user_id, word_id)
+            vocabulary_of[pair] = vocabulary_id
+            outcomes[pair].append(success)
+
+        mastered = defaultdict(lambda: defaultdict(int))
+        for (user_id, word_id), series in outcomes.items():
+            if all(series[-hard_runs[user_id]:]):
+                mastered[user_id][vocabulary_of[(user_id, word_id)]] += 1
+
+        return {user_id: dict(counts)
+                for user_id, counts in mastered.items()}
 
 
 # --------------------------------------------------------------- migration
@@ -1592,6 +1843,7 @@ def load_database(name: str) -> Database:
                                            'varchar(255)')
         migrated |= _add_column_if_missing('dbuser', 'words_per_run',
                                            'INTEGER')
+        migrated |= _add_column_if_missing('dbuser', 'hard_runs', 'INTEGER')
         _remap_old_levels()
 
         if migrated:
