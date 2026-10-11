@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import math
 import os
 from typing import Optional, List
 from datetime import date, timedelta
@@ -509,10 +510,29 @@ async def stats(request: Request,
 
     mastered_now = learned_now = days_practised = 0
     chart = {'has_data': False}
+    eta = None
     if daily:
         mastered_now, learned_now = daily[sorted(daily)[-1]]
         days_practised = len(daily)
         chart = _over_time_chart(daily)
+
+        # completion estimate: the overall pace (mastered words per day
+        # since the first practice day, up to today) extrapolated to the
+        # remaining words of the current scope
+        first_day = sorted(daily)[0]
+        elapsed = (date.today() - first_day).days + 1
+        pace = mastered_now / elapsed if elapsed else 0.0
+        remaining = total_words - mastered_now
+        if remaining <= 0:
+            eta = {'done': True}
+        elif pace > 0:
+            days = math.ceil(remaining / pace)
+            eta = {
+                'pace': pace,
+                'remaining': remaining,
+                'days': days,
+                'date': (date.today() + timedelta(days=days)).isoformat(),
+            }
 
     return TEMPLATES.TemplateResponse(
         request, "stats.html",
@@ -525,6 +545,7 @@ async def stats(request: Request,
             'learned_now': learned_now,
             'days_practised': days_practised,
             'chart': chart,
+            'eta': eta,
         },
         headers={'Cache-Control': 'no-store'}
     )

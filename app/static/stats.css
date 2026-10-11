@@ -74,6 +74,32 @@
   color: #B4A398;
 }
 
+.stats-eta {
+  background: #FDF8F4;
+  border: 1px solid #D9C6B8;
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+.eta-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #B4A398;
+}
+.eta-date {
+  font-size: 22px;
+  font-weight: 700;
+  color: #3B2F2A;
+}
+.eta-note { font-size: 13px; color: #6B5D55; }
+.stats-eta.muted { background: #fff; border-color: #EDE3DB; }
+.stats-eta.muted .eta-note { color: #B4A398; }
+
 .stats-chart {
   background: #fff;
   border: 1px solid #EDE3DB;

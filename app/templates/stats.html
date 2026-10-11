@@ -58,6 +58,26 @@
       </div>
     </div>
 
+    {% if eta %}
+      <div class="stats-eta">
+        {% if eta.done %}
+          <span class="eta-title">Estimated completion</span>
+          <span class="eta-note">all {{ total_words }} words mastered &mdash; you're done!</span>
+        {% else %}
+          <span class="eta-title">Estimated completion</span>
+          <span class="eta-date">{{ eta.date }}</span>
+          <span class="eta-note">about {{ eta.days }} days at
+            {{ '%.1f' % eta.pace }} word(s)/day &mdash; {{ eta.remaining }} word(s) left</span>
+        {% endif %}
+      </div>
+    {% elif chart.has_data %}
+      <div class="stats-eta muted">
+        <span class="eta-title">Estimated completion</span>
+        <span class="eta-note">not enough data yet &mdash; you need at least one
+          mastered word to estimate a pace</span>
+      </div>
+    {% endif %}
+
     {% if chart.has_data %}
       <div class="stats-chart">
         <div class="chart-legend">
