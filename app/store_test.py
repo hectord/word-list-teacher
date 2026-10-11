@@ -691,6 +691,42 @@ class TestStore(unittest.TestCase):
         self.assertEqual((True, False, True), after[ids[0]])
         self.assertEqual((True, True, False), after[ids[1]])
 
+    def test_duplicate_words_stay_distinct(self):
+        """Two rows with the SAME input and output (a duplicate entry)
+        must not collapse: each keeps its own id, its own run entry and
+        its own attempts - otherwise a word would be asked forever."""
+        self._create_user()
+        self.db.set_user_strategy(self.user, 'ai')
+        self.db.set_user_words_per_run(self.user, 0)  # whole vocabulary
+
+        w1 = Word(word_input='la femme', word_output='die Frau (-en)')
+        w2 = Word(word_input='la femme', word_output='die Frau (-en)')
+        w3 = Word(word_input='autre', word_output='anders')
+        voc = Vocabulary(Word('t', 't'), [w1, w2, w3], 'fr', 'de')
+        vid = self.db.create_vocabulary(voc)
+
+        user = self.db.get_user(self.user.email, 'abc')
+        v = self.db.get_vocabulary(user, vid, Language.GERMAN)
+        pair = [w for w in v.words if w.word_input == 'la femme']
+        self.assertEqual(2, len(pair))
+        ids = [v.word_id(w) for w in pair]
+        self.assertEqual(2, len(set(ids)))       # distinct ids
+
+        session = self.db.create_new_session(user, v)
+        self.assertEqual(3, session.run.total_words)
+
+        # answer each word correctly (including both duplicates)
+        for step in range(10):
+            session = self.db.load_session(session.id)
+            cur = session.current_word
+            if cur is None:
+                break
+            res = session.guess(cur, cur.word_output)
+            self.assertTrue(res.success)
+            self.db.add_word_attempt(session, res)
+
+        self.assertTrue(session.is_finished)
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

@@ -259,7 +259,12 @@ class Vocabulary:
 
         self._similar_words = None
         self._id = None
+        # maps word id -> the Word instance and word -> id, keyed by the
+        # object identity (``id(word)``): several words may share the
+        # same texts (a duplicate or a variant row) and they must stay
+        # distinct instead of collapsing into one dictionary entry
         self._word_ids = {}
+        self._words_by_id = {}
         self._flipped = flipped
         self._input_language = input_language
         self._output_language = output_language
@@ -277,7 +282,8 @@ class Vocabulary:
         self._words.append(word)
         self._word_sections.append(section)
         if word_id is not None:
-            self._word_ids[word] = word_id
+            self._word_ids[id(word)] = word_id
+            self._words_by_id[word_id] = word
         self._similar_words = None   # rebuilt lazily
 
     @property
@@ -350,7 +356,8 @@ class Vocabulary:
         sub_sections = []
 
         for word, section in zip(self._words, self._word_sections):
-            if self._word_ids.get(word) in wanted:
+            word_id = self.word_id(word)
+            if word_id is not None and word_id in wanted:
                 words.append(word)
                 sub_sections.append(section)
 
@@ -361,7 +368,7 @@ class Vocabulary:
         voc.set_id(self._id)
 
         for word in words:
-            word_id = self._word_ids.get(word)
+            word_id = self.word_id(word)
             if word_id is not None:
                 voc.set_word_id(word, word_id)
             voc.set_example(word, self.example(word))
@@ -391,7 +398,7 @@ class Vocabulary:
         voc.set_id(self._id)
 
         for word in words:
-            word_id = self._word_ids.get(word)
+            word_id = self.word_id(word)
             if word_id is not None:
                 voc.set_word_id(word, word_id)
             voc.set_example(word, self.example(word))
@@ -432,7 +439,7 @@ class Vocabulary:
         voc.set_id(self._id)
 
         for word in self._words:
-            word_id = self._word_ids.get(word)
+            word_id = self.word_id(word)
             if word_id is not None:
                 voc.set_word_id(word.flip(), word_id)
             voc.set_example(word.flip(), self.example(word))
@@ -456,16 +463,22 @@ class Vocabulary:
         self._id = id
 
     def set_word_id(self, word: Word, word_id: int):
-        self._word_ids[word] = word_id
+        self._word_ids[id(word)] = word_id
+        self._words_by_id[word_id] = word
 
     def word_id(self, word: Word) -> Optional[int]:
-        return self._word_ids.get(word)
+        word_id = self._word_ids.get(id(word))
+        if word_id is not None:
+            return word_id
+        # fallback for freshly built instances which are equal but not
+        # identical: any matching row works for a lookup
+        for this_word in self._words:
+            if this_word == word:
+                return self._word_ids.get(id(this_word))
+        return None
 
     def word(self, word_id: int) -> Optional[Word]:
-        for this_word, this_word_id in self._word_ids.items():
-            if word_id == this_word_id:
-                return this_word
-        return None
+        return self._words_by_id.get(word_id)
 
     def add(self, other: 'Vocabulary'):
         # inherit the metadata when merging into an empty vocabulary
@@ -483,6 +496,7 @@ class Vocabulary:
         self._examples.update(other._examples)
         self._input_examples.update(other._input_examples)
         self._word_ids.update(other._word_ids)
+        self._words_by_id.update(other._words_by_id)
 
         # the similar-words index is rebuilt lazily
         self._similar_words = None
@@ -633,22 +647,24 @@ class Session:
         self.strategy_name = strategy_name
 
         # map the application words to the strategy words (real word ids
-        # when available, a stable per-position id otherwise)
+        # when available, a stable per-position id otherwise). Keyed by
+        # object identity: two words may share the same texts and must
+        # each map to their own id.
         self._word_to_id = {}
         self._id_to_word = {}
         for index, word in enumerate(vocabulary.words):
             word_id = vocabulary.word_id(word)
             if word_id is None:
                 word_id = '#%d' % index
-            self._word_to_id[word] = word_id
+            self._word_to_id[id(word)] = word_id
             self._id_to_word[word_id] = word
 
         self._run = self.strategy.create_run(
-            [StrategyWord(id=self._word_to_id[w],
+            [StrategyWord(id=self._word_to_id[id(w)],
                           text=w.word_output,
                           level=w.level or 'B1')
-             for w in self._word_to_id],
-            [StrategyAttempt(word_id=self._word_to_id[a.word],
+             for w in vocabulary.words],
+            [StrategyAttempt(word_id=self._word_to_id[id(a.word)],
                              success=a.success,
                              tested_at=a.time)
              for a in attempts],
@@ -658,7 +674,7 @@ class Session:
         if self._current_word is None:
             self._pick_next_word()
         assert self._current_word is None or \
-            self._word_to_id[self._current_word] in \
+            self._word_to_id[id(self._current_word)] in \
             self._run.remaining_word_ids
         self._id = None
 
@@ -783,7 +799,7 @@ class Session:
 
         current_word = self.current_word
         if word != self._current_word:
-            word_id = self._word_to_id.get(word)
+            word_id = self._word_to_id.get(id(word))
             if word_id is None or \
                     word_id not in self._run.remaining_word_ids:
                 return None
@@ -808,7 +824,7 @@ class Session:
                                   current_word))
         self._attempts.append(attempt)
 
-        self._run.answer(self._word_to_id[current_word], success)
+        self._run.answer(self._word_to_id[id(current_word)], success)
         self._pick_next_word()
 
         return attempt

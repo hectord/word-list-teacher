@@ -526,12 +526,14 @@ class Database:
                             titles, input_code, output_code, display_code,
                             levels) -> Vocabulary:
         words = []
-        word_ids = {}
+        word_ids = {}      # id(word) -> (word, word_id)
         sections = []
         section_ids = {}
-        examples = {}
-        input_examples = {}
+        examples = {}      # id(word) -> (word, example)
+        input_examples = {}  # id(word) -> (word, example)
 
+        # identity-keyed: two rows may have identical texts (a duplicate
+        # or a variant with the same writing) and must stay separate
         for word_id, section_id, word_type, level in db_words:
             word_texts = texts_by_word.get(word_id, {})
             in_text = word_texts.get(input_code)
@@ -548,7 +550,7 @@ class Database:
             word = Word(word_input=in_text[0], word_output=out_text[0],
                         type=word_type, level=level)
             words.append(word)
-            word_ids[word] = word_id
+            word_ids[id(word)] = (word, word_id)
 
             if section_id is not None:
                 name = Database._pick_text(
@@ -560,9 +562,9 @@ class Database:
                 sections.append(None)
 
             if out_text[1] is not None:
-                examples[word] = out_text[1]
+                examples[id(word)] = (word, out_text[1])
             if in_text[1] is not None:
-                input_examples[word] = in_text[1]
+                input_examples[id(word)] = (word, in_text[1])
 
         title = Database._pick_text(titles, display_code)
         name = None if title is None else Word(word_input=title,
@@ -572,11 +574,11 @@ class Database:
                          sections=sections, section_ids=section_ids)
         voc.set_id(voc_id)
 
-        for word, word_id in word_ids.items():
+        for word, word_id in word_ids.values():
             voc.set_word_id(word, word_id)
-        for word, example in examples.items():
+        for word, example in examples.values():
             voc.set_example(word, example)
-        for word, example in input_examples.items():
+        for word, example in input_examples.values():
             voc.set_input_example(word, example)
 
         return voc
@@ -1366,14 +1368,24 @@ class Database:
                                    strategy=strategy_name)
 
         db_session = DbSession.get(new_db_session.id)
-        current_db_word = None
         if new_session.current_word is not None:
-            current_db_word = self._get_db_word(new_session,
-                                                new_session.current_word)
-        db_session.current_word = current_db_word
+            db_session.current_word_id = \
+                self.session_word_id(new_session, new_session.current_word)
         db_session.save()
 
         return new_session
+
+    def session_word_id(self, session: Session, word: Word) -> Optional[int]:
+        """The exact database row of ``word`` inside ``session``.
+
+        The run maps each word to its own id, so two rows with the same
+        texts (a duplicate or a variant) stay distinct - text matching
+        alone is ambiguous for them."""
+        word_id = session._word_to_id.get(id(word))
+        if isinstance(word_id, int):
+            return word_id
+        db_word = self._get_db_word(session, word)
+        return db_word.id if db_word is not None else None
 
     def _get_db_word(self,
                      session: Session,
@@ -1417,17 +1429,17 @@ class Database:
         db_session = DbSession.get(session_id)
 
         if session.current_word is None:
-            db_session.current_word = None
+            db_session.current_word_id = None
         else:
-            db_session.current_word = self._get_db_word(
-                session, session.current_word)
+            db_session.current_word_id = \
+                self.session_word_id(session, session.current_word)
 
         db_session.finished = session.is_finished
         db_session.save()
 
-        db_word = self._get_db_word(session, word_attempt.word)
+        db_word_id = self.session_word_id(session, word_attempt.word)
 
-        DbWordAttempt.create(word=db_word.id,
+        DbWordAttempt.create(word=db_word_id,
                              typed_word=word_attempt.typed_word,
                              session=session_id,
                              time=word_attempt.time,
@@ -1538,6 +1550,7 @@ class Database:
         v = self._with_variant_siblings(v, whole_v)
 
         attempts = []
+        completed = set()
 
         for attempt in (DbWordAttempt
                         .select()
@@ -1547,6 +1560,16 @@ class Database:
             word = v.word(attempt.word_id)
             if word is None:
                 continue
+
+            # tolerate corrupt histories: sessions recorded before a
+            # duplicate/variant fix may contain extra attempts after a
+            # word already succeeded (they were asked in a loop). A run
+            # is only valid up to each word's first success, so later
+            # attempts are ignored when reconstructing it.
+            if attempt.word_id in completed:
+                continue
+            if attempt.success:
+                completed.add(attempt.word_id)
 
             attempts.append(WordAttempt(word=word,
                                         typed_word=attempt.typed_word,
