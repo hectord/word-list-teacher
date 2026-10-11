@@ -501,7 +501,7 @@ def _over_time_chart(daily) -> dict:
 
 @app.get("/stats")
 async def stats(request: Request,
-                voc: Optional[int] = None,
+                voc: Optional[str] = None,
                 user: User = Depends(get_user)):
 
     # stats are always about the signed-in user, within the levels they
@@ -513,8 +513,18 @@ async def stats(request: Request,
     voc_options = [{'id': s['id'], 'title': _pick_title(s),
                     'size': sizes.get(s['id'], 0)}
                    for s in summaries if sizes.get(s['id'], 0) > 0]
-    selected_voc = voc if voc is not None and \
-        any(o['id'] == voc for o in voc_options) else None
+
+    # the filter form submits an empty value for "All vocabularies";
+    # parse it leniently instead of letting FastAPI 422 on ""
+    selected_voc = None
+    if voc:
+        try:
+            requested = int(voc)
+        except ValueError:
+            requested = None
+        if requested is not None and \
+                any(o['id'] == requested for o in voc_options):
+            selected_voc = requested
 
     total_words = sum(o['size'] for o in voc_options
                       if selected_voc is None or o['id'] == selected_voc)
