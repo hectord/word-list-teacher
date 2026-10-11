@@ -50,7 +50,7 @@
       </div>
       <div class="stats-card">
         <span class="stats-value">{{ total_words }}</span>
-        <span class="stats-label">words in scope</span>
+        <span class="stats-label">words in scope{% if user.level %} · level {{ user.level }}{% endif %}</span>
       </div>
       <div class="stats-card">
         <span class="stats-value">{{ days_practised }}</span>

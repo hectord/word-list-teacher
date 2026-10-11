@@ -13,7 +13,7 @@
     <div class="brand-line">
       <a class="back" href="/index{% if target %}?to={{ target.code }}{% endif %}">&larr; All vocabularies</a>
       <h1>{{ voc.name.word_input if voc.name else 'Vocabulary' }}</h1>
-      <span class="subtitle">{{ voc.input_language or '?' }} → {{ voc.output_language or '?' }}</span>
+      <span class="subtitle">{{ voc.input_language or '?' }} → {{ voc.output_language or '?' }}{% if user.level %} · level {{ user.level }}{% endif %}</span>
       <a class="nav-link" href="/stats">Stats</a>
       <a class="nav-link" href="/scoreboard">Scoreboard</a>
       <a class="nav-link" href="/settings">Settings</a>
