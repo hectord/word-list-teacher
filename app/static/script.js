@@ -47,6 +47,37 @@ $(document).ready(function() {
       "<div class=\"summary-strategy\">strategy: <b>" +
         strategy + "</b></div>" +
       "<div class=\"summary-grid\">" + cellsHtml + "</div>";
+
+    // the words to learn again: every word with at least one mistake,
+    // the most mistaken first
+    var toLearn = summary.words_to_learn || [];
+    if (toLearn.length) {
+      var list = document.createElement("div");
+      list.className = "summary-words";
+      var title = document.createElement("div");
+      title.className = "summary-words-title";
+      title.textContent = "Words to learn (" + toLearn.length + ")";
+      list.appendChild(title);
+      for (var i = 0; i < toLearn.length; i++) {
+        var row = document.createElement("div");
+        row.className = "summary-word";
+        var word = document.createElement("span");
+        word.className = "summary-word-answer";
+        word.textContent = toLearn[i].word;
+        var input = document.createElement("span");
+        input.className = "summary-word-input";
+        input.textContent = toLearn[i].input;
+        var badge = document.createElement("span");
+        badge.className = "summary-word-failures";
+        badge.textContent = "\u00d7" + toLearn[i].failures;
+        row.appendChild(word);
+        row.appendChild(input);
+        row.appendChild(badge);
+        list.appendChild(row);
+      }
+      div.appendChild(list);
+    }
+
     return div;
   }
 

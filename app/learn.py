@@ -734,7 +734,9 @@ class Session:
         return self._run
 
     def summary(self, understand: Dict = None) -> Dict:
-        """Numeric summary of the run (statistics only, no word lists).
+        """End-of-run summary: the statistics plus the words to learn
+        again (every word with at least one mistake, the most mistaken
+        first).
 
         ``understand`` is an optional {strategy word id: understanding}
         map (the AI strategy): the summary then also reports the model
@@ -743,6 +745,13 @@ class Session:
         status = self._run.status()
 
         failures = self._failure_counts()
+
+        failed_words = sorted(
+            ((self._id_to_word[word_id], count)
+             for word_id, count in failures.items()
+             if count > 0),
+            key=lambda item: -item[1],
+        )
 
         ret = {
             'strategy': self.strategy_name,
@@ -755,6 +764,12 @@ class Session:
                              if count == 0),
             'words_to_review': sum(1 for count in failures.values()
                                    if count > 0),
+            'words_to_learn': [
+                {'word': word.word_output,
+                 'input': word.word_input,
+                 'failures': count}
+                for word, count in failed_words
+            ],
         }
 
         if understand:

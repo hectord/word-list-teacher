@@ -81,6 +81,9 @@ class LearnTest(unittest.TestCase):
             'accuracy': 50.0,
             'new_words': 1,
             'words_to_review': 1,
+            'words_to_learn': [{'word': 'word1_output',
+                                'input': 'word1_input',
+                                'failures': 1}],
         }, summary)
 
         # the AI strategy adds model statistics (numbers only)
