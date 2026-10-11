@@ -138,6 +138,18 @@ class LearnTest(unittest.TestCase):
 
         self.assertTrue(words.is_finished)
 
+    def test_is_other_variant(self):
+        word = Word(word_output='die Größe (-n)',
+                    word_input='la taille')
+
+        # the expected variant itself (even without the plural note)
+        self.assertFalse(word.is_other_variant('die Größe', 'de'))
+        # another accepted variant differs from the expected one
+        self.assertTrue(word.is_other_variant('die Taille', 'de'))
+        # any different text counts too: acceptance is the caller's
+        # business (success already proved the answer is correct)
+        self.assertTrue(word.is_other_variant('der Tisch', 'de'))
+
     def test_filter_word(self):
         word = Word(word_output='abc (1)',
                     word_input='def (2)')

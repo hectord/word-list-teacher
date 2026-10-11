@@ -197,6 +197,16 @@ class Word:
         return normalize(self.word_output, language) == \
             normalize(word_output, language)
 
+    def is_other_variant(self, typed_word: str,
+                         language: Optional[str] = None) -> bool:
+        """Whether ``typed_word`` differs from the expected output of
+        this word. The caller has established the answer is correct (it
+        matched one of the accepted variants); passing e.g. "die Taille"
+        for ``la taille`` -> ``die Größe (-n)`` means the learner used
+        another correct variant than the one this exercise expects."""
+        return normalize(self.word_output, language) !=\
+            normalize(typed_word, language)
+
     @property
     def line(self) -> str:
         return f'{self.word_output};{self.word_input}'

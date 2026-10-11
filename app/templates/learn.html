@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 
-{% macro word_ok(word_input, word_output, word_example='', word_input_example='') -%}
+{% macro variant_note(word_used, word_expected) -%}
+  <div class="variant-note">
+    correct &mdash; you used <b class="variant-used">{{ word_used }}</b>
+    &middot; this exercise has <b class="variant-expected">{{ word_expected }}</b>
+  </div>
+{%- endmacro %}
+
+{% macro word_ok(word_input, word_output, word_example='', word_input_example='', word_used='', other_variant=False) -%}
   <div class="word-box input">
     <span class="field">
       {{ word_input }}
@@ -11,6 +18,9 @@
       {{ word_output }}
     </span>
   </div>
+  {% if other_variant %}
+    {{ variant_note(word_used, word_output) }}
+  {% endif %}
   <div class="word-example{% if word_input_example %} with-input{% endif %}"
        {% if not word_example and not word_input_example %}style="display:none"{% endif %}>
     <span class="example-text">
@@ -92,7 +102,9 @@
           {{ word_ok(attempt.word.word_input,
                      attempt.word.word_output,
                      attempt.example or '',
-                     attempt.input_example or '') }}
+                     attempt.input_example or '',
+                     attempt.typed_word,
+                     variant_notes[loop.index0] if variant_notes else False) }}
         </div>
         {% else %}
           <div class="word wrong-word">
@@ -115,7 +127,11 @@
 
   <!-- used to inform the user of a wrong word -->
   <div id="right-word" style="visibility: hidden;" class="word right-word">
-    {{ word_ok('', '') }}
+    {{ word_ok('') }}
+    <div class="variant-note hidden">
+      correct &mdash; you used <b class="variant-used"></b>
+      &middot; this exercise has <b class="variant-expected"></b>
+    </div>
   </div>
 
 {% endblock %}

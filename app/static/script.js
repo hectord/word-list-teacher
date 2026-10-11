@@ -108,6 +108,16 @@ $(document).ready(function() {
         new_node.find(".output .field").text(result.word_output.word);
         new_node.find(".result .field").text(result.hint);
 
+        // when another correct variant was used, point out which variant
+        // this exercise expected, so it is learnt as well
+        if (result.used_other_variant) {
+          new_node.find(".variant-note")
+                  .removeClass("hidden")
+                  .find(".variant-used").text(result.word_output.word);
+          new_node.find(".variant-note .variant-expected")
+                  .text(result.hint);
+        }
+
         // show the example sentence of the practised word (when any),
         // with a click-to-translate version in the learner's language
         var example = new_node.find(".word-example");

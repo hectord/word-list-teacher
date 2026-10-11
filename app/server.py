@@ -54,6 +54,11 @@ class WordResult(BaseModel):
 
     hint: Optional[str]
 
+    # when the correct answer was a different accepted variant than the
+    # one this exercise expected, show both so the expected variant is
+    # learnt even though another was used
+    used_other_variant: bool = False
+
     # a sentence using the answer word (in the answer's language)
     example: Optional[str] = None
 
@@ -617,12 +622,22 @@ async def learn(request: Request,
         first_word = WordInput(word=current_word.word_input,
                                word_id=vocabulary.word_id(current_word))
 
+    # for already-answered cards: which ones used another correct variant
+    # than the expected one (shown on resume, like during the run)
+    output_language = session.vocabulary.output_language
+    variant_notes = [
+        attempt.success and attempt.word.is_other_variant(
+            attempt.typed_word, output_language)
+        for attempt in session.attempts
+    ]
+
     ret = TEMPLATES.TemplateResponse(
         request, "learn.html",
         {
             'session': session,
             'first_word': first_word,
             'summary': _session_summary(session, user),
+            'variant_notes': variant_notes,
         },
         headers={'Cache-Control': 'no-store'}
     )
@@ -644,9 +659,12 @@ async def post_word(word_output: WordOutput,
     result = session.guess(current_word, word_output.word)
 
     success = False
+    used_other_variant = False
     if result is not None:
         db.add_word_attempt(session, result)
         success = result.success
+        used_other_variant = current_word.is_other_variant(
+            word_output.word, vocabulary.output_language)
 
     next_word_input = None
     if session.current_word is not None:
@@ -661,5 +679,6 @@ async def post_word(word_output: WordOutput,
                       word_input=WordInput(word=current_word.word_input,
                                            word_id=word_output.word_id),
                       word_output=word_output,
+                      used_other_variant=used_other_variant,
                       next_word=next_word_input,
                       summary=_session_summary(session, user))
