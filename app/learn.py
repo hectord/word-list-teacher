@@ -733,18 +733,20 @@ class Session:
         """The strategy run behind this session (stats, per-word info)."""
         return self._run
 
-    def summary(self, understand: Dict = None) -> Dict:
-        """End-of-run summary: the statistics plus the words to learn
+    def summary(self, ai_delta: Dict = None) -> Dict:
+        """End-of-run summary: how many words are known (no mistake) out
+        of the run's words, with a percentage, plus the words to learn
         again (every word with at least one mistake, the most mistaken
         first).
 
-        ``understand`` is an optional {strategy word id: understanding}
-        map (the AI strategy): the summary then also reports the model
-        statistics.
+        ``ai_delta`` is an optional dict (the AI strategy) with the
+        counts which changed from before the run: ``new_words`` (first
+        time practised), ``new_mastered`` and ``new_hard``.
         """
         status = self._run.status()
 
         failures = self._failure_counts()
+        words_known = sum(1 for count in failures.values() if count == 0)
 
         failed_words = sorted(
             ((self._id_to_word[word_id], count)
@@ -755,15 +757,11 @@ class Session:
 
         ret = {
             'strategy': self.strategy_name,
-            'words': status.total_words,
-            'attempts': status.attempts,
-            'successes': status.successes,
-            'failures': status.failures,
-            'accuracy': round(self.accuracy, 1),
-            'new_words': sum(1 for count in failures.values()
-                             if count == 0),
-            'words_to_review': sum(1 for count in failures.values()
-                                   if count > 0),
+            'words_known': words_known,
+            'words_total': status.total_words,
+            'known_percentage': round(
+                100.0 * words_known / status.total_words, 1)
+                if status.total_words else 0.0,
             'words_to_learn': [
                 {'word': word.word_output,
                  'input': word.word_input,
@@ -772,16 +770,8 @@ class Session:
             ],
         }
 
-        if understand:
-            scores = list(understand.values())
-            if scores:
-                ret['avg_understanding'] = \
-                    round(100.0 * sum(scores) / len(scores), 1)
-                ret['min_understanding'] = round(100.0 * min(scores), 1)
-                ret['weak_words'] = sum(1 for score in scores
-                                        if score < 0.5)
-                ret['mastered_words'] = sum(1 for score in scores
-                                            if score >= 0.7)
+        if ai_delta:
+            ret.update(ai_delta)
 
         return ret
 

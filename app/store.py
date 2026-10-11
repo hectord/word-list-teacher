@@ -1263,6 +1263,53 @@ class Database:
             return scope_voc
         return full_voc.select_ids(sorted(wanted))
 
+    def word_states(self, user,
+                    voc_id: int,
+                    word_ids: Sequence[int],
+                    exclude_session: int = None) -> dict:
+        """Per-word practice state ``{word_id: (included, mastered,
+        hard)}`` over the user's history of ``voc_id``, optionally minus
+        ``exclude_session`` (the state as it was when that run started).
+
+        Uses the same definitions as the rest of the app: a word is
+        ``included`` once it was part of a run and ``mastered`` when all
+        of the last ``hard_runs`` runs which included it were answered
+        correctly (``hard`` otherwise)."""
+        if not word_ids:
+            return {}
+
+        db_user = self._get_db_user(user)
+        hard_runs = db_user.hard_runs if db_user.hard_runs is not None else 2
+
+        placeholders = ','.join('?' * len(word_ids))
+        sql = '''
+            SELECT a.word_id, a.session_id, a.success
+            FROM dbwordattempt a
+            JOIN dbsession s ON s.id = a.session_id
+            WHERE a.word_id IN (%s) AND s.user_id = ?
+        ''' % placeholders
+        params = list(word_ids) + [db_user.id]
+        if exclude_session is not None:
+            sql += ' AND a.session_id != ?'
+            params.append(exclude_session)
+        sql += (' ORDER BY a.word_id, s.creation, s.id, a.time, a.id')
+
+        outcomes_by_word = defaultdict(list)
+        seen = set()
+        for word_id, session_id, success in db.execute_sql(sql, params):
+            key = (word_id, session_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            outcomes_by_word[word_id].append(success)
+
+        states = {}
+        for word_id, outcomes in outcomes_by_word.items():
+            window = outcomes[-hard_runs:]
+            mastered = all(window)
+            states[word_id] = (True, mastered, not mastered)
+        return states
+
     # ------------------------------------------------------------- sessions
     def create_new_session(self,
                            user: User,

@@ -15,8 +15,6 @@ from fastapi.templating import Jinja2Templates
 from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
-from optimizer import VocabularySelector
-
 from learn import Vocabulary, Session, Word, Language, User
 from learn import LEVELS, STRATEGIES, included_levels
 from store import load_database, DbException
@@ -601,21 +599,31 @@ async def new_session(request: Request,
 
 
 def _session_summary(session: Session, user: User) -> Optional[dict]:
-    """End-of-run statistics (numbers only). For the AI strategy the
-    understanding model statistics are added."""
+    """End-of-run summary: words known (no mistake) out of the total,
+    the words to learn again, and - for the AI strategy - how many
+    words are new, newly mastered or newly hard compared to before the
+    run."""
     if not session.is_finished:
         return None
 
-    understand = None
+    ai_delta = None
     if session.strategy_name == 'ai':
-        history = db.historical_attempts(user, session.vocabulary.id)
-        selector = VocabularySelector(history)
-        understand = {
-            word.id: selector.understanding(word.id)
-            for word in session.run.words
+        word_ids = [word.id for word in session.run.words]
+        before = db.word_states(user, session.vocabulary.id, word_ids,
+                                exclude_session=session.id)
+        after = db.word_states(user, session.vocabulary.id, word_ids)
+
+        def count(key):
+            return sum(1 for word_id, state in after.items()
+                       if state[key] and not before.get(word_id, (0, 0, 0))[key])
+
+        ai_delta = {
+            'new_words': count(0),
+            'new_mastered': count(1),
+            'new_hard': count(2),
         }
 
-    return session.summary(understand)
+    return session.summary(ai_delta)
 
 
 @app.get("/learn")

@@ -74,24 +74,21 @@ class LearnTest(unittest.TestCase):
         summary = session.summary()
         self.assertEqual({
             'strategy': 'full',
-            'words': 2,
-            'attempts': 3,
-            'successes': 2,
-            'failures': 1,
-            'accuracy': 50.0,
-            'new_words': 1,
-            'words_to_review': 1,
+            'words_known': 1,
+            'words_total': 2,
+            'known_percentage': 50.0,
             'words_to_learn': [{'word': 'word1_output',
                                 'input': 'word1_input',
                                 'failures': 1}],
         }, summary)
 
-        # the AI strategy adds model statistics (numbers only)
-        summary_ai = session.summary({1: 0.8, 2: 0.2})
-        self.assertEqual(50.0, summary_ai['avg_understanding'])
-        self.assertEqual(20.0, summary_ai['min_understanding'])
-        self.assertEqual(1, summary_ai['weak_words'])
-        self.assertEqual(1, summary_ai['mastered_words'])
+        # the AI strategy adds the counts which changed vs before the run
+        summary_ai = session.summary({
+            'new_words': 1, 'new_mastered': 1, 'new_hard': 0,
+        })
+        self.assertEqual(1, summary_ai['new_words'])
+        self.assertEqual(1, summary_ai['new_mastered'])
+        self.assertEqual(0, summary_ai['new_hard'])
 
     def test_flip_vocabulary(self):
         new_voc = self.voc.flip()

@@ -15,38 +15,49 @@ $(document).ready(function() {
   function summaryElement(summary) {
     if (!summary) { return null; }
 
-    var strategy = summary.strategy === "ai" ? "AI" : "Full";
-    var cells = [
-      [summary.words, "words"],
-      [summary.attempts, "attempts"],
-      [summary.successes, "right"],
-      [summary.failures, "wrong"],
-      [summary.accuracy, "accuracy %"],
-      [summary.new_words, "new words"],
-      [summary.words_to_review, "to review"],
-    ];
-    if (summary.avg_understanding !== undefined) {
-      cells.push([summary.avg_understanding, "avg understanding %"]);
-      cells.push([summary.min_understanding, "weakest word %"]);
-      cells.push([summary.weak_words, "weak words"]);
-      cells.push([summary.mastered_words, "mastered"]);
-    }
-
     var div = document.createElement("div");
     div.className = "session-summary";
-    var cellsHtml = "";
-    for (var i = 0; i < cells.length; i++) {
-      cellsHtml += "<div class=\"summary-cell\"><span class=\"summary-value\">" +
-                   cells[i][0] +
-                   "</span><span class=\"summary-label\">" +
-                   cells[i][1] +
-                   "</span></div>";
-    }
     div.innerHTML =
       "<div class=\"summary-title\">Session summary</div>" +
       "<div class=\"summary-strategy\">strategy: <b>" +
-        strategy + "</b></div>" +
-      "<div class=\"summary-grid\">" + cellsHtml + "</div>";
+        (summary.strategy === "ai" ? "AI" : "Full") + "</b></div>";
+
+    function appendGrid(title, cells) {
+      if (title) {
+        var caption = document.createElement("div");
+        caption.className = "summary-ai-title";
+        caption.textContent = title;
+        div.appendChild(caption);
+      }
+      var grid = document.createElement("div");
+      grid.className = "summary-grid";
+      var html = "";
+      for (var i = 0; i < cells.length; i++) {
+        html += "<div class=\"summary-cell\"><span class=\"summary-value\">" +
+                cells[i][0] +
+                "</span><span class=\"summary-label\">" +
+                cells[i][1] +
+                "</span></div>";
+      }
+      grid.innerHTML = html;
+      div.appendChild(grid);
+    }
+
+    // line one: the regular stats
+    appendGrid("", [
+      [summary.words_known, "known words"],
+      [summary.words_total, "total words"],
+      [summary.known_percentage + "%", "known %"],
+    ]);
+
+    // line two: only the AI strategy reports per-run progress
+    if (summary.new_words !== undefined) {
+      appendGrid("AI progress (vs. before this run)", [
+        [summary.new_words, "new words"],
+        [summary.new_mastered, "new mastered"],
+        [summary.new_hard, "new hard"],
+      ]);
+    }
 
     // the words to learn again: every word with at least one mistake,
     // the most mistaken first

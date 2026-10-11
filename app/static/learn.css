@@ -213,6 +213,15 @@ input.field {
   gap: 10px;
 }
 
+.summary-ai-title {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #A08B7F;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
 .summary-cell {
   display: flex;
   flex-direction: column;

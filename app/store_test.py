@@ -647,6 +647,50 @@ class TestStore(unittest.TestCase):
             result = session.guess(asked, sibling.word_output)
             self.assertTrue(result.success)
 
+    def test_word_states_before_and_after_a_run(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def attempt(word, success, session=None):
+            session = session or self.db.create_new_session(self.user, voc)
+            self.db.add_word_attempt(
+                session, WordAttempt(word=word, typed_word='x',
+                                     success=success,
+                                     time=datetime(2026, 9, 1, 9, 0)))
+
+        def states(word_ids, exclude=None):
+            return self.db.word_states(self.user, voc.id, word_ids,
+                                       exclude_session=exclude)
+
+        ids = [self.db.get_vocabulary(self.user, 1,
+                                      Language.GERMAN).word_id(w)
+               for w in (word1, word2)]
+
+        # two clean runs on word1 before (mastered), word2 never seen
+        for _ in range(2):
+            attempt(word1, True)
+        before = states(ids)
+        self.assertEqual((True, True, False), before[ids[0]])
+        self.assertNotIn(ids[1], before)
+
+        # this new session misses word1 and masters word2
+        session = self.db.create_new_session(self.user, voc)
+        attempt(word2, True, session=session)
+        attempt(word1, False, session=session)
+        attempt(word1, True, session=session)
+
+        # excluding the session reproduces the "before" state
+        self.assertEqual(before, states(ids, exclude=session.id))
+        # after the run: word1 has a miss inside its last two runs ->
+        # hard, word2 is newly included and mastered
+        after = states(ids)
+        self.assertEqual((True, False, True), after[ids[0]])
+        self.assertEqual((True, True, False), after[ids[1]])
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 
