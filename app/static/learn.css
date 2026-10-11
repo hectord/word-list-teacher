@@ -276,7 +276,9 @@ input.field {
 }
 .summary-word:last-child { border-bottom: none; }
 
-.summary-word-answer { font-weight: 600; color: #3B2F2A; }
+/* explicit sizes: the global ``*`` rule in base.css inflates every
+   element without a font-size to 23px (50px on hi-dpi phones) */
+.summary-word-answer { font-weight: 600; color: #3B2F2A; font-size: inherit; }
 .summary-word-input { color: #A08B7F; font-size: 13px; }
 .summary-word-failures {
   font-size: 12px;
@@ -323,13 +325,15 @@ input.field {
   }
   .example-text { font-size: 12px; }
 
-  /* keep the variant note (words with the same translation) as compact
-     as the example sentence on phones */
+  /* keep the variant note (words with the same translation) and the
+     words-to-learn list as compact as the example sentence on phones */
   .variant-note {
     font-size: 12px;
     padding: 4px 12px;
     margin-top: 6px;
   }
+  .summary-word { font-size: 12px; }
+  .summary-word-input { font-size: 12px; }
 
   .word { margin-bottom: 14px; }
 }
