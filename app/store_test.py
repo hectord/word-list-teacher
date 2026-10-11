@@ -611,6 +611,42 @@ class TestStore(unittest.TestCase):
         counts = self.db.mastered_counts_by_user(levels=b1)
         self.assertEqual({1: 1}, counts[users['test@hotmail.com']])
 
+    def test_ai_keeps_variant_groups_whole(self):
+        """A correct answer may be any translation of the input: a
+        variant group must never be split by the AI word selection,
+        otherwise a valid answer would be judged wrong forever."""
+        self._create_user()
+        self.db.set_user_strategy(self.user, 'ai')
+        self.db.set_user_words_per_run(self.user, 1)  # one practice word
+
+        a = Word(word_input='in', word_output='out_a')
+        b = Word(word_input='in', word_output='out_b')  # sibling of a
+        c = Word(word_input='other', word_output='out_c')
+        voc = Vocabulary(Word('title', 'title'), [a, b, c], 'fr', 'de')
+        voc_id = self.db.create_vocabulary(voc)
+
+        # fetch the profile again: the settings above were stored and
+        # cached by the store, but the dataclass we hold is stale
+        user = self.db.get_user(self.user.email, 'abc')
+        v = self.db.get_vocabulary(user, voc_id, Language.GERMAN)
+        session = self.db.create_new_session(user, v)
+        run_ids = {word.id for word in session.run.words}
+
+        pair_ids = {self.db.get_vocabulary(
+            user, voc_id, Language.GERMAN).word_id(w)
+            for w in (a, b)}
+
+        # the pair is atomic: either both are in the run or neither
+        self.assertEqual(pair_ids.issubset(run_ids),
+                         len(pair_ids & run_ids) > 0)
+
+        if pair_ids <= run_ids:
+            # answering with the sibling translation must succeed
+            asked = session.current_word
+            sibling = (b if asked == a else a)
+            result = session.guess(asked, sibling.word_output)
+            self.assertTrue(result.success)
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

@@ -1230,7 +1230,38 @@ class Database:
 
         ids = selected_ids + [word_id for word_id in must_include
                               if word_id not in selected_ids]
+
+        # variant groups are kept whole by create_new_session (against
+        # the whole vocabulary), so a plain subset is enough here
         return scope_voc.select_ids(ids)
+
+    @staticmethod
+    def _with_variant_siblings(scope_voc: Vocabulary,
+                               full_voc: Vocabulary) -> Vocabulary:
+        """Extend ``scope_voc`` so that the sibling translations (same
+        input, different output) of every word it contains are included
+        too: the learner may answer with any of them, wherever in the
+        vocabulary they live. Returns ``scope_voc`` unchanged when it is
+        already complete (e.g. a whole-vocabulary run)."""
+        def word_ids(voc):
+            return {word_id for word_id in
+                    (voc.word_id(word) for word in voc.words)
+                    if word_id is not None}
+
+        wanted = word_ids(scope_voc)
+        by_key = {}
+        for word in full_voc.words:
+            word_id = full_voc.word_id(word)
+            if word_id is not None:
+                by_key.setdefault(word.key, []).append(word_id)
+
+        for siblings in by_key.values():
+            if any(sibling in wanted for sibling in siblings):
+                wanted.update(siblings)
+
+        if wanted == word_ids(scope_voc):
+            return scope_voc
+        return full_voc.select_ids(sorted(wanted))
 
     # ------------------------------------------------------------- sessions
     def create_new_session(self,
@@ -1261,6 +1292,13 @@ class Database:
             scope_voc = self._ai_words(
                 user.email, user.words_per_run, scope_voc, section_id,
                 now=created_at)
+
+        # a learner may answer an input with any of its translations, so
+        # sibling variants of the run words must always be part of the
+        # run (they can be dropped by the AI subset or split across
+        # sections), otherwise a valid answer would be judged wrong and
+        # the word would be asked over and over
+        scope_voc = self._with_variant_siblings(scope_voc, voc)
 
         new_session = Session([], scope_voc,
                               strategy=make_strategy(strategy_name),
@@ -1406,9 +1444,10 @@ class Database:
         output_code = db_voc_session.output_language.code
         levels = included_levels(db_voc_session.level)
 
-        v = self._load_vocabulary(db_voc_session.vocabulary_id,
-                                  input_code, output_code,
-                                  levels=levels)
+        whole_v = self._load_vocabulary(db_voc_session.vocabulary_id,
+                                        input_code, output_code,
+                                        levels=levels)
+        v = whole_v
 
         if db_voc_session.section_id is not None:
             section_voc = v.section_by_id(db_voc_session.section_id)
@@ -1446,6 +1485,10 @@ class Database:
                                       password='', main_language=None),
                     now=db_session.creation)
                 _cache_ai_scope(session_id, v)
+
+        # the same variant-group rule as session creation: sibling
+        # translations of the run words must be in the run on resume too
+        v = self._with_variant_siblings(v, whole_v)
 
         attempts = []
 
