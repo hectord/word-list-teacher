@@ -1478,12 +1478,13 @@ class Database:
     def vocabulary_stats(self, voc: Vocabulary,
                          user: Optional[User] = None) -> Optional[VocabularyStats]:
         """Per-word practice statistics of ``voc``, from the attempts of
-        one ``user``: the mastery percentage (runs where the word was
+        one ``user``: the lifetime success rate (runs where the word was
         answered correctly on its first attempt, over all runs which
         included it) and the hard-word flag (the word was answered
         wrongly at least once during the last ``hard_runs`` runs which
-        included it). Without a user, every user's attempts would be
-        mixed together, so the page always passes the current user."""
+        included it). Mastery is derived from those two. Without a
+        user, every user's attempts would be mixed together, so the
+        page always passes the current user."""
         hard_runs = 2
         db_user = None
         if user is not None:
@@ -1512,17 +1513,19 @@ class Database:
             seen.add(key)
             runs_by_word_id[word_id].append(success)
 
-        mastery_by_word = {}
+        success_rate_by_word = {}
         hard_words = set()
         for word_id, outcomes in runs_by_word_id.items():
             word = voc.word(word_id)
             if word is None:
                 continue
-            mastery_by_word[word] = 100 * sum(outcomes) / len(outcomes)
+            success_rate_by_word[word] = \
+                100 * sum(outcomes) / len(outcomes)
             if not all(outcomes[-hard_runs:]):
                 hard_words.add(word)
 
-        return VocabularyStats(voc, mastery_by_word, hard_words=hard_words)
+        return VocabularyStats(voc, success_rate_by_word,
+                               hard_words=hard_words)
 
     def known_word_counts(self, user: User,
                           levels=None) -> Dict[int, int]:

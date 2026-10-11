@@ -571,37 +571,45 @@ class Vocabulary:
 
 
 class VocabularyStats:
-    """Per-word practice statistics: how reliably the learner knows each
-    word (mastery) and whether it is currently flagged as hard.
+    """Per-word practice statistics: whether the learner masters each
+    word, plus the lifetime success rate which feeds the per-word bars.
 
-    * mastery: share of runs where the word was answered correctly on
-      its first attempt (100 = never missed it, 0 = never got it
-      right);
+    * mastery: the word was part of at least one run and is not hard
+      (every one of the last ``hard_runs`` runs which included it was
+      answered correctly);
     * hard: the word was answered wrongly at least once during the
-      last ``hard_runs`` runs which included it.
+      last ``hard_runs`` runs which included it;
+    * success rate: share of ALL runs which included the word and were
+      answered correctly on the first attempt (0-100, over the whole
+      history).
     """
 
     def __init__(self,
                  v: Vocabulary,
-                 mastery_by_word: Dict[Word, float],
+                 success_rate_by_word: Dict[Word, float],
                  hard_words=()):
         self._v = v
-        self._mastery_by_word = mastery_by_word
+        self._success_rate_by_word = success_rate_by_word
         self._hard_words = frozenset(hard_words)
 
     def mastery_for(self, w: Word):
-        """The 0-100 mastery percentage of ``w`` (0.0 when it was never
-        part of a run)."""
-        return self._mastery_by_word.get(w, 0.0)
+        """True when ``w`` is mastered: it was seen (part of at least
+        one run) and is not hard."""
+        return self.included_for(w) and not self.hard_for(w)
 
     def included_for(self, w: Word):
         """True when ``w`` was part of at least one run."""
-        return w in self._mastery_by_word
+        return w in self._success_rate_by_word
 
     def hard_for(self, w: Word):
         """True when ``w`` was answered wrongly during at least one of
         the last ``hard_runs`` runs which included it."""
         return w in self._hard_words
+
+    def success_rate_for(self, w: Word):
+        """The 0-100 percentage of runs which included ``w`` and were
+        answered correctly on the first attempt (0.0 when never seen)."""
+        return self._success_rate_by_word.get(w, 0.0)
 
 
 class Session:

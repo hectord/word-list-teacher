@@ -107,6 +107,7 @@
         {% set mastery = stats.mastery_for(word) %}
         {% set hard = stats.hard_for(word) %}
         {% set included = stats.included_for(word) %}
+        {% set success_rate = stats.success_rate_for(word) %}
         {% set sec = sections_by_index[loop.index0] %}
         {% set example = voc.example(word) %}
         <div class="row"
@@ -116,13 +117,14 @@
           <span class="col out">{% if sec %}<span class="sec-badge">{{ sec }}</span>{% endif %}{% if word.type %}<span class="type-badge">{{ word.type }}</span>{% endif %}{{ word.word_output }}</span>
           <span class="col in">{{ word.word_input }}</span>
           <span class="col err">
-            <span class="badge {% if not included %}never{% elif hard %}unknown{% elif mastery >= 80 %}good{% else %}shaky{% endif %}">
-              {% if included %}{{ '%.0f%%' % mastery }}{% else %}&mdash;{% endif %}
+            <span class="badge {% if mastery %}good{% elif hard %}unknown{% else %}never{% endif %}">
+              {% if mastery %}&#10003;{% elif hard %}&#10007;{% else %}&mdash;{% endif %}
             </span>
-            <div class="bar">
+            <div class="bar"
+                 title="{% if included %}{{ '%.0f%%' % success_rate }} of runs answered correctly{% endif %}">
               {% if included %}
-                <div class="bar-fill {% if hard %}danger{% elif mastery < 80 %}warn{% endif %}"
-                     style="width: {{ mastery | round }}%"></div>
+                <div class="bar-fill {% if hard %}danger{% endif %}"
+                     style="width: {{ success_rate | round }}%"></div>
               {% endif %}
             </div>
           </span>

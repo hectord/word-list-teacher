@@ -128,11 +128,12 @@ class TestStore(unittest.TestCase):
 
         stats = self.db.vocabulary_stats(voc, self.user)
 
-        # the answer 'bla' was wrong: mastery 0, and the word was missed
-        # during its only run, so it is hard
-        self.assertEqual(0.0, stats.mastery_for(word))
+        # the answer 'bla' was wrong: the word is seen but hard, so it
+        # is not mastered; its success rate is 0 (0 of 1 runs correct)
+        self.assertFalse(stats.mastery_for(word))
         self.assertTrue(stats.included_for(word))
         self.assertTrue(stats.hard_for(word))
+        self.assertEqual(0.0, stats.success_rate_for(word))
 
     def test_target_languages(self):
         self._create_vocabulary()
@@ -324,9 +325,10 @@ class TestStore(unittest.TestCase):
 
         # our user has no attempts at all -> the word was never included
         stats = self.db.vocabulary_stats(voc, self.user)
-        self.assertEqual(0.0, stats.mastery_for(word))
+        self.assertFalse(stats.mastery_for(word))
         self.assertFalse(stats.included_for(word))
         self.assertFalse(stats.hard_for(word))
+        self.assertEqual(0.0, stats.success_rate_for(word))
 
     def test_known_over_time(self):
         self._create_vocabulary()
@@ -394,7 +396,8 @@ class TestStore(unittest.TestCase):
 
         # with the default N=2 both words were right in the last 2 runs
         stats = self.db.vocabulary_stats(voc, self.user)
-        self.assertEqual(100.0, stats.mastery_for(word1))
+        self.assertTrue(stats.mastery_for(word1))
+        self.assertTrue(stats.mastery_for(word2))
         self.assertFalse(stats.hard_for(word1))
         self.assertFalse(stats.hard_for(word2))
 
@@ -404,8 +407,10 @@ class TestStore(unittest.TestCase):
         stats = self.db.vocabulary_stats(voc, self.user)
         self.assertTrue(stats.hard_for(word1))
         self.assertFalse(stats.hard_for(word2))
-        # mastery overall: 2 correct runs out of 3
-        self.assertEqual(100 * 2 / 3, stats.mastery_for(word1))
+        # word1 is seen but hard -> not mastered; its lifetime success
+        # rate is still 2 correct runs out of 3
+        self.assertFalse(stats.mastery_for(word1))
+        self.assertEqual(100 * 2 / 3, stats.success_rate_for(word1))
 
         # run 4: word1 is right again. With N=1 a single clean run
         # forgets the miss; with N=2 it is still among the last two runs
@@ -413,12 +418,14 @@ class TestStore(unittest.TestCase):
         self.db.set_user_hard_runs(self.user, 1)
         stats = self.db.vocabulary_stats(voc, self.user)
         self.assertFalse(stats.hard_for(word1))
+        self.assertTrue(stats.mastery_for(word1))
         self.db.set_user_hard_runs(self.user, 2)
         stats = self.db.vocabulary_stats(voc, self.user)
         self.assertTrue(stats.hard_for(word1))
-        # mastery overall: 3 correct runs out of 4
-        self.assertEqual(75.0, stats.mastery_for(word1))
-        self.assertEqual(100.0, stats.mastery_for(word2))
+        self.assertFalse(stats.mastery_for(word1))
+        # lifetime success rate: 3 correct runs out of 4
+        self.assertEqual(75.0, stats.success_rate_for(word1))
+        self.assertEqual(100.0, stats.success_rate_for(word2))
 
         # hard flags are per user: nobody else has the word flagged
         other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
