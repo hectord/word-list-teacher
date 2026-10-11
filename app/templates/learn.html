@@ -96,7 +96,9 @@
         </div>
       {% endif %}
 
-      {% for attempt in session.attempts %}
+      {# newest first: the live view adds every answer right under the
+         pinned input, so a reload must render the same order #}
+      {% for attempt in session.attempts | reverse %}
         {% if attempt.success %}
         <div class="word right-word">
           {{ word_ok(attempt.word.word_input,
