@@ -395,6 +395,23 @@ a.signout:hover { text-decoration: underline; }
 .section-count { font-size: 13px; color: #A08B7F; }
 
 .section-actions { display: flex; gap: 8px; }
+
+.sec-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+.sec-progress .bar { width: 100%; }
+.sec-stats { font-size: 12px; color: #A08B7F; }
+.sec-stats.muted { color: #B4A398; }
+.voc-total-progress {
+  background: #FDF8F4;
+  border: 1px solid #D9C6B8;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
 .section-actions .button { padding: 8px 16px; font-size: 14px; }
 
 .sec-badge {

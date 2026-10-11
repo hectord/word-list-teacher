@@ -198,6 +198,28 @@ async def vocabulary(request: Request,
     # the last N runs which included it (N = the user's setting)
     unknown_count = sum(1 for word in voc.words if stats.hard_for(word))
 
+    def section_progress(words):
+        """(included, mastered) counts for a list of words, using the
+        same hard-word rule as the vocabulary page."""
+        included = mastered = 0
+        for word in words:
+            if stats.included_for(word):
+                included += 1
+                if not stats.hard_for(word):
+                    mastered += 1
+        size = len(words)
+        seen = included - mastered
+        return {
+            'included': included,
+            'mastered': mastered,
+            'seen': seen,
+            'never': size - included,
+            'pct_mastered': 100 * mastered // size if size else 0,
+            'pct_seen': 100 * seen // size if size else 0,
+        }
+
+    whole_progress = section_progress(voc.words)
+
     sections = []
     for section in voc.sections:
         resume_session = db.last_session(user, voc, section=section.name)
@@ -208,6 +230,7 @@ async def vocabulary(request: Request,
             'name': section.name,
             'size': len(section.vocabulary),
             'resume': resume,
+            'progress': section_progress(section.vocabulary.words),
         })
 
     whole_session = db.last_session(user, voc, section='')
@@ -227,6 +250,7 @@ async def vocabulary(request: Request,
             'target': target,
             'word_count': word_count,
             'unknown_count': unknown_count,
+            'whole_progress': whole_progress,
             'sections': sections,
             'sections_by_index': sections_by_index,
             'unfinished_session': unfinished_session

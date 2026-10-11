@@ -3,7 +3,7 @@
 {% block title %}Vocabulary{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=11">
+    <link rel="stylesheet" href="/static/pages.css?v=15">
     <script src="/static/vocabulary.js?v=5"></script>
 {% endblock %}
 
@@ -28,6 +28,26 @@
 
   <div class="center">
 
+    {% macro sec_progress(p) %}
+      <div class="sec-progress">
+        <div class="bar seg-bar">
+          {% if p.pct_mastered %}
+            <div class="seg seg-mastered"
+                 style="width: {{ p.pct_mastered }}%"></div>
+          {% endif %}
+          {% if p.pct_seen %}
+            <div class="seg seg-seen"
+                 style="width: {{ p.pct_seen }}%"></div>
+          {% endif %}
+        </div>
+        {% if p.included %}
+          <span class="sec-stats">{{ p.pct_mastered }}% mastered · {{ p.seen }} seen · {{ p.never }} never</span>
+        {% else %}
+          <span class="sec-stats muted">no practice yet</span>
+        {% endif %}
+      </div>
+    {% endmacro %}
+
     {% if word_count > 500 %}
     <details class="word-list-toggle">
       <summary>Word list — {{ word_count }} words{% if unknown_count %} · <b class="unknown-text">{{ unknown_count }} hard</b>{% endif %}</summary>
@@ -45,6 +65,7 @@
             <span class="section-name">Whole vocabulary</span>
             <span class="section-count">{{ word_count }} words</span>
           </a>
+          {{ sec_progress(whole_progress) }}
           <div class="section-actions">
             {% if unfinished_session %}
               <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume</a>
@@ -59,6 +80,7 @@
               <span class="section-name">{{ section.name }}</span>
               <span class="section-count">{{ section.size }} words</span>
             </a>
+            {{ sec_progress(section.progress) }}
             <div class="section-actions">
               {% if section.resume %}
                 <a class="button resume" href="/learn?session_id={{ section.resume.id }}">Resume</a>
@@ -68,6 +90,10 @@
           </div>
         {% endfor %}
       </div>
+    {% endif %}
+
+    {% if not sections %}
+      <div class="voc-total-progress">{{ sec_progress(whole_progress) }}</div>
     {% endif %}
 
     <div id="word-list" class="word-list">
