@@ -138,8 +138,11 @@ input.field {
   font-size: 13px;
   color: #6B5D55;
 }
-.variant-note b { color: #3B2F2A; }
-.variant-note .variant-expected { color: #C75B39; }
+/* explicit sizes: the global ``*`` rule in base.css gives every
+   element without a font-size 23px (50px on hi-dpi phones), which
+   would otherwise dwarf the highlighted words */
+.variant-note b { color: #3B2F2A; font-size: inherit; }
+.variant-note .variant-expected { color: #C75B39; font-size: inherit; }
 
 .current .output .field {
   background: white;
@@ -206,6 +209,7 @@ input.field {
   font-size: 13px;
   color: #A08B7F;
 }
+.summary-strategy b { font-size: inherit; color: #6B5D55; }
 
 .summary-grid {
   display: flex;
