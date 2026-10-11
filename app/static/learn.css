@@ -319,5 +319,13 @@ input.field {
   }
   .example-text { font-size: 12px; }
 
+  /* keep the variant note (words with the same translation) as compact
+     as the example sentence on phones */
+  .variant-note {
+    font-size: 12px;
+    padding: 4px 12px;
+    margin-top: 6px;
+  }
+
   .word { margin-bottom: 14px; }
 }
