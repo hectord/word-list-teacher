@@ -567,6 +567,43 @@ class TestStore(unittest.TestCase):
         progress = self.db.progress_word_counts(self.user)
         self.assertEqual({1: (2, 2)}, progress)
 
+    def test_progress_skips_higher_levels(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        # word 1 is at the learner's level, word 2 is higher
+        DbWord.update(level='B1').where(DbWord.id == 1).execute()
+        DbWord.update(level='C1').where(DbWord.id == 2).execute()
+        b1 = frozenset({'B1'})
+
+        def attempt(word_input, success):
+            session = self.db.create_new_session(self.user, voc)
+            self.db.add_word_attempt(
+                session, WordAttempt(word=Word(word_input=word_input,
+                                               word_output='de_' +
+                                               word_input[-1]),
+                                     typed_word='x', success=success,
+                                     time=datetime(2026, 8, 1, 9, 0)))
+
+        attempt('fr_1', True)
+        attempt('fr_2', True)
+
+        # vocabulary sizes skip the higher-level word
+        self.assertEqual({1: 2}, self.db.all_vocabulary_sizes())
+        self.assertEqual({1: 1}, self.db.all_vocabulary_sizes(levels=b1))
+
+        # mastered counts and the over-time series do too
+        day = date(2026, 8, 1)
+        daily = self.db.mastered_over_time(self.user)
+        daily_b1 = self.db.mastered_over_time(self.user, levels=b1)
+        self.assertEqual((2, 2), daily[day])
+        self.assertEqual((1, 1), daily_b1[day])
+
+        users = {email: user_id for user_id, email in self.db.list_users()}
+        counts = self.db.mastered_counts_by_user(levels=b1)
+        self.assertEqual({1: 1}, counts[users['test@hotmail.com']])
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

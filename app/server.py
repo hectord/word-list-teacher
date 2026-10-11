@@ -382,10 +382,13 @@ async def index(request: Request,
 async def scoreboard(request: Request,
                      user: User = Depends(get_user)):
 
-    sizes = db.all_vocabulary_sizes()
+    # the board is scored within the levels the viewing user has to
+    # learn: words above that level are skipped everywhere
+    levels = included_levels(user.level)
+    sizes = db.all_vocabulary_sizes(levels)
     total_words = sum(sizes.values())
 
-    mastered_by_user = db.mastered_counts_by_user()
+    mastered_by_user = db.mastered_counts_by_user(levels)
 
     entries = []
     for user_id, email in db.list_users():
@@ -496,17 +499,21 @@ async def stats(request: Request,
                 voc: Optional[int] = None,
                 user: User = Depends(get_user)):
 
-    # stats are always about the signed-in user
+    # stats are always about the signed-in user, within the levels they
+    # have to learn: words above that level are skipped everywhere
+    levels = included_levels(user.level)
+    sizes = db.all_vocabulary_sizes(levels)
     summaries = db.vocabulary_summaries()
 
-    voc_options = [{'id': s['id'], 'title': _pick_title(s), 'size': s['size']}
-                   for s in summaries]
+    voc_options = [{'id': s['id'], 'title': _pick_title(s),
+                    'size': sizes.get(s['id'], 0)}
+                   for s in summaries if sizes.get(s['id'], 0) > 0]
     selected_voc = voc if voc is not None and \
         any(o['id'] == voc for o in voc_options) else None
 
-    total_words = sum(s['size'] for s in summaries
-                      if selected_voc is None or s['id'] == selected_voc)
-    daily = db.mastered_over_time(user, voc_id=selected_voc)
+    total_words = sum(o['size'] for o in voc_options
+                      if selected_voc is None or o['id'] == selected_voc)
+    daily = db.mastered_over_time(user, voc_id=selected_voc, levels=levels)
 
     mastered_now = learned_now = days_practised = 0
     chart = {'has_data': False}

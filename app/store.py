@@ -632,10 +632,19 @@ class Database:
         return self._load_vocabulary(voc_id, input_code, output_code,
                                      levels=levels)
 
-    def all_vocabulary_sizes(self) -> Dict[int, int]:
+    def all_vocabulary_sizes(self, levels=None) -> Dict[int, int]:
+        """Size of every vocabulary, optionally restricted to the words
+        of the given levels (plus words without a level)."""
+        sql = 'SELECT vocabulary_id, COUNT(*) FROM dbword'
+        params = []
+        if levels is not None:
+            sql += (' WHERE (level IN (%s) OR level IS NULL)'
+                    % ','.join('?' * len(levels)))
+            params += list(levels)
+        sql += ' GROUP BY vocabulary_id'
         sizes = defaultdict(int)
-        for voc_id, in DbWord.select(DbWord.vocabulary).tuples():
-            sizes[voc_id] += 1
+        for voc_id, count in db.execute_sql(sql, params):
+            sizes[voc_id] = count
         return dict(sizes)
 
     def vocabulary_summaries(self) -> List[dict]:
@@ -742,7 +751,8 @@ class Database:
         return daily
 
     def mastered_over_time(self, user,
-                           voc_id: int = None) -> Dict[date, tuple]:
+                           voc_id: int = None,
+                           levels=None) -> Dict[date, tuple]:
         """How many of the user's words are mastered, day by day.
 
         Returns ``{date: (mastered, learned)}`` for every day on which
@@ -754,7 +764,8 @@ class Database:
         * ``learned`` - words ever answered correctly up to that day
           (monotonic: keeps counting a word after later failures).
 
-        Optionally restricted to one vocabulary (``voc_id``)."""
+        Optionally restricted to one vocabulary (``voc_id``) and to the
+        given ``levels`` (plus words without a level)."""
         db_user = self._get_db_user(user)
         hard_runs = db_user.hard_runs if db_user.hard_runs is not None else 2
 
@@ -768,6 +779,9 @@ class Database:
 
         if voc_id is not None:
             query = query.where(DbWord.vocabulary == voc_id)
+        if levels is not None:
+            query = query.where((DbWord.level.in_(list(levels))) |
+                                DbWord.level.is_null())
 
         query = query.order_by(DbWordAttempt.time, DbWordAttempt.id)
 
@@ -1624,11 +1638,12 @@ class Database:
         return {user_id: dict(counts)
                 for user_id, counts in known.items()}
 
-    def mastered_counts_by_user(self) -> Dict[int, Dict[int, int]]:
+    def mastered_counts_by_user(self, levels=None) -> Dict[int, Dict[int, int]]:
         """Mastered words per user and vocabulary (the definition used
         on the vocabulary page: all of the last ``hard_runs`` runs which
         included the word were answered correctly). Every user counts
-        with their own ``hard_runs`` setting."""
+        with their own ``hard_runs`` setting; ``levels`` restricts the
+        counted words to the given levels (plus words without one)."""
         hard_runs = {}
         for db_user in DbUser.select():
             hard_runs[db_user.id] = \
@@ -1640,14 +1655,19 @@ class Database:
             FROM dbwordattempt a
             JOIN dbsession s ON s.id = a.session_id
             JOIN dbword w ON w.id = a.word_id
-            ORDER BY s.user_id, a.word_id, s.creation, s.id,
-                     a.time, a.id
         '''
+        params = []
+        if levels is not None:
+            sql += (' WHERE (w.level IN (%s) OR w.level IS NULL)'
+                    % ','.join('?' * len(levels)))
+            params += list(levels)
+        sql += (' ORDER BY s.user_id, a.word_id, s.creation, s.id, '
+                'a.time, a.id')
         outcomes = defaultdict(list)
         vocabulary_of = {}
         seen = set()
         for user_id, word_id, vocabulary_id, session_id, success in \
-                db.execute_sql(sql):
+                db.execute_sql(sql, params):
             key = (user_id, word_id, session_id)
             if key in seen:
                 continue
