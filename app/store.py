@@ -1254,8 +1254,12 @@ class Database:
         by_key = {}
         for word in full_voc.words:
             word_id = full_voc.word_id(word)
-            if word_id is not None:
-                by_key.setdefault(word.key, []).append(word_id)
+            if word_id is None:
+                continue
+            # a word may spell its input several ways (la portefeuille
+            # vs la portefeuille / porte-monnaie): register every key
+            for key in word.keys:
+                by_key.setdefault(key, set()).add(word_id)
 
         for siblings in by_key.values():
             if any(sibling in wanted for sibling in siblings):

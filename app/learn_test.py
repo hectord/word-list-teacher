@@ -173,6 +173,35 @@ class LearnTest(unittest.TestCase):
         self.assertTrue(word.accepts('Die Beschreibung (-en)', 'de'))
         self.assertFalse(word.accepts('die Erscheinung', 'de'))
 
+    def test_accepts_alternatives(self):
+        # the vocabulary data separates alternatives with '/'
+        cases = [
+            ('das Portemonnaie / Portmonee (-s)',
+             ['das Portemonnaie', 'Portmonee', 'das Portmonee']),
+            ('er/sie hat ... Augen', ['er hat ... Augen',
+                                      'sie hat ... Augen']),
+            ('der/die Schneider(in) (Schneider/die Schneiderinnen)',
+             ['der Schneider', 'die Schneiderin']),
+            ('der Popo/Po', ['der Popo', 'der Po']),
+            ('eine Glatze haben/tragen', ['eine Glatze haben', 'tragen']),
+            ('sich lehnen gegen/auf', ['sich lehnen gegen',
+                                       'sich lehnen auf']),
+            ('zu/ins Bett gehen', ['zu Bett gehen', 'ins Bett gehen']),
+        ]
+        for output, typed in cases:
+            word = Word(word_output=output, word_input='x')
+            for answer in typed:
+                self.assertTrue(word.accepts(answer, 'de'),
+                                '%r should accept %r' % (output, answer))
+
+    def test_keys_include_alternatives(self):
+        word = Word(word_output='x',
+                    word_input='la portefeuille / porte-monnaie')
+        self.assertIn('la portefeuille', word.keys)
+        self.assertIn('porte-monnaie', word.keys)
+        plain = Word(word_output='y', word_input='la portefeuille')
+        self.assertTrue(word.keys & plain.keys)
+
     def test_accepts_german_umlauts(self):
         word = Word(word_output='die Größe (-n)',
                     word_input='taille')

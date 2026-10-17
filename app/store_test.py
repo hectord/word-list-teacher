@@ -727,6 +727,29 @@ class TestStore(unittest.TestCase):
 
         self.assertTrue(session.is_finished)
 
+    def test_variants_with_different_input_writings(self):
+        """Rows for the same input written differently ('la portefeuille'
+        vs 'la portefeuille / porte-monnaie') are the same word group:
+        answering with the sibling's translation must succeed."""
+        self._create_user()
+        a = Word(word_input='la portefeuille',
+                 word_output='die Brieftasche (-n)')
+        b = Word(word_input='la portefeuille / porte-monnaie',
+                 word_output='das Portemonnaie / Portmonee (-s)')
+        voc = Vocabulary(Word('t', 't'), [a, b], 'fr', 'de')
+        vid = self.db.create_vocabulary(voc)
+        user = self.db.get_user(self.user.email, 'abc')
+        v = self.db.get_vocabulary(user, vid, Language.GERMAN)
+
+        first, second = v.words
+        self.assertIn(second, v.similar_words(first))
+
+        session = self.db.create_new_session(user, v)
+        res = session.guess(first, 'das Portemonnaie')
+        self.assertTrue(res.success)
+        # its own translation is accepted too
+        self.assertTrue(first.accepts('die Brieftasche', 'de'))
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

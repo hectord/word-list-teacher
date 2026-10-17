@@ -161,6 +161,96 @@ def word_filter(word):
     return normalize(word)
 
 
+# a parenthetical annotation, e.g. the plural "die Beschreibung (-en)"
+# or the feminine suffix "der/die Schneider(in)"
+PARENTHETICAL = re.compile(r'\(([^)]*)\)')
+
+
+def _expand_parenthetical(text: str, keep: int) -> str:
+    """The entry with the ``keep``-th parenthetical replaced by its
+    content and the others removed.
+    """
+    out = []
+    last = 0
+    index = 0
+    for match in PARENTHETICAL.finditer(text):
+        out.append(text[last:match.start()])
+        if index == keep:
+            out.append(match.group(1))
+        last = match.end()
+        index += 1
+    out.append(text[last:])
+    return ' '.join(''.join(out).split())
+
+
+def alternatives(text: str) -> List[str]:
+    """The alternative writings of a vocabulary entry.
+
+    The vocabulary data separates alternatives with ``/``:
+
+    * ``aller/convenir``            -> the word or its alternative
+    * ``das Portemonnaie / Portmonee`` -> either spelling
+    * ``er/sie hat ... Augen``      -> the first token alternates
+    * ``der/die Schneider(in)``     -> the shared suffix stays
+
+    Returns the raw candidate strings (the full entry included); each
+    is normalized before comparing with what the learner typed.
+    """
+    candidates = [text]
+
+    # parenthetical forms are written either with or without their
+    # content ("Schneiderin", "Schneider"); normalize() drops every
+    # parenthetical, so also try the versions keeping one of them
+    bases = [text]
+    for index in range(len(PARENTHETICAL.findall(text))):
+        expanded = _expand_parenthetical(text, index)
+        if expanded != text:
+            bases.append(expanded)
+
+    for base in bases:
+        if base not in candidates:
+            candidates.append(base)
+
+        parts = base.split('/')
+        candidates.extend(part.strip() for part in parts)
+        if len(parts) < 2:
+            continue
+
+        # "er/sie hat ..." / "der/die Schneider(in)" -> both tokens with
+        # the shared tail, e.g. "er hat ..." and "sie hat ..."
+        first = parts[0].strip()
+        rest = '/'.join(parts[1:]).strip()
+        rest_tokens = rest.split(None, 1)
+        if len(rest_tokens) == 2:
+            tail = rest_tokens[1]
+            candidates.append('%s %s' % (first, tail))
+            candidates.append('%s %s' % (rest_tokens[0], tail))
+
+        # "das Portemonnaie / Portmonee": the article of the first
+        # alternative is often dropped from the later ones
+        first_words = first.split(None, 1)
+        if len(first_words) == 2 and len(first_words[0]) <= 5:
+            for part in parts[1:]:
+                part = part.strip()
+                if part:
+                    candidates.append('%s %s' % (first_words[0], part))
+
+        # "sich lehnen gegen/auf": the last word alternates and the
+        # shared head of the first alternative stays
+        first_tokens = first.split()
+        if len(first_tokens) > 1:
+            head = ' '.join(first_tokens[:-1])
+            tails = [first_tokens[-1]]
+            for part in parts[1:]:
+                bare = PARENTHETICAL.sub(' ', part).split()
+                if bare:
+                    tails.append(bare[-1])
+            for tail in tails:
+                candidates.append('%s %s' % (head, tail))
+
+    return candidates
+
+
 @dataclass(frozen=True)
 class Word:
     word_output: str
@@ -189,23 +279,34 @@ class Word:
         return word_filter(self.word_input)
 
     @property
+    def keys(self) -> Set[str]:
+        """Every key grouping words with the same input, one for each
+        alternative written with ``/`` ("la portefeuille" and
+        "la portefeuille / porte-monnaie" share a key)."""
+        return {word_filter(candidate)
+                for candidate in alternatives(self.word_input)}
+
+    @property
     def _simplified_word_output(self) -> str:
         return word_filter(self.word_output)
 
     def accepts(self, word_output: str,
                 language: Optional[str] = None) -> bool:
-        return normalize(self.word_output, language) == \
-            normalize(word_output, language)
+        typed = normalize(word_output, language)
+        return any(normalize(candidate, language) == typed
+                   for candidate in alternatives(self.word_output))
 
     def is_other_variant(self, typed_word: str,
                          language: Optional[str] = None) -> bool:
-        """Whether ``typed_word`` differs from the expected output of
-        this word. The caller has established the answer is correct (it
-        matched one of the accepted variants); passing e.g. "die Taille"
-        for ``la taille`` -> ``die Größe (-n)`` means the learner used
-        another correct variant than the one this exercise expects."""
-        return normalize(self.word_output, language) !=\
-            normalize(typed_word, language)
+        """Whether the correct answer came from ANOTHER word of the
+        group than this one. The caller has established the answer is
+        correct; passing e.g. "die Taille" for ``la taille`` ->
+        ``die Größe (-n)`` means the learner used another correct
+        variant than the one this exercise expects.
+
+        Answering one of this word's own alternatives ("das Portemonnaie"
+        for ``das Portemonnaie / Portmonee``) is not another variant."""
+        return not self.accepts(typed_word, language)
 
     @property
     def line(self) -> str:
@@ -297,10 +398,14 @@ class Vocabulary:
         if self._similar_words is None:
             similar = defaultdict(set)
             for this_word in self._words:
-                similar[this_word.key].add(this_word)
+                for key in this_word.keys:
+                    similar[key].add(this_word)
             self._similar_words = similar
 
-        return self._similar_words[word.key]
+        found = set()
+        for key in word.keys:
+            found.update(self._similar_words.get(key, ()))
+        return found
 
     def section_of(self, word: Word) -> Optional[str]:
         try:
