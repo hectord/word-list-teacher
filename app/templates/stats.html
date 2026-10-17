@@ -4,7 +4,7 @@
 
 {% block header %}
     <link rel="stylesheet" href="/static/pages.css?v=14">
-    <link rel="stylesheet" href="/static/stats.css?v=4">
+    <link rel="stylesheet" href="/static/stats.css?v=5">
 {% endblock %}
 
 {% block body %}
@@ -55,6 +55,22 @@
       <div class="stats-card">
         <span class="stats-value">{{ days_practised }}</span>
         <span class="stats-label">days practised</span>
+      </div>
+    </div>
+
+    <div class="practice-stats">
+      <div class="practice-item">
+        <span class="practice-value">{{ practice.days_practised }} / {{ practice.total_days }}</span>
+        <span class="practice-label">days practised
+          {% if practice.first_day %}(since {{ practice.first_day }}){% endif %}</span>
+      </div>
+      <div class="practice-item">
+        <span class="practice-value">{{ practice.average }}</span>
+        <span class="practice-label">average active time per practised day</span>
+      </div>
+      <div class="practice-item">
+        <span class="practice-value">{{ practice.active }}</span>
+        <span class="practice-label">total active time (gaps under 1 min)</span>
       </div>
     </div>
 

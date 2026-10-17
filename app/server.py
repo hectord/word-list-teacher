@@ -426,6 +426,17 @@ async def scoreboard(request: Request,
     )
 
 
+def _format_duration(seconds) -> str:
+    """A compact human duration ("45s", "12m", "1h 05m")."""
+    seconds = int(round(seconds))
+    if seconds < 60:
+        return '%ds' % seconds
+    minutes = seconds // 60
+    if minutes < 60:
+        return '%dm' % minutes
+    return '%dh %02dm' % (minutes // 60, minutes % 60)
+
+
 def _hourly_chart(hours) -> dict:
     """Bar chart of the attempts per hour of the day: successful ones
     and errors side by side."""
@@ -751,6 +762,12 @@ async def stats(request: Request,
     weekday = _weekday_chart(
         db.attempts_by_weekday(user, voc_id=selected_voc, levels=levels))
 
+    # practice consistency: days practised vs. days since the start,
+    # and the average active time on a practised day
+    practice = db.practice_stats(user, voc_id=selected_voc, levels=levels)
+    practice['average'] = _format_duration(practice['average_seconds'])
+    practice['active'] = _format_duration(practice['active_seconds'])
+
     mastered_now = learned_now = days_practised = 0
     chart = {'has_data': False}
     eta = None
@@ -791,6 +808,7 @@ async def stats(request: Request,
             'markov': markov,
             'hourly': hourly,
             'weekday': weekday,
+            'practice': practice,
             'eta': eta,
         },
         headers={'Cache-Control': 'no-store'}

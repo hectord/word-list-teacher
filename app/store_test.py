@@ -849,6 +849,43 @@ class TestStore(unittest.TestCase):
         self.assertEqual(2, sum(d['successes'] for d in days))
         self.assertEqual(1, sum(d['failures'] for d in days))
 
+    def test_practice_stats(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        # one session on 2026-09-01: gaps 30s, 150s (ignored), 20s
+        session = self.db.create_new_session(self.user, voc)
+        for word, seconds in ((word1, (10, 0, 0)),
+                              (word2, (10, 0, 30)),
+                              (word1, (10, 3, 0)),
+                              (word2, (10, 3, 20))):
+            self.db.add_word_attempt(
+                session,
+                WordAttempt(word=word, typed_word='x', success=True,
+                            time=datetime(2026, 9, 1, *seconds)))
+
+        # another session on the next day: one gap of 10s
+        session2 = self.db.create_new_session(self.user, voc)
+        for word, seconds in ((word1, (9, 0, 0)),
+                              (word2, (9, 0, 10))):
+            self.db.add_word_attempt(
+                session2,
+                WordAttempt(word=word, typed_word='x', success=True,
+                            time=datetime(2026, 9, 2, *seconds)))
+
+        stats = self.db.practice_stats(self.user)
+        self.assertEqual(2, stats['days_practised'])          # two days
+        self.assertEqual(date(2026, 9, 1), stats['first_day'])
+        self.assertEqual((date.today() - date(2026, 9, 1)).days + 1,
+                         stats['total_days'])
+        # 30 + 20 + 10 seconds of active practice (the 150s gap ignored)
+        self.assertEqual(60, stats['active_seconds'])
+        self.assertEqual(30.0, stats['average_seconds'])
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

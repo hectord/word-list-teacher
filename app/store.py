@@ -881,6 +881,68 @@ class Database:
 
         return days
 
+    def practice_stats(self, user,
+                       voc_id: int = None,
+                       levels=None) -> dict:
+        """Practice consistency: how many days the user practised, for
+        how long the account has been used, and how much active time
+        was spent on an average practiced day.
+
+        Active time is the sum of the gaps between consecutive checked
+        words of the same session when the gap is below one minute
+        (longer pauses are not considered practice).
+
+        Returns ``{days_practised, first_day, total_days,
+        active_seconds, average_seconds}``.
+        """
+        db_user = self._get_db_user(user)
+
+        query = (DbWordAttempt
+                 .select(DbWordAttempt.success, DbWordAttempt.time,
+                         DbWordAttempt.session_id)
+                 .join(DbWord)
+                 .switch(DbWordAttempt)
+                 .join(DbSession)
+                 .where(DbSession.user == db_user))
+
+        if voc_id is not None:
+            query = query.where(DbWord.vocabulary == voc_id)
+        if levels is not None:
+            query = query.where((DbWord.level.in_(list(levels))) |
+                                DbWord.level.is_null())
+
+        query = query.order_by(DbWordAttempt.session_id,
+                               DbWordAttempt.time, DbWordAttempt.id)
+
+        days = set()
+        active_seconds = 0.0
+        last_session = None
+        last_time = None
+
+        for _success, tested_at, session_id in query.tuples():
+            if tested_at is None:
+                continue
+            days.add(tested_at.date())
+
+            if session_id == last_session and last_time is not None:
+                gap = (tested_at - last_time).total_seconds()
+                if 0 <= gap < 60:
+                    active_seconds += gap
+
+            last_session = session_id
+            last_time = tested_at
+
+        first_day = min(days) if days else None
+        total_days = ((date.today() - first_day).days + 1) if first_day else 0
+
+        return {
+            'days_practised': len(days),
+            'first_day': first_day,
+            'total_days': total_days,
+            'active_seconds': round(active_seconds),
+            'average_seconds': (active_seconds / len(days)) if days else 0.0,
+        }
+
     def mastered_over_time(self, user,
                            voc_id: int = None,
                            levels=None) -> Dict[date, tuple]:
