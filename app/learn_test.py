@@ -194,6 +194,36 @@ class LearnTest(unittest.TestCase):
                 self.assertTrue(word.accepts(answer, 'de'),
                                 '%r should accept %r' % (output, answer))
 
+    def test_in_word_parenthesis_is_optional(self):
+        word = Word(word_output='der Ell(en)bogen (Ellbogen)',
+                    word_input='le coude')
+        self.assertTrue(word.accepts('der Ellbogen', 'de'))
+        self.assertTrue(word.accepts('der Ellenbogen', 'de'))
+        self.assertTrue(word.accepts('der Ell(en)bogen', 'de'))
+        self.assertFalse(word.accepts('der Ell bogen', 'de'))
+
+        # a feminine suffix works the same way
+        baker = Word(word_output='der/die Bäcker(in) (-)',
+                     word_input='le boulanger')
+        self.assertTrue(baker.accepts('der Bäcker', 'de'))
+        self.assertTrue(baker.accepts('die Bäckerin', 'de'))
+
+        # separable verb marker inside a word
+        frozen = Word(word_output='durch(ge)froren', word_input='x')
+        self.assertTrue(frozen.accepts('durchgefroren', 'de'))
+        self.assertTrue(frozen.accepts('durchfroren', 'de'))
+
+    def test_out_of_word_annotation_is_ignored(self):
+        word = Word(word_output='Die Junggeselle (fam)', word_input='x')
+        self.assertTrue(word.accepts('Die Junggeselle', 'de'))
+        self.assertTrue(word.accepts('Die Junggeselle (fam)', 'de'))
+        # the annotation content alone is not part of the word
+        self.assertFalse(word.accepts('Die Junggeselle fam', 'de'))
+
+        # plural notes outside a word stay optional too
+        plural = Word(word_output='die Beschreibung (-en)', word_input='x')
+        self.assertTrue(plural.accepts('die Beschreibung', 'de'))
+
     def test_keys_include_alternatives(self):
         word = Word(word_output='x',
                     word_input='la portefeuille / porte-monnaie')

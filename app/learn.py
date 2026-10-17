@@ -102,7 +102,13 @@ def included_levels(level: Optional[str]) -> Optional[frozenset]:
 
 
 
-REMOVE_PARENTHESIS = re.compile(r'\s*\([^)]*\)\s*')
+# an annotation written OUTSIDE a word (e.g. the register "Die
+# Junggeselle (fam)"): it is ignored when comparing answers
+OUTSIDE_PARENTHESIS = re.compile(r'(?:^|\s)\([^)]*\)')
+
+# a parenthetical written INSIDE a word (e.g. "Ell(ge)bogen"): its
+# content is optional, both "Ellbogen" and "Ellgebogen" are accepted
+GLUED_PARENTHESIS = re.compile(r'(?<=\S)\(([^)]*)\)')
 
 APOSTROPHES = str.maketrans({
     '\u2019': "'",   # ’
@@ -137,8 +143,11 @@ def normalize(word: str, language: Optional[str] = None) -> str:
     word = word.translate(APOSTROPHES)
     word = word.replace('|', '').replace('*', '')
 
-    while REMOVE_PARENTHESIS.sub(' ', word) != word:
-        word = REMOVE_PARENTHESIS.sub(' ', word)
+    # only the annotations written outside a word are dropped: an
+    # in-word parenthetical ("Ell(ge)bogen") keeps its content and is
+    # expanded by alternatives()
+    while OUTSIDE_PARENTHESIS.sub('', word) != word:
+        word = OUTSIDE_PARENTHESIS.sub('', word)
 
     word = re.sub(r'\s+', ' ', word).strip()
 
@@ -166,21 +175,24 @@ def word_filter(word):
 PARENTHETICAL = re.compile(r'\(([^)]*)\)')
 
 
-def _expand_parenthetical(text: str, keep: int) -> str:
-    """The entry with the ``keep``-th parenthetical replaced by its
-    content and the others removed.
-    """
-    out = []
+def _parenthetical_variants(text: str) -> List[str]:
+    """"All the ways an in-word parenthetical can be written: as given
+    ("Ell(ge)bogen"), with its content ("Ellgebogen") or without it
+    ("Ellbogen"). Combinations of several groups are expanded too."""
+    matches = list(GLUED_PARENTHESIS.finditer(text))
+    if not matches:
+        return [text]
+
+    variants = ['']
     last = 0
-    index = 0
-    for match in PARENTHETICAL.finditer(text):
-        out.append(text[last:match.start()])
-        if index == keep:
-            out.append(match.group(1))
+    for match in matches:
+        prefix = text[last:match.start()]
+        options = [match.group(0), match.group(1), '']
+        variants = [variant + prefix + option
+                    for variant in variants for option in options]
         last = match.end()
-        index += 1
-    out.append(text[last:])
-    return ' '.join(''.join(out).split())
+    suffix = text[last:]
+    return [variant + suffix for variant in variants]
 
 
 def alternatives(text: str) -> List[str]:
@@ -193,26 +205,36 @@ def alternatives(text: str) -> List[str]:
     * ``er/sie hat ... Augen``      -> the first token alternates
     * ``der/die Schneider(in)``     -> the shared suffix stays
 
+    Annotations written outside a word ("Die Junggeselle (fam)") are
+    ignored, while a parenthetical inside a word ("Ell(ge)bogen") is
+    optional, so both "Ellbogen" and "Ellgebogen" are produced.
+
     Returns the raw candidate strings (the full entry included); each
     is normalized before comparing with what the learner typed.
     """
-    candidates = [text]
+    candidates = []
 
-    # parenthetical forms are written either with or without their
-    # content ("Schneiderin", "Schneider"); normalize() drops every
-    # parenthetical, so also try the versions keeping one of them
-    bases = [text]
-    for index in range(len(PARENTHETICAL.findall(text))):
-        expanded = _expand_parenthetical(text, index)
-        if expanded != text:
-            bases.append(expanded)
+    def add(candidate):
+        candidate = candidate.strip()
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+
+    # drop the out-of-word annotations first: their content is never
+    # part of the answer (and may contain slashes of its own)
+    cleaned = OUTSIDE_PARENTHESIS.sub('', text).strip()
+
+    bases = []
+    for variant in _parenthetical_variants(cleaned):
+        if variant not in bases:
+            bases.append(variant)
 
     for base in bases:
-        if base not in candidates:
-            candidates.append(base)
+        add(base)
 
         parts = base.split('/')
-        candidates.extend(part.strip() for part in parts)
+        for part in parts:
+            add(part)
+
         if len(parts) < 2:
             continue
 
@@ -223,17 +245,16 @@ def alternatives(text: str) -> List[str]:
         rest_tokens = rest.split(None, 1)
         if len(rest_tokens) == 2:
             tail = rest_tokens[1]
-            candidates.append('%s %s' % (first, tail))
-            candidates.append('%s %s' % (rest_tokens[0], tail))
+            add('%s %s' % (first, tail))
+            add('%s %s' % (rest_tokens[0], tail))
 
         # "das Portemonnaie / Portmonee": the article of the first
         # alternative is often dropped from the later ones
         first_words = first.split(None, 1)
         if len(first_words) == 2 and len(first_words[0]) <= 5:
             for part in parts[1:]:
-                part = part.strip()
                 if part:
-                    candidates.append('%s %s' % (first_words[0], part))
+                    add('%s %s' % (first_words[0], part))
 
         # "sich lehnen gegen/auf": the last word alternates and the
         # shared head of the first alternative stays
@@ -246,7 +267,7 @@ def alternatives(text: str) -> List[str]:
                 if bare:
                     tails.append(bare[-1])
             for tail in tails:
-                candidates.append('%s %s' % (head, tail))
+                add('%s %s' % (head, tail))
 
     return candidates
 
