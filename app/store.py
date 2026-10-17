@@ -922,19 +922,16 @@ class Database:
                 hard[word_id] = misses
         return hard
 
-    def practice_stats(self, user,
-                       voc_id: int = None,
-                       levels=None) -> dict:
-        """Practice consistency: how many days the user practised, for
-        how long the account has been used, and how much active time
-        was spent on an average practiced day.
+    def active_seconds_by_day(self, user,
+                              voc_id: int = None,
+                              levels=None) -> Dict[date, float]:
+        """Active practice time per calendar day.
 
-        Active time is the sum of the gaps between consecutive checked
-        words of the same session when the gap is below one minute
-        (longer pauses are not considered practice).
-
-        Returns ``{days_practised, first_day, total_days,
-        active_seconds, average_seconds}``.
+        The active time of a day is the sum of the gaps between
+        consecutive checked words of the same session when the gap is
+        below one minute (longer pauses are not considered practice).
+        Every day on which the user answered at least one word is
+        present, with 0 seconds when no short gap was measured.
         """
         db_user = self._get_db_user(user)
 
@@ -955,33 +952,54 @@ class Database:
         query = query.order_by(DbWordAttempt.session_id,
                                DbWordAttempt.time, DbWordAttempt.id)
 
-        days = set()
-        active_seconds = 0.0
+        seconds_by_day = defaultdict(float)
         last_session = None
         last_time = None
 
         for _success, tested_at, session_id in query.tuples():
             if tested_at is None:
                 continue
-            days.add(tested_at.date())
+            day = tested_at.date()
+            seconds_by_day.setdefault(day, 0.0)
 
             if session_id == last_session and last_time is not None:
                 gap = (tested_at - last_time).total_seconds()
                 if 0 <= gap < 60:
-                    active_seconds += gap
+                    seconds_by_day[day] += gap
 
             last_session = session_id
             last_time = tested_at
 
+        return dict(seconds_by_day)
+
+    def practice_stats(self, user,
+                       voc_id: int = None,
+                       levels=None) -> dict:
+        """Practice consistency: how many days the user practised, for
+        how long the account has been used, and how much active time
+        was spent on an average practiced day.
+
+        Active time is the sum of the gaps between consecutive checked
+        words of the same session when the gap is below one minute
+        (longer pauses are not considered practice).
+
+        Returns ``{days_practised, first_day, total_days,
+        active_seconds, average_seconds}``.
+        """
+        seconds_by_day = self.active_seconds_by_day(user, voc_id=voc_id,
+                                                    levels=levels)
+
+        days = seconds_by_day.keys()
+        active_seconds = sum(seconds_by_day.values())
         first_day = min(days) if days else None
         total_days = ((date.today() - first_day).days + 1) if first_day else 0
 
         return {
-            'days_practised': len(days),
+            'days_practised': len(seconds_by_day),
             'first_day': first_day,
             'total_days': total_days,
             'active_seconds': round(active_seconds),
-            'average_seconds': (active_seconds / len(days)) if days else 0.0,
+            'average_seconds': ((active_seconds / len(days)) if days else 0.0),
         }
 
     def mastered_over_time(self, user,

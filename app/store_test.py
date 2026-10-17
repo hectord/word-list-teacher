@@ -880,6 +880,39 @@ class TestStore(unittest.TestCase):
         run([(word1, True)])
         self.assertEqual({}, self.db.hard_word_ids(self.user))
 
+    def test_active_seconds_by_day(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def session(day, seconds):
+            run = self.db.create_new_session(self.user, voc)
+            for word, sec in zip((word1, word2), seconds):
+                self.db.add_word_attempt(
+                    run, WordAttempt(word=word, typed_word='x',
+                                     success=True,
+                                     time=datetime(2026, 9, day, 10, 0,
+                                                   sec)))
+
+        session(1, (0, 25))     # 25s active on the 1st
+        session(3, (0, 10))     # 10s active on the 3rd
+        # a day with attempts but a long pause: present with 0 seconds
+        run = self.db.create_new_session(self.user, voc)
+        for word, when in ((word1, datetime(2026, 9, 5, 10, 0, 0)),
+                           (word2, datetime(2026, 9, 5, 10, 5, 0))):
+            self.db.add_word_attempt(
+                run, WordAttempt(word=word, typed_word='x', success=True,
+                                 time=when))
+
+        by_day = self.db.active_seconds_by_day(self.user)
+        self.assertEqual(25.0, by_day[date(2026, 9, 1)])
+        self.assertEqual(10.0, by_day[date(2026, 9, 3)])
+        self.assertEqual(0.0, by_day[date(2026, 9, 5)])
+        self.assertEqual(3, len(by_day))
+
     def test_practice_stats(self):
         self._create_vocabulary()
         self._create_user()

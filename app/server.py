@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import bisect
 import math
 import os
 from typing import Optional, List
@@ -505,6 +506,85 @@ def _hourly_chart(hours) -> dict:
 WEEKDAYS = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
 
 
+HEATMAP_WEEKS = 26
+MONTH_NAMES = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+
+
+def _activity_heatmap(seconds_by_day, weeks: int = HEATMAP_WEEKS) -> dict:
+    """A GitHub-like calendar: one square per day, darker green when more
+    active practice time was spent (the same measure as the practice
+    stats: gaps under one minute inside a session)."""
+    if not seconds_by_day:
+        return {'has_data': False}
+
+    today = date.today()
+    start = today - timedelta(days=weeks * 7 - 1)
+    start -= timedelta(days=start.weekday())   # Monday-start weeks
+
+    values = sorted(seconds for seconds in seconds_by_day.values()
+                    if seconds > 0)
+
+    def level(seconds):
+        # the shade follows the rank of the day among the practised days,
+        # so ties do not collapse everything into one level
+        if seconds <= 0:
+            return 0
+        if len(values) < 2:
+            return 4
+        fraction = bisect.bisect_left(values, seconds) / (len(values) - 1)
+        return min(4, 1 + int(fraction * 4))
+
+    cell, gap = 14, 17
+    left, top = 30, 18
+
+    columns = []
+    current = start
+    previous_month = None
+    while current <= today:
+        cells = []
+        month_label = ''
+        for row in range(7):
+            day = current + timedelta(days=row)
+            is_future = day > today
+            seconds = int(round(seconds_by_day.get(day, 0.0)))
+            if is_future:
+                level_value = -1
+            else:
+                level_value = level(seconds)
+            cells.append({
+                'x': left + len(columns) * gap,
+                'y': top + row * gap,
+                'level': level_value,
+                'title': ('%s · %s' % (day, _format_duration(seconds))
+                          if not is_future else ''),
+            })
+            if row == 0 and not is_future:
+                if previous_month != day.month:
+                    month_label = MONTH_NAMES[day.month - 1]
+                    previous_month = day.month
+        columns.append({'cells': cells, 'label': month_label})
+        current += timedelta(days=7)
+
+    width = left + len(columns) * gap + 2
+    height = top + 7 * gap + 2
+
+    weekday_labels = [
+        {'y': top + row * gap + cell / 2 + 4, 'text': text}
+        for row, text in ((0, 'Mon'), (2, 'Wed'), (4, 'Fri'))
+    ]
+
+    return {
+        'has_data': True,
+        'width': width,
+        'height': height,
+        'cell': cell,
+        'columns': columns,
+        'weekday_labels': weekday_labels,
+        'weeks': len(columns),
+    }
+
+
 def _weekday_chart(days) -> dict:
     """Bar chart of the attempts per day of the week: successful ones
     and errors side by side."""
@@ -762,6 +842,10 @@ async def stats(request: Request,
     weekday = _weekday_chart(
         db.attempts_by_weekday(user, voc_id=selected_voc, levels=levels))
 
+    # GitHub-like calendar of the active practice time
+    heatmap = _activity_heatmap(
+        db.active_seconds_by_day(user, voc_id=selected_voc, levels=levels))
+
     # practice consistency: days practised vs. days since the start,
     # and the average active time on a practised day
     practice = db.practice_stats(user, voc_id=selected_voc, levels=levels)
@@ -808,6 +892,7 @@ async def stats(request: Request,
             'markov': markov,
             'hourly': hourly,
             'weekday': weekday,
+            'heatmap': heatmap,
             'practice': practice,
             'eta': eta,
         },

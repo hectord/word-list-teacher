@@ -203,6 +203,25 @@
 .hourly-chart { margin-top: 16px; }
 /* attempts per day of the week (same bars, separate chart) */
 .weekday-chart { margin-top: 16px; }
+
+/* GitHub-like calendar of the practice time */
+.heatmap-panel { margin-top: 16px; }
+.heatmap-panel svg { width: 100%; height: auto; max-width: 560px; display: block; }
+.hm-cell { stroke: rgba(255, 255, 255, 0.6); stroke-width: 1; }
+.hm-level-0 { fill: #F0E7E0; }
+.hm-level-1 { fill: #DCEFE3; }
+.hm-level-2 { fill: #AEDCC0; }
+.hm-level-3 { fill: #6FBF91; }
+.hm-level-4 { fill: #2F7D5B; }
+.hm-weekday, .hm-month { font-size: 10px; fill: #A08B7F; }
+.hm-legend { gap: 4px; align-items: center; }
+.hm-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+  margin: 0 1px;
+}
 .hour-bar { opacity: 0.9; }
 .hour-bar:hover { opacity: 1; }
 .hour-bar.success { fill: #2F7D5B; }

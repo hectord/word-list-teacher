@@ -4,7 +4,7 @@
 
 {% block header %}
     <link rel="stylesheet" href="/static/pages.css?v=14">
-    <link rel="stylesheet" href="/static/stats.css?v=5">
+    <link rel="stylesheet" href="/static/stats.css?v=6">
 {% endblock %}
 
 {% block body %}
@@ -288,6 +288,49 @@
               <span class="legend-end">{{ weekday.failures }}</span>
             </span>
             <span class="legend-range">peak: {{ weekday.peak }} attempt(s) in a day</span>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if heatmap.has_data %}
+        <div class="stats-chart heatmap-panel">
+          <div class="markov-title">Practice time over the last {{ heatmap.weeks }} weeks</div>
+          <div class="markov-note">
+            Each square is one day; the darker the green, the more active
+            time spent (gaps under one minute inside a session). Hover a
+            square for the date and duration.
+          </div>
+          <svg viewBox="0 0 {{ heatmap.width }} {{ heatmap.height }}"
+               role="img" aria-label="Active practice time per day">
+            {% for label in heatmap.weekday_labels %}
+              <text class="hm-weekday" x="24" y="{{ label.y }}"
+                    text-anchor="end">{{ label.text }}</text>
+            {% endfor %}
+            {% for column in heatmap.columns %}
+              {% if column.label %}
+                <text class="hm-month" x="{{ column.cells[0].x }}"
+                      y="12">{{ column.label }}</text>
+              {% endif %}
+              {% for cell in column.cells %}
+                {% if cell.level >= 0 %}
+                  <rect class="hm-cell hm-level-{{ cell.level }}"
+                        x="{{ cell.x }}" y="{{ cell.y }}"
+                        width="{{ heatmap.cell }}"
+                        height="{{ heatmap.cell }}" rx="3">
+                    <title>{{ cell.title }}</title>
+                  </rect>
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+          </svg>
+          <div class="chart-legend hm-legend">
+            <span class="legend-range">less</span>
+            <span class="hm-swatch hm-level-0"></span>
+            <span class="hm-swatch hm-level-1"></span>
+            <span class="hm-swatch hm-level-2"></span>
+            <span class="hm-swatch hm-level-3"></span>
+            <span class="hm-swatch hm-level-4"></span>
+            <span class="legend-range">more</span>
           </div>
         </div>
       {% endif %}
