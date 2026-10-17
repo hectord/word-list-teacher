@@ -304,7 +304,10 @@ async def index(request: Request,
     entries = []
 
     for voc_id, vocabulary in vocabularies.items():
-        session = db.last_session(user, vocabulary)
+        # only whole-vocabulary runs are resumable from here: section
+        # runs are resumed from the vocabulary page, where they are not
+        # confusing with the vocabulary's own run
+        session = db.last_session(user, vocabulary, section='')
         if session is not None and not session.is_finished:
             session_by_vocabulary[vocabulary] = session
 
