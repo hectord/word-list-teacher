@@ -815,6 +815,61 @@ async def stats(request: Request,
     )
 
 
+@app.get("/hard-words")
+async def hard_words(request: Request,
+                     user: User = Depends(get_user)):
+
+    target = _resolve_target(user)
+    levels = included_levels(user.level)
+
+    if target is None:
+        return TEMPLATES.TemplateResponse(
+            request, "hard_words.html",
+            {'user': user, 'groups': [], 'total': 0, 'target': None},
+            headers={'Cache-Control': 'no-store'}
+        )
+
+    vocabularies = db.list_vocabularies(user, target, levels=levels)
+    hard = db.hard_word_ids(user, levels=levels)
+
+    groups = []
+    total = 0
+    for voc in vocabularies.values():
+        entries = []
+        for word in voc.words:
+            word_id = voc.word_id(word)
+            if word_id is not None and word_id in hard:
+                entries.append({
+                    'word': word.word_output,
+                    'input': word.word_input,
+                    'misses': hard[word_id],
+                })
+        if not entries:
+            continue
+
+        entries.sort(key=lambda entry: (-entry['misses'], entry['word']))
+        total += len(entries)
+        groups.append({
+            'id': voc.id,
+            'title': voc.name.word_input if voc.name else 'Vocabulary',
+            'entries': entries,
+        })
+
+    # the most problematic vocabularies first
+    groups.sort(key=lambda group: (-len(group['entries']), group['title']))
+
+    return TEMPLATES.TemplateResponse(
+        request, "hard_words.html",
+        {
+            'user': user,
+            'groups': groups,
+            'total': total,
+            'target': target,
+        },
+        headers={'Cache-Control': 'no-store'}
+    )
+
+
 @app.get("/new_session")
 async def new_session(request: Request,
                       voc_id: int,

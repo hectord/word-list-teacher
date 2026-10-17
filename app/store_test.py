@@ -849,6 +849,37 @@ class TestStore(unittest.TestCase):
         self.assertEqual(2, sum(d['successes'] for d in days))
         self.assertEqual(1, sum(d['failures'] for d in days))
 
+    def test_hard_word_ids(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+
+        def run(results):
+            session = self.db.create_new_session(self.user, voc)
+            for word, success in results:
+                self.db.add_word_attempt(
+                    session, WordAttempt(word=word, typed_word='x',
+                                         success=success,
+                                         time=datetime(2026, 5, 1, 9)))
+
+        # word1: wrong in its last run -> hard; word2: only correct
+        run([(word1, True)])
+        run([(word1, False)])
+        run([(word2, True)])
+
+        hard = self.db.hard_word_ids(self.user)
+        v = self.db.get_vocabulary(self.user, 1, Language.GERMAN)
+        word_ids = {word: v.word_id(word) for word in (word1, word2)}
+        self.assertEqual({word_ids[word1]: 1}, hard)
+
+        # a clean run makes word1 master again
+        run([(word1, True)])
+        run([(word1, True)])
+        self.assertEqual({}, self.db.hard_word_ids(self.user))
+
     def test_practice_stats(self):
         self._create_vocabulary()
         self._create_user()

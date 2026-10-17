@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Hard words{% endblock %}
+
+{% block header %}
+    <link rel="stylesheet" href="/static/pages.css?v=15">
+    <link rel="stylesheet" href="/static/hard.css?v=1">
+{% endblock %}
+
+{% block body %}
+
+  <header class="page-header">
+    <div class="brand-line">
+      <a class="back" href="/index">&larr; All vocabularies</a>
+      <h1>Hard words</h1>
+      <span class="subtitle">words missed in their last runs — ready to repeat</span>
+    </div>
+    <div class="user-box">
+      <span class="user">{{ user.email }}</span>
+      <a class="nav-link" href="/stats">Stats</a>
+      <a class="signout" href="/logout">sign&nbsp;out</a>
+    </div>
+  </header>
+
+  <div class="center">
+
+    {% if groups %}
+      <div class="hard-total">
+        <span class="hard-total-value">{{ total }}</span>
+        <span class="hard-total-label">hard word(s) in {{ groups | length }} vocabulary(ies)</span>
+      </div>
+
+      {% for group in groups %}
+        <div class="hard-group">
+          <div class="hard-group-head">
+            <a class="hard-group-title"
+               href="/vocabulary?id={{ group.id }}{% if target %}&amp;to={{ target.code }}{% endif %}">
+              {{ group.title }}
+            </a>
+            <span class="hard-group-count">{{ group.entries | length }} hard</span>
+          </div>
+
+          <div class="hard-rows">
+            {% for entry in group.entries %}
+              <div class="hard-row">
+                <span class="hard-word">{{ entry.word }}</span>
+                <span class="hard-input">{{ entry.input }}</span>
+                <span class="hard-misses">&times;{{ entry.misses }}
+                  <span class="hard-misses-note">in the last runs</span></span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="stats-empty">
+        No hard words right now — every word you have practised was
+        answered correctly in its recent runs.
+        <a href="/index">Back to the vocabularies</a>
+      </div>
+    {% endif %}
+
+  </div>
+
+{% endblock %}

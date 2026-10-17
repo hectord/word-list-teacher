@@ -881,6 +881,47 @@ class Database:
 
         return days
 
+    def hard_word_ids(self, user, levels=None) -> Dict[int, int]:
+        """Every hard word of the user across all vocabularies.
+
+        A word is hard when it was answered wrongly at least once in
+        the last ``hard_runs`` runs which included it (the vocabulary
+        page's rule). Returns ``{word_id: misses in the window}``.
+        """
+        db_user = self._get_db_user(user)
+        hard_runs = db_user.hard_runs if db_user.hard_runs is not None else 2
+
+        sql = '''
+            SELECT a.word_id, a.session_id, a.success
+            FROM dbwordattempt a
+            JOIN dbsession s ON s.id = a.session_id
+            JOIN dbword w ON w.id = a.word_id
+            WHERE s.user_id = ?
+        '''
+        params = [db_user.id]
+        if levels is not None:
+            sql += (' AND (w.level IN (%s) OR w.level IS NULL)'
+                    % ','.join('?' * len(levels)))
+            params += list(levels)
+        sql += ' ORDER BY a.word_id, s.creation, s.id, a.time, a.id'
+
+        outcomes_by_word = defaultdict(list)
+        seen_runs = set()
+        for word_id, session_id, success in db.execute_sql(sql, params):
+            key = (word_id, session_id)
+            if key in seen_runs:
+                continue
+            seen_runs.add(key)
+            outcomes_by_word[word_id].append(success)
+
+        hard = {}
+        for word_id, outcomes in outcomes_by_word.items():
+            window = outcomes[-hard_runs:]
+            misses = sum(1 for success in window if not success)
+            if misses:
+                hard[word_id] = misses
+        return hard
+
     def practice_stats(self, user,
                        voc_id: int = None,
                        levels=None) -> dict:
