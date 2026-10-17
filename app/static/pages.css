@@ -64,6 +64,8 @@ a.signout:hover { text-decoration: underline; }
 
 .center {
   width: min(960px, 92vw);
+  max-width: 100%;
+  box-sizing: border-box;
   margin: 28px auto;
   padding: 0;
 }
@@ -576,8 +578,23 @@ a.signout:hover { text-decoration: underline; }
 
   .center {
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     margin: 10px auto 16px;
     padding: 0 12px;
+  }
+
+  /* the words-per-run controls do not fit next to the AI option on a
+     phone: put them on their own line under the description */
+  .setting-option.with-controls {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+  .setting-option.with-controls .wpr-controls {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 8px;
+    flex-wrap: wrap;
   }
 
   .button { padding: 9px 16px; font-size: 15px; }
