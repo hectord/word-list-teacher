@@ -426,6 +426,71 @@ async def scoreboard(request: Request,
     )
 
 
+def _hourly_chart(hours) -> dict:
+    """Bar chart of the attempts per hour of the day: successful ones
+    and errors side by side."""
+    if not any(h['successes'] or h['failures'] for h in hours):
+        return {'has_data': False}
+
+    W, H = 940, 260
+    PL, PR, PT, PB = 46, 18, 18, 30
+    plot_w, plot_h = W - PL - PR, H - PT - PB
+
+    top = max(max(h['successes'], h['failures']) for h in hours) or 1
+    group = plot_w / len(hours)
+    bar_w = max(4.0, group * 0.32)
+
+    def ypx(value):
+        return PT + plot_h * (1 - value / top)
+
+    bars = []
+    for index, hour in enumerate(hours):
+        centre = PL + group * (index + 0.5)
+        for offset, key, css in ((-bar_w / 2, 'successes', 'success'),
+                                 (bar_w / 2, 'failures', 'error')):
+            value = hour[key]
+            if not value:
+                continue
+            y = ypx(value)
+            bars.append({
+                'x': '%.1f' % (centre + offset - bar_w / 2),
+                'y': '%.1f' % y,
+                'width': '%.1f' % bar_w,
+                'height': '%.1f' % (PT + plot_h - y),
+                'css': css,
+                'title': 'hour %02d-%02d: %d %s' % (
+                    hour['hour'], hour['hour'] + 1, value,
+                    'correct' if key == 'successes' else 'wrong'),
+            })
+
+    gridlines = []
+    for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
+        value = fraction * top
+        gridlines.append({'y': '%.1f' % ypx(value),
+                          'label': '%d' % round(value)})
+
+    x_labels = []
+    for hour in range(0, 24, 3):
+        centre = PL + group * (hour + 0.5)
+        x_labels.append({'x': '%.1f' % centre,
+                         'text': '%dh' % hour})
+
+    return {
+        'has_data': True,
+        'width': W,
+        'height': H,
+        'pl': PL,
+        'pr': W - PR,
+        'pb': H - PB,
+        'bars': bars,
+        'gridlines': gridlines,
+        'x_labels': x_labels,
+        'successes': sum(h['successes'] for h in hours),
+        'failures': sum(h['failures'] for h in hours),
+        'peak': top,
+    }
+
+
 def _markov_chart(transitions) -> dict:
     """The Markov-chain diagram: states are the number of correct
     attempts a word has; each attempt advances the state with the
@@ -611,6 +676,10 @@ async def stats(request: Request,
         db.attempt_state_transitions(user, voc_id=selected_voc,
                                      levels=levels))
 
+    # attempts per hour of the day (correct vs wrong)
+    hourly = _hourly_chart(
+        db.attempts_by_hour(user, voc_id=selected_voc, levels=levels))
+
     mastered_now = learned_now = days_practised = 0
     chart = {'has_data': False}
     eta = None
@@ -649,6 +718,7 @@ async def stats(request: Request,
             'days_practised': days_practised,
             'chart': chart,
             'markov': markov,
+            'hourly': hourly,
             'eta': eta,
         },
         headers={'Cache-Control': 'no-store'}

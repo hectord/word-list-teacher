@@ -790,6 +790,37 @@ class TestStore(unittest.TestCase):
                                      by_state[2]['failures']))
         self.assertEqual(0, by_state[3]['attempts'])
 
+    def test_attempts_by_hour(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        def attempt(word, success, hour, minute=0):
+            session = self.db.create_new_session(self.user, voc)
+            self.db.add_word_attempt(
+                session, WordAttempt(word=word, typed_word='x',
+                                     success=success,
+                                     time=datetime(2026, 9, 1, hour,
+                                                   minute)))
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+        attempt(word1, True, 14)
+        attempt(word2, False, 14, 30)
+        attempt(word1, True, 23, 59)
+
+        hours = self.db.attempts_by_hour(self.user)
+        self.assertEqual(24, len(hours))
+        self.assertEqual((1, 1), (hours[14]['successes'],
+                                 hours[14]['failures']))
+        self.assertEqual((1, 0), (hours[23]['successes'],
+                                 hours[23]['failures']))
+        self.assertEqual((0, 0), (hours[0]['successes'],
+                                 hours[0]['failures']))
+        # the totals add up
+        self.assertEqual(2, sum(h['successes'] for h in hours))
+        self.assertEqual(1, sum(h['failures'] for h in hours))
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

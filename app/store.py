@@ -804,6 +804,44 @@ class Database:
 
         return transitions
 
+    def attempts_by_hour(self, user,
+                         voc_id: int = None,
+                         levels=None) -> List[dict]:
+        """Attempts grouped by the hour of the day (0..23), split into
+        successful ones and errors. The hour comes from the time the
+        guess was made (the server's local time).
+
+        Returns one dict per hour with ``successes`` and ``failures``.
+        """
+        db_user = self._get_db_user(user)
+
+        query = (DbWordAttempt
+                 .select(DbWordAttempt.success, DbWordAttempt.time)
+                 .join(DbWord)
+                 .switch(DbWordAttempt)
+                 .join(DbSession)
+                 .where(DbSession.user == db_user))
+
+        if voc_id is not None:
+            query = query.where(DbWord.vocabulary == voc_id)
+        if levels is not None:
+            query = query.where((DbWord.level.in_(list(levels))) |
+                                DbWord.level.is_null())
+
+        hours = [{'hour': hour, 'successes': 0, 'failures': 0}
+                 for hour in range(24)]
+
+        for success, tested_at in query.tuples():
+            if tested_at is None:
+                continue
+            bucket = hours[tested_at.hour]
+            if success:
+                bucket['successes'] += 1
+            else:
+                bucket['failures'] += 1
+
+        return hours
+
     def mastered_over_time(self, user,
                            voc_id: int = None,
                            levels=None) -> Dict[date, tuple]:

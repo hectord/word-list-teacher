@@ -173,6 +173,14 @@
 .arrow-stay { fill: #E0A63C; }
 .legend-dot.seen { background: #E0A63C; }
 
+/* attempts per hour of the day */
+.hourly-chart { margin-top: 16px; }
+.hour-bar { opacity: 0.9; }
+.hour-bar:hover { opacity: 1; }
+.hour-bar.success { fill: #2F7D5B; }
+.hour-bar.error { fill: #C75B39; }
+.legend-dot.error { background: #C75B39; }
+
 .stats-empty {
   background: #fff;
   border: 1px dashed #E0D2C6;

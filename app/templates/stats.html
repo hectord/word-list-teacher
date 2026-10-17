@@ -4,7 +4,7 @@
 
 {% block header %}
     <link rel="stylesheet" href="/static/pages.css?v=14">
-    <link rel="stylesheet" href="/static/stats.css?v=2">
+    <link rel="stylesheet" href="/static/stats.css?v=3">
 {% endblock %}
 
 {% block body %}
@@ -186,6 +186,49 @@
               <span class="legend-dot seen"></span> wrong &rarr; same state
             </span>
             <span class="legend-range">numbers below = attempts from that state</span>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if hourly.has_data %}
+        <div class="stats-chart hourly-chart">
+          <div class="markov-title">Attempts by time of day</div>
+          <div class="markov-note">
+            Successful answers against errors for every hour (server local
+            time). Hover a bar for the exact count.
+          </div>
+          <svg viewBox="0 0 {{ hourly.width }} {{ hourly.height }}"
+               role="img" aria-label="Attempts per hour of the day">
+            {% for line in hourly.gridlines %}
+              <line class="grid" x1="{{ hourly.pl }}" y1="{{ line.y }}"
+                    x2="{{ hourly.pr }}" y2="{{ line.y }}"></line>
+              <text class="grid-label" x="{{ hourly.pl - 4 }}" y="{{ line.y }}"
+                    text-anchor="end" dy=".35em">{{ line.label }}</text>
+            {% endfor %}
+
+            {% for bar in hourly.bars %}
+              <rect class="hour-bar {{ bar.css }}" x="{{ bar.x }}"
+                    y="{{ bar.y }}" width="{{ bar.width }}"
+                    height="{{ bar.height }}" rx="2">
+                <title>{{ bar.title }}</title>
+              </rect>
+            {% endfor %}
+
+            {% for label in hourly.x_labels %}
+              <text class="date-label" x="{{ label.x }}" y="{{ hourly.pb + 18 }}"
+                    text-anchor="middle">{{ label.text }}</text>
+            {% endfor %}
+          </svg>
+          <div class="chart-legend">
+            <span class="legend-item">
+              <span class="legend-dot mastered"></span> successful
+              <span class="legend-end">{{ hourly.successes }}</span>
+            </span>
+            <span class="legend-item">
+              <span class="legend-dot error"></span> errors
+              <span class="legend-end">{{ hourly.failures }}</span>
+            </span>
+            <span class="legend-range">peak: {{ hourly.peak }} attempt(s) in an hour</span>
           </div>
         </div>
       {% endif %}
