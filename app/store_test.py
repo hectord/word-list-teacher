@@ -821,6 +821,34 @@ class TestStore(unittest.TestCase):
         self.assertEqual(2, sum(h['successes'] for h in hours))
         self.assertEqual(1, sum(h['failures'] for h in hours))
 
+    def test_attempts_by_weekday(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        def attempt(word, success, day):
+            session = self.db.create_new_session(self.user, voc)
+            self.db.add_word_attempt(
+                session, WordAttempt(word=word, typed_word='x',
+                                     success=success,
+                                     time=datetime(2026, 9, day, 12)))
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+        # 2026-09-07 is a Monday, 09-01 a Tuesday, 09-06 a Sunday
+        attempt(word1, True, 7)
+        attempt(word1, True, 1)
+        attempt(word2, False, 6)
+
+        days = self.db.attempts_by_weekday(self.user)
+        self.assertEqual(7, len(days))
+        monday, tuesday, sunday = days[0], days[1], days[6]
+        self.assertEqual((1, 0), (monday['successes'], monday['failures']))
+        self.assertEqual((1, 0), (tuesday['successes'], tuesday['failures']))
+        self.assertEqual((0, 1), (sunday['successes'], sunday['failures']))
+        self.assertEqual(2, sum(d['successes'] for d in days))
+        self.assertEqual(1, sum(d['failures'] for d in days))
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

@@ -491,6 +491,73 @@ def _hourly_chart(hours) -> dict:
     }
 
 
+WEEKDAYS = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
+
+
+def _weekday_chart(days) -> dict:
+    """Bar chart of the attempts per day of the week: successful ones
+    and errors side by side."""
+    if not any(d['successes'] or d['failures'] for d in days):
+        return {'has_data': False}
+
+    W, H = 940, 260
+    PL, PR, PT, PB = 46, 18, 18, 30
+    plot_w, plot_h = W - PL - PR, H - PT - PB
+
+    top = max(max(d['successes'], d['failures']) for d in days) or 1
+    group = plot_w / len(days)
+    bar_w = min(44.0, max(6.0, group * 0.24))
+
+    def ypx(value):
+        return PT + plot_h * (1 - value / top)
+
+    bars = []
+    for index, day in enumerate(days):
+        centre = PL + group * (index + 0.5)
+        for offset, key, css in ((-bar_w / 2, 'successes', 'success'),
+                                 (bar_w / 2, 'failures', 'error')):
+            value = day[key]
+            if not value:
+                continue
+            y = ypx(value)
+            bars.append({
+                'x': '%.1f' % (centre + offset - bar_w / 2),
+                'y': '%.1f' % y,
+                'width': '%.1f' % bar_w,
+                'height': '%.1f' % (PT + plot_h - y),
+                'css': css,
+                'title': '%s: %d %s' % (
+                    WEEKDAYS[day['weekday']], value,
+                    'correct' if key == 'successes' else 'wrong'),
+            })
+
+    gridlines = []
+    for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
+        value = fraction * top
+        gridlines.append({'y': '%.1f' % ypx(value),
+                          'label': '%d' % round(value)})
+
+    x_labels = []
+    for index in range(len(days)):
+        centre = PL + group * (index + 0.5)
+        x_labels.append({'x': '%.1f' % centre, 'text': WEEKDAYS[index]})
+
+    return {
+        'has_data': True,
+        'width': W,
+        'height': H,
+        'pl': PL,
+        'pr': W - PR,
+        'pb': H - PB,
+        'bars': bars,
+        'gridlines': gridlines,
+        'x_labels': x_labels,
+        'successes': sum(d['successes'] for d in days),
+        'failures': sum(d['failures'] for d in days),
+        'peak': top,
+    }
+
+
 def _markov_chart(transitions) -> dict:
     """The Markov-chain diagram: states are the number of correct
     attempts a word has; each attempt advances the state with the
@@ -680,6 +747,10 @@ async def stats(request: Request,
     hourly = _hourly_chart(
         db.attempts_by_hour(user, voc_id=selected_voc, levels=levels))
 
+    # attempts per day of the week (correct vs wrong)
+    weekday = _weekday_chart(
+        db.attempts_by_weekday(user, voc_id=selected_voc, levels=levels))
+
     mastered_now = learned_now = days_practised = 0
     chart = {'has_data': False}
     eta = None
@@ -719,6 +790,7 @@ async def stats(request: Request,
             'chart': chart,
             'markov': markov,
             'hourly': hourly,
+            'weekday': weekday,
             'eta': eta,
         },
         headers={'Cache-Control': 'no-store'}

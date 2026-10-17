@@ -175,6 +175,8 @@
 
 /* attempts per hour of the day */
 .hourly-chart { margin-top: 16px; }
+/* attempts per day of the week (same bars, separate chart) */
+.weekday-chart { margin-top: 16px; }
 .hour-bar { opacity: 0.9; }
 .hour-bar:hover { opacity: 1; }
 .hour-bar.success { fill: #2F7D5B; }

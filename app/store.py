@@ -842,6 +842,45 @@ class Database:
 
         return hours
 
+    def attempts_by_weekday(self, user,
+                            voc_id: int = None,
+                            levels=None) -> List[dict]:
+        """Attempts grouped by the day of the week (Monday = 0 ...
+        Sunday = 6), split into successful ones and errors. The day
+        comes from the time the guess was made (the server's local
+        time).
+
+        Returns one dict per day with ``successes`` and ``failures``.
+        """
+        db_user = self._get_db_user(user)
+
+        query = (DbWordAttempt
+                 .select(DbWordAttempt.success, DbWordAttempt.time)
+                 .join(DbWord)
+                 .switch(DbWordAttempt)
+                 .join(DbSession)
+                 .where(DbSession.user == db_user))
+
+        if voc_id is not None:
+            query = query.where(DbWord.vocabulary == voc_id)
+        if levels is not None:
+            query = query.where((DbWord.level.in_(list(levels))) |
+                                DbWord.level.is_null())
+
+        days = [{'weekday': weekday, 'successes': 0, 'failures': 0}
+                for weekday in range(7)]
+
+        for success, tested_at in query.tuples():
+            if tested_at is None:
+                continue
+            bucket = days[tested_at.weekday()]
+            if success:
+                bucket['successes'] += 1
+            else:
+                bucket['failures'] += 1
+
+        return days
+
     def mastered_over_time(self, user,
                            voc_id: int = None,
                            levels=None) -> Dict[date, tuple]:

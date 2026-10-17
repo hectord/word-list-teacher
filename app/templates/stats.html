@@ -4,7 +4,7 @@
 
 {% block header %}
     <link rel="stylesheet" href="/static/pages.css?v=14">
-    <link rel="stylesheet" href="/static/stats.css?v=3">
+    <link rel="stylesheet" href="/static/stats.css?v=4">
 {% endblock %}
 
 {% block body %}
@@ -229,6 +229,49 @@
               <span class="legend-end">{{ hourly.failures }}</span>
             </span>
             <span class="legend-range">peak: {{ hourly.peak }} attempt(s) in an hour</span>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if weekday.has_data %}
+        <div class="stats-chart weekday-chart">
+          <div class="markov-title">Attempts by day of week</div>
+          <div class="markov-note">
+            Successful answers against errors for every weekday (server
+            local time). Hover a bar for the exact count.
+          </div>
+          <svg viewBox="0 0 {{ weekday.width }} {{ weekday.height }}"
+               role="img" aria-label="Attempts per day of the week">
+            {% for line in weekday.gridlines %}
+              <line class="grid" x1="{{ weekday.pl }}" y1="{{ line.y }}"
+                    x2="{{ weekday.pr }}" y2="{{ line.y }}"></line>
+              <text class="grid-label" x="{{ weekday.pl - 4 }}" y="{{ line.y }}"
+                    text-anchor="end" dy=".35em">{{ line.label }}</text>
+            {% endfor %}
+
+            {% for bar in weekday.bars %}
+              <rect class="hour-bar {{ bar.css }}" x="{{ bar.x }}"
+                    y="{{ bar.y }}" width="{{ bar.width }}"
+                    height="{{ bar.height }}" rx="2">
+                <title>{{ bar.title }}</title>
+              </rect>
+            {% endfor %}
+
+            {% for label in weekday.x_labels %}
+              <text class="date-label" x="{{ label.x }}" y="{{ weekday.pb + 18 }}"
+                    text-anchor="middle">{{ label.text }}</text>
+            {% endfor %}
+          </svg>
+          <div class="chart-legend">
+            <span class="legend-item">
+              <span class="legend-dot mastered"></span> successful
+              <span class="legend-end">{{ weekday.successes }}</span>
+            </span>
+            <span class="legend-item">
+              <span class="legend-dot error"></span> errors
+              <span class="legend-end">{{ weekday.failures }}</span>
+            </span>
+            <span class="legend-range">peak: {{ weekday.peak }} attempt(s) in a day</span>
           </div>
         </div>
       {% endif %}
