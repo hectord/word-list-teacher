@@ -240,5 +240,12 @@
 
 @media (max-width: 700px) {
   .stats-cards { grid-template-columns: repeat(2, 1fr); }
-  .filter-field select { min-width: 150px; }
+  /* the vocabulary select must fit the filter panel instead of
+     overflowing it on narrow screens */
+  .filter-field { width: 100%; }
+  .filter-field select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
 }
