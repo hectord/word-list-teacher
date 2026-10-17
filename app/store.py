@@ -752,6 +752,58 @@ class Database:
 
         return daily
 
+    def attempt_state_transitions(self, user,
+                                  voc_id: int = None,
+                                  levels=None,
+                                  max_state: int = 10) -> List[dict]:
+        """How words move between the states "correct attempts so far".
+
+        Every attempt of a word is a transition: a correct answer
+        advances the state by one, a wrong answer keeps it (a self
+        loop). The probabilities are estimated over the whole attempt
+        history of the user (optionally one vocabulary / the given
+        levels). States above ``max_state`` are counted in the last
+        state, which is therefore absorbing.
+
+        Returns one dict per state ``0..max_state`` with ``attempts``,
+        ``successes`` and ``failures``.
+        """
+        db_user = self._get_db_user(user)
+
+        sql = '''
+            SELECT a.word_id, a.success
+            FROM dbwordattempt a
+            JOIN dbsession s ON s.id = a.session_id
+            JOIN dbword w ON w.id = a.word_id
+            WHERE s.user_id = ?
+        '''
+        params = [db_user.id]
+        if voc_id is not None:
+            sql += ' AND w.vocabulary_id = ?'
+            params.append(voc_id)
+        if levels is not None:
+            sql += (' AND (w.level IN (%s) OR w.level IS NULL)'
+                    % ','.join('?' * len(levels)))
+            params += list(levels)
+        sql += ' ORDER BY a.time, a.id'
+
+        states = {}
+        transitions = [{'state': state, 'attempts': 0,
+                        'successes': 0, 'failures': 0}
+                       for state in range(max_state + 1)]
+
+        for word_id, success in db.execute_sql(sql, params):
+            current = min(states.get(word_id, 0), max_state)
+            bucket = transitions[current]
+            bucket['attempts'] += 1
+            if success:
+                bucket['successes'] += 1
+                states[word_id] = states.get(word_id, 0) + 1
+            else:
+                bucket['failures'] += 1
+
+        return transitions
+
     def mastered_over_time(self, user,
                            voc_id: int = None,
                            levels=None) -> Dict[date, tuple]:

@@ -426,6 +426,84 @@ async def scoreboard(request: Request,
     )
 
 
+def _markov_chart(transitions) -> dict:
+    """The Markov-chain diagram: states are the number of correct
+    attempts a word has; each attempt advances the state with the
+    probability of answering correctly or keeps it (self loop)."""
+    states = [s for s in transitions]
+    if not any(s['attempts'] for s in states):
+        return {'has_data': False}
+
+    W, H = 940, 300
+    margin = 66
+    cy = 172
+    radius = 22
+    count = len(states)
+    spacing = (W - 2 * margin) / count if count else W
+
+    nodes = []
+    for index, state in enumerate(states):
+        x = margin + spacing * (index + 0.5)
+        attempts = state['attempts']
+        nodes.append({
+            'state': state['state'],
+            'x': '%.1f' % x,
+            'cy': cy,
+            'attempts': attempts,
+            'reached': attempts > 0,
+            'success_rate': (100.0 * state['successes'] / attempts)
+                            if attempts else 0.0,
+            'stay_rate': (100.0 * state['failures'] / attempts)
+                         if attempts else 0.0,
+        })
+
+    edges = []
+    loops = []
+    for index, node in enumerate(nodes[:-1]):
+        if not node['reached']:
+            continue
+        following = nodes[index + 1]
+        rate = node['success_rate']
+        edges.append({
+            'x1': '%.1f' % (float(node['x']) + radius),
+            'x2': '%.1f' % (float(following['x']) - radius - 6),
+            'y': cy,
+            'label_x': '%.1f' % ((float(node['x']) +
+                                  float(following['x'])) / 2),
+            'label_y': cy - 12,
+            'probability': '%.0f%%' % rate,
+            'title': '%d transition(s), %d correct' % (
+                node['attempts'],
+                round(node['attempts'] * rate / 100.0)),
+            'visible': rate > 0,
+        })
+
+    for node in nodes:
+        if not node['reached'] or node['stay_rate'] <= 0:
+            continue
+        x = float(node['x'])
+        loops.append({
+            'x1': '%.1f' % (x - radius * 0.45),
+            'x2': '%.1f' % (x + radius * 0.45),
+            'y': cy - radius,
+            'label_x': '%.1f' % x,
+            'label_y': cy - radius - 52,
+            'probability': '%.0f%%' % node['stay_rate'],
+            'title': '%d transition(s), %d wrong' % (
+                node['attempts'],
+                round(node['attempts'] * node['stay_rate'] / 100.0)),
+        })
+
+    return {
+        'has_data': True,
+        'width': W,
+        'height': H,
+        'nodes': nodes,
+        'edges': [e for e in edges if e['visible']],
+        'loops': loops,
+    }
+
+
 def _pick_title(summary: dict) -> str:
     titles = summary.get('titles', {})
     for code in ('en', 'de', 'fr', 'es', 'it', 'nl', 'pt'):
@@ -528,6 +606,11 @@ async def stats(request: Request,
                       if selected_voc is None or o['id'] == selected_voc)
     daily = db.mastered_over_time(user, voc_id=selected_voc, levels=levels)
 
+    # how words move between the states "correct attempts so far"
+    markov = _markov_chart(
+        db.attempt_state_transitions(user, voc_id=selected_voc,
+                                     levels=levels))
+
     mastered_now = learned_now = days_practised = 0
     chart = {'has_data': False}
     eta = None
@@ -565,6 +648,7 @@ async def stats(request: Request,
             'learned_now': learned_now,
             'days_practised': days_practised,
             'chart': chart,
+            'markov': markov,
             'eta': eta,
         },
         headers={'Cache-Control': 'no-store'}

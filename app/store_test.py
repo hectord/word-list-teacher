@@ -750,6 +750,46 @@ class TestStore(unittest.TestCase):
         # its own translation is accepted too
         self.assertTrue(first.accepts('die Brieftasche', 'de'))
 
+    def test_attempt_state_transitions(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+
+        def attempt(word, success, minute):
+            session = self.db.create_new_session(self.user, voc)
+            self.db.add_word_attempt(
+                session, WordAttempt(word=word, typed_word='x',
+                                     success=success,
+                                     time=datetime(2026, 5, 1, 9,
+                                                   minute)))
+
+        word1 = Word(word_input='fr_1', word_output='de_1')
+        word2 = Word(word_input='fr_2', word_output='de_2')
+        # word1: ok, ok, wrong, ok  -> transitions from states 0,1,2,2
+        attempt(word1, True, 1)
+        attempt(word1, True, 2)
+        attempt(word1, False, 3)
+        attempt(word1, True, 4)
+        # word2: wrong from state 0
+        attempt(word2, False, 5)
+
+        transitions = self.db.attempt_state_transitions(self.user,
+                                                        max_state=4)
+        by_state = {t['state']: t for t in transitions}
+
+        # state 0: word1's first correct answer and word2's wrong one
+        self.assertEqual((2, 1, 1), (by_state[0]['attempts'],
+                                     by_state[0]['successes'],
+                                     by_state[0]['failures']))
+        self.assertEqual((1, 1, 0), (by_state[1]['attempts'],
+                                     by_state[1]['successes'],
+                                     by_state[1]['failures']))
+        # from state 2: one wrong (stays) then one correct (advances)
+        self.assertEqual((2, 1, 1), (by_state[2]['attempts'],
+                                     by_state[2]['successes'],
+                                     by_state[2]['failures']))
+        self.assertEqual(0, by_state[3]['attempts'])
+
     def test_user_hard_runs_setting(self):
         self._create_user()
 

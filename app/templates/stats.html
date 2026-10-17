@@ -4,7 +4,7 @@
 
 {% block header %}
     <link rel="stylesheet" href="/static/pages.css?v=14">
-    <link rel="stylesheet" href="/static/stats.css?v=1">
+    <link rel="stylesheet" href="/static/stats.css?v=2">
 {% endblock %}
 
 {% block body %}
@@ -114,6 +114,82 @@
           {% endfor %}
         </svg>
       </div>
+
+      {% if markov.has_data %}
+        <div class="stats-chart markov-chart">
+          <div class="markov-title">How words move between states</div>
+          <div class="markov-note">
+            A state is the number of correct attempts a word has. Every
+            attempt either advances the state (green, correct) or keeps
+            it (amber, wrong); the labels are the estimated probabilities.
+          </div>
+          <svg viewBox="0 0 {{ markov.width }} {{ markov.height }}"
+               role="img" aria-label="Markov chain of correct attempts">
+            <defs>
+              <marker id="arrow-advance" viewBox="0 0 10 10"
+                      refX="9" refY="5" markerWidth="7" markerHeight="7"
+                      orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-advance"/>
+              </marker>
+              <marker id="arrow-stay" viewBox="0 0 10 10"
+                      refX="9" refY="5" markerWidth="7" markerHeight="7"
+                      orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-stay"/>
+              </marker>
+            </defs>
+
+            {% for edge in markov.edges %}
+              <line class="mk-edge" x1="{{ edge.x1 }}" y1="{{ edge.y }}"
+                    x2="{{ edge.x2 }}" y2="{{ edge.y }}"
+                    marker-end="url(#arrow-advance)">
+                <title>{{ edge.title }}</title>
+              </line>
+              <text class="mk-label advance" x="{{ edge.label_x }}"
+                    y="{{ edge.label_y }}"
+                    text-anchor="middle">{{ edge.probability }}</text>
+            {% endfor %}
+
+            {% for self_loop in markov.loops %}
+              <path class="mk-loop"
+                    d="M {{ self_loop.x1 }} {{ self_loop.y }} C {{ self_loop.x1 }} {{ self_loop.label_y }} {{ self_loop.x2 }} {{ self_loop.label_y }} {{ self_loop.x2 }} {{ self_loop.y }}"
+                    marker-end="url(#arrow-stay)">
+                <title>{{ self_loop.title }}</title>
+              </path>
+              <text class="mk-label stay" x="{{ self_loop.label_x }}"
+                    y="{{ self_loop.label_y }}"
+                    text-anchor="middle">{{ self_loop.probability }}</text>
+            {% endfor %}
+
+            {% for node in markov.nodes %}
+              <circle class="mk-node{% if not node.reached %} muted{% endif %}"
+                      cx="{{ node.x }}" cy="{{ node.cy }}" r="22">
+                <title>{{ node.attempts }} attempt(s) made from this state</title>
+              </circle>
+              <text class="mk-state" x="{{ node.x }}"
+                    y="{{ node.cy }}" text-anchor="middle"
+                    dy=".35em">{{ node.state }}</text>
+              <text class="mk-count" x="{{ node.x }}"
+                    y="{{ node.cy + 44 }}" text-anchor="middle">
+                {% if node.reached %}{{ node.attempts }}{% else %}&ndash;{% endif %}
+              </text>
+            {% endfor %}
+
+            <text class="mk-axis-label" x="{{ markov.nodes[0].x }}"
+                  y="{{ markov.nodes[0].cy + 74 }}"
+                  text-anchor="middle">correct attempts</text>
+          </svg>
+          <div class="chart-legend">
+            <span class="legend-item">
+              <span class="legend-dot mastered"></span> correct &rarr; next state
+            </span>
+            <span class="legend-item">
+              <span class="legend-dot seen"></span> wrong &rarr; same state
+            </span>
+            <span class="legend-range">numbers below = attempts from that state</span>
+          </div>
+        </div>
+      {% endif %}
+
     {% else %}
       <div class="stats-empty">
         No practice data for this user yet — try a run on the
