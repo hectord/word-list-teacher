@@ -493,6 +493,11 @@ a.signout:hover { text-decoration: underline; }
 }
 .toolbar .stats { color: #A08B7F; }
 
+/* vocabulary search on the index page */
+.voc-toolbar { margin: 4px 0 18px; }
+.voc-toolbar input[type="search"] { flex: 1 1 240px; max-width: 420px; }
+.no-voc-match { padding: 34px 0; }
+
 .word-list {
   background: #fff;
   border: 1px solid #EDE3DB;

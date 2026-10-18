@@ -3,7 +3,8 @@
 {% block title %}Vocabularies{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=17">
+    <link rel="stylesheet" href="/static/pages.css?v=18">
+    <script src="/static/index.js?v=1"></script>
 {% endblock %}
 
 {% block body %}
@@ -53,6 +54,14 @@
       </p>
     {% endif %}
 
+    {% if target and vocabularies %}
+      <div class="toolbar voc-toolbar">
+        <input id="voc-filter" type="search" placeholder="Search vocabularies…"
+               autocomplete="off">
+        <span class="stats" id="voc-filter-count"></span>
+      </div>
+    {% endif %}
+
     {% if target %}
       {% if total_words %}
         <div class="overall">
@@ -79,7 +88,8 @@
       {% endif %}
 
       {% for voc_id, vocabulary in vocabularies %}
-        <div class="vocabulary">
+        <div class="vocabulary"
+             data-search="{{ (vocabulary.name.word_input if vocabulary.name else (language.name ~ ' ' ~ target.name)) | lower }}">
           <div class="voc-top">
             <a class="show-vocabulary" href="/vocabulary?id={{ voc_id }}&to={{ target.code }}">
               <span class="voc-name">{{ vocabulary.name.word_input if vocabulary.name else (language.name ~ ' → ' ~ target.name) }}</span>
@@ -119,6 +129,10 @@
           </div>
         </div>
       {% endfor %}
+
+      <p class="empty no-voc-match" hidden>
+        No vocabulary matches your search.
+      </p>
 
       {% if not vocabularies %}
         <p class="empty">No vocabulary to practice for this language pair yet.</p>
