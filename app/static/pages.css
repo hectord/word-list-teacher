@@ -495,7 +495,7 @@ a.signout:hover { text-decoration: underline; }
 
 /* vocabulary search on the index page */
 .voc-toolbar { margin: 4px 0 18px; }
-.voc-toolbar input[type="search"] { flex: 1 1 240px; max-width: 420px; }
+.voc-toolbar input[type="search"] { flex: 1 1 auto; max-width: 420px; }
 .no-voc-match { padding: 34px 0; }
 
 .word-list {
@@ -664,6 +664,9 @@ a.signout:hover { text-decoration: underline; }
     padding: 8px 12px;
     font-size: 14px;
   }
+  /* the toolbar stacks in a column here: a flex-basis would become the
+     height of the search box */
+  .voc-toolbar input[type="search"] { flex: 0 0 auto; max-width: 100%; }
   .toolbar .stats { text-align: right; font-size: 13px; }
 
   .word-list-toggle { padding: 10px 12px; margin-bottom: 12px; }
