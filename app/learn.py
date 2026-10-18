@@ -175,6 +175,33 @@ def word_filter(word):
 PARENTHETICAL = re.compile(r'\(([^)]*)\)')
 
 
+def _split_alternatives(text: str) -> List[str]:
+    """Split an entry on its alternatives separators (``/`` and ``,``).
+
+    Separators inside a parenthetical annotation (e.g. the register
+    ``(fam, dated)``) are not separators: their content is an
+    annotation, not another word.
+    """
+    parts = []
+    current = []
+    depth = 0
+
+    for char in text:
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth = max(0, depth - 1)
+
+        if char in '/,' and depth == 0:
+            parts.append(''.join(current))
+            current = []
+        else:
+            current.append(char)
+
+    parts.append(''.join(current))
+    return parts
+
+
 def _parenthetical_variants(text: str) -> List[str]:
     """"All the ways an in-word parenthetical can be written: as given
     ("Ell(ge)bogen"), with its content ("Ellgebogen") or without it
@@ -231,7 +258,8 @@ def alternatives(text: str) -> List[str]:
     for base in bases:
         add(base)
 
-        parts = base.split('/')
+        # a word may offer its alternatives with '/' or ','
+        parts = _split_alternatives(base)
         for part in parts:
             add(part)
 

@@ -224,6 +224,26 @@ class LearnTest(unittest.TestCase):
         plural = Word(word_output='die Beschreibung (-en)', word_input='x')
         self.assertTrue(plural.accepts('die Beschreibung', 'de'))
 
+    def test_accepts_comma_alternatives(self):
+        # a comma separates alternatives just like a slash
+        cases = [
+            ('der Arzt (-"e), die Ärztin', ['der Arzt', 'die Ärztin']),
+            ('mince, maigre', ['mince', 'maigre']),
+            ('assez, plutôt', ['assez', 'plutôt']),
+        ]
+        for output, typed in cases:
+            word = Word(word_output=output, word_input='x')
+            for answer in typed:
+                self.assertTrue(word.accepts(answer, 'de'),
+                                '%r should accept %r' % (output, answer))
+
+        # a comma inside an annotation is not a separator
+        annotated = Word(word_output='das Wort (fam, dated)',
+                         word_input='x')
+        self.assertTrue(annotated.accepts('das Wort', 'de'))
+        self.assertFalse(annotated.accepts('fam', 'de'))
+        self.assertFalse(annotated.accepts('dated', 'de'))
+
     def test_keys_include_alternatives(self):
         word = Word(word_output='x',
                     word_input='la portefeuille / porte-monnaie')
@@ -231,6 +251,11 @@ class LearnTest(unittest.TestCase):
         self.assertIn('porte-monnaie', word.keys)
         plain = Word(word_output='y', word_input='la portefeuille')
         self.assertTrue(word.keys & plain.keys)
+
+        # commas work the same way on the input side
+        comma = Word(word_output='z', word_input='mince, maigre')
+        self.assertIn('mince', comma.keys)
+        self.assertIn('maigre', comma.keys)
 
     def test_accepts_german_umlauts(self):
         word = Word(word_output='die Größe (-n)',
