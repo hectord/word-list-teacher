@@ -1709,15 +1709,14 @@ class Database:
         if voc.id is None:
             return None
 
+        # note: the direction (input/output languages) is not filtered:
+        # a reversed run is still a run of this vocabulary and resumes
+        # with its own direction (load_session rebuilds it below)
         sessions = (DbSession
                     .select()
                     .join(DbVocabularySession)
                     .where(DbSession.user == db_user)
-                    .where(DbVocabularySession.vocabulary == voc.id)
-                    .where(DbVocabularySession.input_language ==
-                           voc.input_language)
-                    .where(DbVocabularySession.output_language ==
-                           voc.output_language))
+                    .where(DbVocabularySession.vocabulary == voc.id))
 
         if section == '':
             # '' means: sessions whose scope is the whole vocabulary

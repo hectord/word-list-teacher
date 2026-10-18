@@ -3,7 +3,7 @@
 {% block title %}Vocabulary{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=16">
+    <link rel="stylesheet" href="/static/pages.css?v=17">
     <script src="/static/vocabulary.js?v=5"></script>
 {% endblock %}
 
@@ -20,8 +20,9 @@
     </div>
     <div class="voc-actions">
       <a class="button new" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}">New session</a>
+      <a class="button new reverse" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}&amp;reverse=1">Practice (reverse)</a>
       {% if unfinished_session %}
-        <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume</a>
+        <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume{% if whole_reversed %} (reverse){% endif %}</a>
       {% endif %}
     </div>
   </header>
@@ -68,9 +69,10 @@
           {{ sec_progress(whole_progress) }}
           <div class="section-actions">
             {% if unfinished_session %}
-              <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume</a>
+              <a class="button resume" href="/learn?session_id={{ unfinished_session.id }}">Resume{% if whole_reversed %} (reverse){% endif %}</a>
             {% endif %}
             <a class="button new" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}">Practice all</a>
+            <a class="button new reverse" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}&amp;reverse=1">Practice (reverse)</a>
           </div>
         </div>
 
@@ -83,9 +85,10 @@
             {{ sec_progress(section.progress) }}
             <div class="section-actions">
               {% if section.resume %}
-                <a class="button resume" href="/learn?session_id={{ section.resume.id }}">Resume</a>
+                <a class="button resume" href="/learn?session_id={{ section.resume.id }}">Resume{% if section.reversed %} (reverse){% endif %}</a>
               {% endif %}
               <a class="button new" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}&amp;section={{ section.name | urlencode }}">Practice</a>
+              <a class="button new reverse" href="/new_session?voc_id={{ voc_id }}{% if target %}&amp;to={{ target.code }}{% endif %}&amp;section={{ section.name | urlencode }}&amp;reverse=1">Practice (reverse)</a>
             </div>
           </div>
         {% endfor %}

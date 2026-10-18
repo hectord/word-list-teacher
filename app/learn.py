@@ -550,11 +550,17 @@ class Vocabulary:
         return result
 
     def flip(self) -> 'Vocabulary':
+        """The same vocabulary with input and output swapped (the word
+        ids and examples are kept, so a reversed run is the same words
+        practised the other way round)."""
         name = None if self._name is None else self._name.flip()
-        words = []
 
+        words = []
+        flipped_ids = {}
         for word in self._words:
-            words.append(word.flip())
+            flipped = word.flip()
+            words.append(flipped)
+            flipped_ids[id(flipped)] = self.word_id(word)
 
         voc = Vocabulary(name, words,
                          self.output_language,
@@ -564,12 +570,18 @@ class Vocabulary:
                          section_ids=self._section_ids)
         voc.set_id(self._id)
 
-        for word in self._words:
-            word_id = self.word_id(word)
+        # set the ids on the very instances that were added, otherwise
+        # the identity-keyed map cannot find them
+        for word in words:
+            word_id = flipped_ids.get(id(word))
             if word_id is not None:
-                voc.set_word_id(word.flip(), word_id)
-            voc.set_example(word.flip(), self.example(word))
-            voc.set_input_example(word.flip(), self.input_example(word))
+                voc.set_word_id(word, word_id)
+            example = self.example(word.flip())
+            if example is not None:
+                voc.set_example(word, example)
+            input_example = self.input_example(word.flip())
+            if input_example is not None:
+                voc.set_input_example(word, input_example)
 
         return voc
 

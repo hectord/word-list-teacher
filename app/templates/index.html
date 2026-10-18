@@ -3,7 +3,7 @@
 {% block title %}Vocabularies{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/pages.css?v=16">
+    <link rel="stylesheet" href="/static/pages.css?v=17">
 {% endblock %}
 
 {% block body %}
@@ -86,8 +86,9 @@
             </a>
             <div class="voc-actions">
               <a class="button new" href="/new_session?voc_id={{ voc_id }}&to={{ target.code }}">New</a>
+              <a class="button new reverse" href="/new_session?voc_id={{ voc_id }}&to={{ target.code }}&reverse=1">New (reverse)</a>
               {% if vocabulary in session_by_vocabulary %}
-                <a class="button resume" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">Resume</a>
+                <a class="button resume" href="/learn?session_id={{ session_by_vocabulary[vocabulary].id }}">Resume{% if reversed_by_vocabulary[vocabulary] %} (reverse){% endif %}</a>
               {% endif %}
             </div>
           </div>

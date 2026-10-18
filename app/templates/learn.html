@@ -65,9 +65,9 @@
 {% block title %}Learn{% endblock %}
 
 {% block header %}
-    <link rel="stylesheet" href="/static/learn.css?v=22">
+    <link rel="stylesheet" href="/static/learn.css?v=23">
 
-    <script src="/static/script.js?v=14"></script>
+    <script src="/static/script.js?v=15"></script>
 
 {% endblock %}
 
@@ -76,6 +76,10 @@
   <div class="centering-box">
 
     <div class="words">
+
+      {% if direction %}
+        <div class="direction-badge">{{ direction }}</div>
+      {% endif %}
 
       {% if summary %}
         <!-- server-rendered: the run was already finished on load; the

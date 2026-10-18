@@ -267,6 +267,12 @@ a.signout:hover { text-decoration: underline; }
 .button.new:hover { background: #27694C; }
 .button.resume { background: #FCEFD8; color: #B97B1E; border: 1px solid #F3DFBC; }
 .button.resume:hover { background: #F7E3C0; }
+.button.new.reverse {
+  background: #EAF4EE;
+  color: #2F7D5B;
+  border: 1px solid #CFE5D8;
+}
+.button.new.reverse:hover { background: #DDEEE3; }
 
 /* ---------- settings ---------- */
 

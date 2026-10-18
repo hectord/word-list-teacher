@@ -913,6 +913,36 @@ class TestStore(unittest.TestCase):
         self.assertEqual(0.0, by_day[date(2026, 9, 5)])
         self.assertEqual(3, len(by_day))
 
+    def test_reverse_session(self):
+        """A reversed run quizzes the target language and expects the
+        learner's own language; it keeps the same word ids and resumes
+        in the same direction."""
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()              # fr -> de
+        flipped = voc.flip()                  # de -> fr
+
+        self.assertEqual('de', flipped.input_language)
+        self.assertEqual('fr', flipped.output_language)
+        # the flipped words keep the ids of their originals
+        self.assertEqual(voc.word_id(voc.words[0]),
+                         flipped.word_id(flipped.words[0]))
+
+        session = self.db.create_new_session(self.user, flipped)
+        current = session.current_word
+        # answering with the expected text (the learner's language)
+        result = session.guess(current, current.word_output)
+        self.assertTrue(result.success)
+        self.db.add_word_attempt(session, result)
+
+        # the session stored the swapped languages, so it reloads reversed
+        reloaded = self.db.load_session(session.id)
+        self.assertEqual('de', reloaded.vocabulary.input_language)
+        self.assertEqual('fr', reloaded.vocabulary.output_language)
+        self.assertEqual(1, len(reloaded.attempts))
+        self.assertEqual(current.word_output,
+                         reloaded.attempts[0].word.word_output)
+
     def test_practice_stats(self):
         self._create_vocabulary()
         self._create_user()

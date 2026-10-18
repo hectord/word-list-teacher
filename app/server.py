@@ -235,13 +235,16 @@ async def vocabulary(request: Request,
             'name': section.name,
             'size': len(section.vocabulary),
             'resume': resume,
+            'reversed': resume is not None and _is_reversed(resume, user),
             'progress': section_progress(section.vocabulary.words),
         })
 
     whole_session = db.last_session(user, voc, section='')
     unfinished_session = None
+    whole_reversed = False
     if whole_session is not None and not whole_session.is_finished:
         unfinished_session = whole_session
+        whole_reversed = _is_reversed(whole_session, user)
 
     sections_by_index = list(voc.word_sections)
 
@@ -258,7 +261,8 @@ async def vocabulary(request: Request,
             'whole_progress': whole_progress,
             'sections': sections,
             'sections_by_index': sections_by_index,
-            'unfinished_session': unfinished_session
+            'unfinished_session': unfinished_session,
+            'whole_reversed': whole_reversed
         },
         headers={'Cache-Control': 'no-store'}
     )
@@ -303,6 +307,8 @@ async def index(request: Request,
     total_mastered = 0
     entries = []
 
+    reversed_by_vocabulary = {}
+
     for voc_id, vocabulary in vocabularies.items():
         # only whole-vocabulary runs are resumable from here: section
         # runs are resumed from the vocabulary page, where they are not
@@ -310,6 +316,7 @@ async def index(request: Request,
         session = db.last_session(user, vocabulary, section='')
         if session is not None and not session.is_finished:
             session_by_vocabulary[vocabulary] = session
+            reversed_by_vocabulary[vocabulary] = _is_reversed(session, user)
 
         finished_session = db.last_session(user, vocabulary, finished=True)
         has_finished_session[vocabulary] = finished_session is not None
@@ -365,6 +372,7 @@ async def index(request: Request,
             'selected_level': selected_level,
             'vocabularies': entries,
             'session_by_vocabulary': session_by_vocabulary,
+            'reversed_by_vocabulary': reversed_by_vocabulary,
             'has_finished_session': has_finished_session,
             'included_by_vocabulary': included_by_vocabulary,
             'mastered_by_vocabulary': mastered_by_vocabulary,
@@ -958,11 +966,20 @@ async def hard_words(request: Request,
     )
 
 
+def _is_reversed(session: Session, user: User) -> bool:
+    """True when a session quizzes the reverse direction: it shows the
+    target language and expects the learner's own language."""
+    if user.main_language is None:
+        return False
+    return session.vocabulary.input_language != user.main_language.code
+
+
 @app.get("/new_session")
 async def new_session(request: Request,
                       voc_id: int,
                       to: Optional[str] = None,
                       section: Optional[str] = None,
+                      reverse: Optional[int] = None,
                       user: User = Depends(get_user)):
 
     target = _resolve_target(user, voc_id=voc_id, to=to)
@@ -972,6 +989,12 @@ async def new_session(request: Request,
     if voc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="vocabulary not found")
+
+    # the reverse direction shows the target language and expects the
+    # learner's own language: the session records the swapped languages
+    # (and therefore resumes in the same direction)
+    if reverse:
+        voc = voc.flip()
 
     try:
         session = db.create_new_session(user, voc, section=section,
@@ -1027,6 +1050,16 @@ async def learn(request: Request,
         first_word = WordInput(word=current_word.word_input,
                                word_id=vocabulary.word_id(current_word))
 
+    # which direction this run quizzes (shown as a badge on the page)
+    direction = None
+    vocabulary = session.vocabulary
+    if vocabulary is not None and vocabulary.input_language \
+            and vocabulary.output_language:
+        direction = '%s \u2192 %s' % (vocabulary.input_language.upper(),
+                                      vocabulary.output_language.upper())
+        if _is_reversed(session, user):
+            direction += ' (reverse)'
+
     # for already-answered cards: which ones used another correct variant
     # than the expected one (shown on resume, like during the run)
     output_language = session.vocabulary.output_language
@@ -1043,6 +1076,7 @@ async def learn(request: Request,
             'first_word': first_word,
             'summary': _session_summary(session, user),
             'variant_notes': variant_notes,
+            'direction': direction,
         },
         headers={'Cache-Control': 'no-store'}
     )
