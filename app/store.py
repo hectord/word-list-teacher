@@ -1096,12 +1096,17 @@ class Database:
         DbVocabularyTitle.delete().execute()
         DbVocabulary.delete().execute()
 
-    def import_changes(self, records, title_language: str = 'de') -> List[str]:
+    def import_changes(self, records, title_language: str = 'de',
+                       include_examples: bool = True) -> List[str]:
         """Preview of an ``--update`` import: the changes that would be
         applied to the database, one string per new vocabulary / new
         section / changed word. Words which would not change are left
         out. The database is not modified (matching is the same as
-        ``import_vocabularies(..., replace=False)``)."""
+        ``import_vocabularies(..., replace=False)``).
+
+        With ``include_examples=False`` the differences of the example
+        sentences are left out (a word whose only changes are examples
+        is not listed at all)."""
         changes = []
         reported = set()
 
@@ -1200,7 +1205,7 @@ class Database:
                     deltas.append('%s text "%s" -> "%s"'
                                   % (language, word_text.text, text))
                 example = examples.get(language)
-                if word_text.example != example:
+                if include_examples and word_text.example != example:
                     deltas.append('%s example "%s" -> "%s"'
                                   % (language, word_text.example or '',
                                      example or ''))

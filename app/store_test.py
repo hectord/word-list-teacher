@@ -1435,6 +1435,23 @@ class TestStore(unittest.TestCase):
              'texts': {'de': 'rot', 'fr': 'rouge'}, 'examples': {}},
         ])
 
+        # an example-only change of word 10 is listed (but not the word
+        # itself as changed when the examples are hidden)
+        example_only = self.db.import_changes([
+            {'id': 10, 'vocabulary': 'Greetings', 'section': 'Basics',
+             'type': 'noun', 'level': 'B1',
+             'texts': {'de': 'Hallo', 'fr': 'bonjour'},
+             'examples': {'de': 'Hallo, Welt!'}},
+        ])
+        self.assertEqual(1, len(example_only))
+        self.assertIn('de example', example_only[0])
+        self.assertEqual([], self.db.import_changes(
+            [{'id': 10, 'vocabulary': 'Greetings', 'section': 'Basics',
+              'type': 'noun', 'level': 'B1',
+              'texts': {'de': 'Hallo', 'fr': 'bonjour'},
+              'examples': {'de': 'Hallo, Welt!'}}],
+            include_examples=False))
+
         joined = '\n'.join(changes)
         self.assertNotIn('word 10', joined)
         self.assertIn('word 11 (gehen):', joined)

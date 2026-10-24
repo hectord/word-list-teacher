@@ -292,6 +292,10 @@ if __name__ == '__main__':
     import_dictionary_subparser.add_argument(
         '--update', action='store_true',
         help='update the existing words (by id) instead of replacing everything')
+    import_dictionary_subparser.add_argument(
+        '--hide-examples', action='store_true',
+        help='when previewing an update, leave out the changes which only '
+             'touch the example sentences')
 
     create_user_subparser = db_subparser.add_parser('create-user')
     create_user_subparser.add_argument('username', help='new username', nargs=1)
@@ -414,9 +418,17 @@ if __name__ == '__main__':
             # first validate the changes, then apply them
             changes = database.import_changes(records)
             if changes:
+                visible = changes
+                if args.hide_examples:
+                    visible = database.import_changes(
+                        records, include_examples=False)
                 print('Planned changes:')
-                for change in changes:
+                for change in visible:
                     print('  -', change)
+                hidden = len(changes) - len(visible)
+                if hidden:
+                    print('  (%d line(s) with only example changes hidden)'
+                          % hidden)
                 print()
                 try:
                     answer = input('Apply these changes? [y/N] ')
