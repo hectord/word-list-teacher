@@ -12,6 +12,15 @@ $(document).ready(function() {
   keep_focus();
 
   // end-of-run statistics (numbers only)
+  // examples mark the practised word with [brackets]: show it bold
+  function escapeHtml(text) {
+    return (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function markExample(text) {
+    return escapeHtml(text).replace(/\[([^\]]+)\]/g, '<b>$1</b>');
+  }
+
   function summaryElement(summary) {
     if (!summary) { return null; }
 
@@ -166,7 +175,7 @@ $(document).ready(function() {
         if (result.example || result.input_example) {
           example.attr("style", "");
           if (result.example) {
-            example.find(".example-text").text(result.example);
+            example.find(".example-text").html(markExample(result.example));
           }
           var translated = result.input_example ? true : false;
           example.toggleClass("with-input", translated);
@@ -174,7 +183,7 @@ $(document).ready(function() {
           // the translation stays hidden until the learner clicks it
           example.find(".example-input")
                  .addClass("hidden")
-                 .text(translated ? result.input_example : "");
+                 .html(markExample(translated ? result.input_example : ""));
         } else {
           example.hide();
         }

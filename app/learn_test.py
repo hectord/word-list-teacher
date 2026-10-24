@@ -3,7 +3,7 @@
 from io import StringIO
 import unittest
 
-from learn import Word, Vocabulary, Session, normalize
+from learn import Word, Vocabulary, Session, normalize, example_html
 
 
 class LearnTest(unittest.TestCase):
@@ -223,6 +223,21 @@ class LearnTest(unittest.TestCase):
         # plural notes outside a word stay optional too
         plural = Word(word_output='die Beschreibung (-en)', word_input='x')
         self.assertTrue(plural.accepts('die Beschreibung', 'de'))
+
+    def test_example_html_bolds_the_marked_word(self):
+        self.assertEqual('Die <b>Frau</b> wartet vor dem Eingang.',
+                         example_html('Die [Frau] wartet vor dem Eingang.'))
+        # separable verb parts are bold too
+        self.assertEqual('Du <b>siehst</b> müde <b>aus</b>.',
+                         example_html('Du [siehst] müde [aus].'))
+        # the rest is escaped
+        self.assertEqual('a &lt;script&gt; <b>x</b>',
+                         example_html('a <script> [x]'))
+        # no brackets: unchanged (but escaped)
+        self.assertEqual('Hallo Welt.', example_html('Hallo Welt.'))
+        self.assertEqual('', example_html(None))
+        # an unbalanced bracket is left alone
+        self.assertEqual('[offen', example_html('[offen'))
 
     def test_nested_parentheses_skip_the_outer_group(self):
         # the female form is an annotation containing a nested group:

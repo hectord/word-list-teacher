@@ -17,12 +17,14 @@ from starlette.responses import RedirectResponse
 from pydantic import BaseModel
 
 from learn import Vocabulary, Session, Word, Language, User
+from learn import example_html
 from learn import LEVELS, STRATEGIES, included_levels
 from store import load_database, DbException
 
 
 BASE_PATH = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(BASE_PATH / "templates"))
+TEMPLATES.env.filters["example_html"] = example_html
 
 DATADIR = Path(os.environ.get('DATADIR', BASE_PATH))
 

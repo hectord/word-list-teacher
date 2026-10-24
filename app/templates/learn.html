@@ -24,11 +24,11 @@
   <div class="word-example{% if word_input_example %} with-input{% endif %}"
        {% if not word_example and not word_input_example %}style="display:none"{% endif %}>
     <span class="example-text">
-      {{ word_example }}
+      {{ word_example | example_html | safe }}
     </span>
     <span class="example-toggle{% if not word_input_example %} hidden{% endif %}">translate</span>
     <span class="example-input hidden">
-      {{ word_input_example }}
+      {{ word_input_example | example_html | safe }}
     </span>
   </div>
 {%- endmacro %}
@@ -52,11 +52,11 @@
   <div class="word-example{% if word_input_example %} with-input{% endif %}"
        {% if not word_example and not word_input_example %}style="display:none"{% endif %}>
     <span class="example-text">
-      {{ word_example }}
+      {{ word_example | example_html | safe }}
     </span>
     <span class="example-toggle{% if not word_input_example %} hidden{% endif %}">translate</span>
     <span class="example-input hidden">
-      {{ word_input_example }}
+      {{ word_input_example | example_html | safe }}
     </span>
   </div>
 {%- endmacro %}
@@ -67,7 +67,7 @@
 {% block header %}
     <link rel="stylesheet" href="/static/learn.css?v=23">
 
-    <script src="/static/script.js?v=15"></script>
+    <script src="/static/script.js?v=16"></script>
 
 {% endblock %}
 

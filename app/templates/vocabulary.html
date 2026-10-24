@@ -131,7 +131,7 @@
               {% endif %}
             </div>
           </span>
-          {% if example %}<span class="col example">{{ example }}</span>{% endif %}
+          {% if example %}<span class="col example">{{ example | example_html | safe }}</span>{% endif %}
         </div>
       {% endfor %}
     </div>

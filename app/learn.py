@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from enum import Enum
+import html
 from typing import TextIO
 import re
 import unicodedata
@@ -208,6 +209,19 @@ def normalize(word: str, language: Optional[str] = None) -> str:
 
     # entries are often given with a trailing question mark / period
     return word.rstrip('.,!?;:').strip()
+
+
+def example_html(example: Optional[str]) -> str:
+    """The example as HTML with the ``[marked]`` parts in bold.
+
+    The vocabulary data marks the target word (or the separable part)
+    with square brackets, e.g. "Die [Frau] wartet vor dem Eingang.".
+    The rest of the text is escaped, so it is safe to render.
+    """
+    if not example:
+        return ''
+    escaped = html.escape(example, quote=False)
+    return re.sub(r'\[([^\]]+)\]', r'<b>\1</b>', escaped)
 
 
 def word_filter(word):
