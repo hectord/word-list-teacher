@@ -534,6 +534,7 @@ a.signout:hover { text-decoration: underline; }
 .col.out { font-weight: 600; }
 
 /* example sentence of the word (small, light grey) */
+.col.example b { font-size: inherit; font-weight: 700; }
 .col.example {
   grid-column: 1 / -1;
   font-size: 13px;

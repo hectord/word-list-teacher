@@ -167,6 +167,10 @@ input.field {
 
 .example-text { flex: 1 1 auto; font-size: 14px; min-width: 0; }
 
+/* the marked word is only bold: the global ``*`` rule in base.css would
+   otherwise give it 23px (50px on hi-dpi phones) */
+.word-example b { font-size: inherit; font-weight: 700; }
+
 /* click an example with a translation to reveal it */
 .word-example.with-input { cursor: pointer; }
 
