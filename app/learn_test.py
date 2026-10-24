@@ -3,7 +3,7 @@
 from io import StringIO
 import unittest
 
-from learn import Word, Vocabulary, Session
+from learn import Word, Vocabulary, Session, normalize
 
 
 class LearnTest(unittest.TestCase):
@@ -223,6 +223,22 @@ class LearnTest(unittest.TestCase):
         # plural notes outside a word stay optional too
         plural = Word(word_output='die Beschreibung (-en)', word_input='x')
         self.assertTrue(plural.accepts('die Beschreibung', 'de'))
+
+    def test_nested_parentheses_skip_the_outer_group(self):
+        # the female form is an annotation containing a nested group:
+        # the whole outer group is skipped, the base form is accepted
+        word = Word(word_output='der Schneider (-) (die Schneiderin (-nen))',
+                    word_input='le tailleur')
+        self.assertTrue(word.accepts('der Schneider', 'de'))
+        self.assertTrue(word.accepts(
+            'der Schneider (-) (die Schneiderin (-nen))', 'de'))
+        self.assertFalse(word.accepts('die Schneiderin', 'de'))
+        self.assertNotIn(')', normalize('der Schneider (-) (die Schneiderin (-nen))'))
+
+        # a group attached to the following word stays optional
+        web = Word(word_output='das (World-Wide-)Web', word_input='x')
+        self.assertTrue(web.accepts('das Web', 'de'))
+        self.assertTrue(web.accepts('das World-Wide-Web', 'de'))
 
     def test_accepts_comma_alternatives(self):
         # a comma separates alternatives just like a slash

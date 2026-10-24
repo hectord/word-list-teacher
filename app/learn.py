@@ -102,13 +102,58 @@ def included_levels(level: Optional[str]) -> Optional[frozenset]:
 
 
 
-# an annotation written OUTSIDE a word (e.g. the register "Die
-# Junggeselle (fam)"): it is ignored when comparing answers
-OUTSIDE_PARENTHESIS = re.compile(r'(?:^|\s)\([^)]*\)')
+def _parenthetical_groups(text: str) -> List[Tuple[int, int, str]]:
+    """The top-level parenthetical groups of ``text``.
 
-# a parenthetical written INSIDE a word (e.g. "Ell(ge)bogen"): its
-# content is optional, both "Ellbogen" and "Ellgebogen" are accepted
-GLUED_PARENTHESIS = re.compile(r'(?<=\S)\(([^)]*)\)')
+    Returns ``(start, end, content)`` for every group which is not
+    nested in another one; the content keeps any nested parentheses
+    (``"der Schneider (-) (die Schneiderin (-nen))"`` -> the second
+    group is ``die Schneiderin (-nen)``).
+    """
+    groups = []
+    depth = 0
+    start = None
+    for index, char in enumerate(text):
+        if char == '(':
+            if depth == 0:
+                start = index
+            depth += 1
+        elif char == ')' and depth > 0:
+            depth -= 1
+            if depth == 0 and start is not None:
+                groups.append((start, index + 1, text[start + 1:index]))
+                start = None
+    return groups
+
+
+def _is_glued(text: str, start: int, end: int) -> bool:
+    """A parenthetical written INSIDE a word: attached to the text
+    before it (``Ell(ge)bogen``) or after it (``das (World-Wide-)Web``).
+    A group separated by spaces on both sides is an annotation."""
+    before_attached = start > 0 and not text[start - 1].isspace()
+    after_attached = end < len(text) and not text[end].isspace()
+    return before_attached or after_attached
+
+
+def _strip_outside_parentheticals(text: str) -> str:
+    """Drop the annotations written outside a word (``Die Junggeselle
+    (fam)``, ``der Schneider (-) (die Schneiderin (-nen))``); the
+    in-word groups stay."""
+    groups = _parenthetical_groups(text)
+    if not groups:
+        return text
+
+    out = []
+    last = 0
+    for start, end, _content in groups:
+        before = text[last:start]
+        if _is_glued(text, start, end):
+            out.append(before + text[start:end])
+        else:
+            out.append(before.rstrip())
+        last = end
+    out.append(text[last:])
+    return ' '.join(''.join(out).split())
 
 APOSTROPHES = str.maketrans({
     '\u2019': "'",   # ’
@@ -146,8 +191,7 @@ def normalize(word: str, language: Optional[str] = None) -> str:
     # only the annotations written outside a word are dropped: an
     # in-word parenthetical ("Ell(ge)bogen") keeps its content and is
     # expanded by alternatives()
-    while OUTSIDE_PARENTHESIS.sub('', word) != word:
-        word = OUTSIDE_PARENTHESIS.sub('', word)
+    word = _strip_outside_parentheticals(word)
 
     word = re.sub(r'\s+', ' ', word).strip()
 
@@ -168,11 +212,6 @@ def normalize(word: str, language: Optional[str] = None) -> str:
 
 def word_filter(word):
     return normalize(word)
-
-
-# a parenthetical annotation, e.g. the plural "die Beschreibung (-en)"
-# or the feminine suffix "der/die Schneider(in)"
-PARENTHETICAL = re.compile(r'\(([^)]*)\)')
 
 
 def _split_alternatives(text: str) -> List[str]:
@@ -206,18 +245,20 @@ def _parenthetical_variants(text: str) -> List[str]:
     """"All the ways an in-word parenthetical can be written: as given
     ("Ell(ge)bogen"), with its content ("Ellgebogen") or without it
     ("Ellbogen"). Combinations of several groups are expanded too."""
-    matches = list(GLUED_PARENTHESIS.finditer(text))
-    if not matches:
+    groups = [(start, end, content)
+              for start, end, content in _parenthetical_groups(text)
+              if _is_glued(text, start, end)]
+    if not groups:
         return [text]
 
     variants = ['']
     last = 0
-    for match in matches:
-        prefix = text[last:match.start()]
-        options = [match.group(0), match.group(1), '']
+    for start, end, content in groups:
+        prefix = text[last:start]
+        options = [text[start:end], content, '']
         variants = [variant + prefix + option
                     for variant in variants for option in options]
-        last = match.end()
+        last = end
     suffix = text[last:]
     return [variant + suffix for variant in variants]
 
@@ -248,7 +289,7 @@ def alternatives(text: str) -> List[str]:
 
     # drop the out-of-word annotations first: their content is never
     # part of the answer (and may contain slashes of its own)
-    cleaned = OUTSIDE_PARENTHESIS.sub('', text).strip()
+    cleaned = _strip_outside_parentheticals(text).strip()
 
     bases = []
     for variant in _parenthetical_variants(cleaned):
@@ -291,7 +332,7 @@ def alternatives(text: str) -> List[str]:
             head = ' '.join(first_tokens[:-1])
             tails = [first_tokens[-1]]
             for part in parts[1:]:
-                bare = PARENTHETICAL.sub(' ', part).split()
+                bare = _strip_outside_parentheticals(part).split()
                 if bare:
                     tails.append(bare[-1])
             for tail in tails:
