@@ -111,19 +111,17 @@ $(document).ready(function() {
 
   // update the thin three-color progress line at the top of the run
   function updateProgress(progress) {
-    if (!progress) { return; }
+    if (!progress || !progress.states) { return; }
 
-    var total = progress.total;
-    function width(count) {
-      return total ? (count / total * 100) + '%' : '0%';
-    }
+    var bar = $("#run-progress");
+    if (!bar.length) { return; }
 
-    $("#run-progress .run-progress-seg.done").css("width",
-                                                   width(progress.done));
-    $("#run-progress .run-progress-seg.failed").css("width",
-                                                     width(progress.failed));
-    $("#run-progress .run-progress-seg.todo").css("width",
-                                                   width(progress.todo));
+    bar.empty();
+    progress.states.forEach(function (state) {
+      $("<span></span>")
+        .addClass("run-progress-seg " + state)
+        .appendTo(bar);
+    });
   }
 
   // on touch devices, keep the keyboard/input focused while practicing

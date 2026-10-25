@@ -1047,22 +1047,12 @@ def _progress(session: Session) -> dict:
     (done), words tried but not yet succeeded (failed) and words still
     to be tested (todo)."""
     statuses = session.word_progress()
-    total = len(statuses)
-    done = statuses.count('done')
-    failed = statuses.count('failed')
-    todo = statuses.count('todo')
-
-    def width(count):
-        return round(100.0 * count / total, 2) if total else 0.0
-
     return {
-        'total': total,
-        'done': done,
-        'failed': failed,
-        'todo': todo,
-        'done_width': width(done),
-        'failed_width': width(failed),
-        'todo_width': width(todo),
+        'total': len(statuses),
+        'done': statuses.count('done'),
+        'failed': statuses.count('failed'),
+        'todo': statuses.count('todo'),
+        'states': statuses,
     }
 
 
