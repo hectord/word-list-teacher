@@ -32,7 +32,8 @@ VOCABULARIES = DATADIR / 'learn.db'
 db = load_database(VOCABULARIES)
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(BASE_PATH / "static")),
+          name="static")
 security = HTTPBasic()
 
 
@@ -1043,7 +1044,13 @@ async def learn(request: Request,
                 response: Response,
                 session_id: int,
                 user: User = Depends(get_user)):
-    session = db.load_session(session_id)
+    try:
+        session = db.load_session(session_id, user)
+    except DbException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="session not found",
+        )
 
     first_word = None
     if session.current_word is not None:
@@ -1089,10 +1096,22 @@ async def learn(request: Request,
 @app.post("/word")
 async def post_word(word_output: WordOutput,
                     user: User = Depends(get_user)):
-    session = db.load_session(word_output.session_id)
-    vocabulary = session.vocabulary
+    try:
+        session = db.load_session(word_output.session_id, user)
+    except DbException:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="session not found",
+        )
 
+    vocabulary = session.vocabulary
     current_word = vocabulary.word(word_output.word_id)
+    if current_word is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="word not found",
+        )
+
     hint_word = current_word.word_output
     example = vocabulary.example(current_word)
     input_example = vocabulary.input_example(current_word)

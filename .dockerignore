@@ -8,3 +8,5 @@ __pycache__
 *.tar.gz
 data
 vocabulary
+learn.db
+*.db

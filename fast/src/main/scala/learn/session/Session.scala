@@ -26,7 +26,7 @@ class Session(voc: Vocabulary)
   def isFinished = currentWord.isEmpty
 
   def guess(text: String): Boolean = {
-    if (wordToLearn(start).output == text) {
+    if (wordToLearn(start).accepts(text)) {
       start += 1
       true
     } else {

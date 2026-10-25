@@ -215,7 +215,9 @@ class Database:
         if db_user.target_language is not None:
             target_language = Language.from_code(db_user.target_language.code)
 
-        user = User(email=email, password=password,
+        # The cached profile never stores the plaintext password; the
+        # cache key already holds a hash of the credentials.
+        user = User(email=email, password='',
                     main_language=main_language,
                     level=db_user.level,
                     target_language=target_language,
@@ -336,7 +338,8 @@ class Database:
                      main_language=previous.main_language, level=level,
                      target_language=previous.target_language,
                      strategy=previous.strategy,
-                     words_per_run=previous.words_per_run))
+                     words_per_run=previous.words_per_run,
+                     hard_runs=previous.hard_runs))
 
     def set_user_target_language(self, user, target_language):
         email = user if isinstance(user, str) else user.email
@@ -356,7 +359,8 @@ class Database:
                      level=previous.level,
                      target_language=Language.from_code(code),
                      strategy=previous.strategy,
-                     words_per_run=previous.words_per_run))
+                     words_per_run=previous.words_per_run,
+                     hard_runs=previous.hard_runs))
 
     def list_users(self) -> List[Tuple[int, str]]:
         """All users as (id, email) pairs."""
@@ -668,15 +672,19 @@ class Database:
     def word_attempts(self, voc_id: int) -> List[tuple]:
         """Practice attempts of a vocabulary, most recent first:
         (word id, success, typed word, timestamp of the guess)."""
-        return [(attempt.word_id, attempt.success, attempt.typed_word,
-                 attempt.time)
-                for attempt in
-                (DbWordAttempt
-                 .select()
-                 .join(DbWord)
-                 .where(DbWord.vocabulary == voc_id)
-                 .order_by(DbWordAttempt.time.desc(),
-                           DbWordAttempt.id.desc()))]
+        rows = []
+        for attempt in (DbWordAttempt
+                        .select()
+                        .join(DbWord)
+                        .where(DbWord.vocabulary == voc_id)
+                        .order_by(DbWordAttempt.time.desc(),
+                                  DbWordAttempt.id.desc())):
+            # legacy rows may predate the ``time`` column: they cannot be
+            # placed on a timeline, so they are skipped
+            if attempt.time is not None:
+                rows.append((attempt.word_id, attempt.success,
+                             attempt.typed_word, attempt.time))
+        return rows
 
     def historical_attempts(self, user: User,
                             voc_id: int,
@@ -737,6 +745,9 @@ class Database:
         daily = {}
 
         for word_id, success, tested_at in query.tuples():
+            if tested_at is None:
+                continue
+
             if word_id in last_success:
                 if last_success[word_id] != success:
                     known += 1 if success else -1
@@ -1047,6 +1058,9 @@ class Database:
         daily = {}
 
         for word_id, session_id, success, tested_at in query.tuples():
+            if tested_at is None:
+                continue
+
             key = (word_id, session_id)
             if key in seen_runs:
                 continue
@@ -1744,8 +1758,16 @@ class Database:
 
         return self.load_session(sessions[0].id)
 
-    def load_session(self, session_id: int) -> Session:
-        db_session = DbSession.get(session_id)
+    def load_session(self, session_id: int,
+                     user: Optional[User] = None) -> Session:
+        db_session = DbSession.get_or_none(session_id)
+        if db_session is None:
+            raise DbException('session not found')
+
+        if user is not None:
+            db_user = DbUser.get_or_none(DbUser.email == user.email)
+            if db_user is None or db_session.user_id != db_user.id:
+                raise DbException('session not found')
 
         db_voc_session = (DbVocabularySession
                           .select()
@@ -1847,21 +1869,17 @@ class Database:
 
     # --------------------------------------------------------------- stats
     def vocabulary_stats(self, voc: Vocabulary,
-                         user: Optional[User] = None) -> Optional[VocabularyStats]:
+                         user: User) -> Optional[VocabularyStats]:
         """Per-word practice statistics of ``voc``, from the attempts of
         one ``user``: the lifetime success rate (runs where the word was
         answered correctly on its first attempt, over all runs which
         included it) and the hard-word flag (the word was answered
         wrongly at least once during the last ``hard_runs`` runs which
-        included it). Mastery is derived from those two. Without a
-        user, every user's attempts would be mixed together, so the
-        page always passes the current user."""
+        included it). Mastery is derived from those two."""
         hard_runs = 2
-        db_user = None
-        if user is not None:
-            db_user = self._get_db_user(user)
-            if db_user.hard_runs is not None:
-                hard_runs = db_user.hard_runs
+        db_user = self._get_db_user(user)
+        if db_user.hard_runs is not None:
+            hard_runs = db_user.hard_runs
 
         # one row per attempt, chronologically per word and run; a word
         # normally appears once per run, and when it does not we keep

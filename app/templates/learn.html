@@ -110,7 +110,7 @@
                      attempt.example or '',
                      attempt.input_example or '',
                      attempt.typed_word,
-                     variant_notes[loop.index0] if variant_notes else False) }}
+                     variant_notes[loop.revindex0] if variant_notes else False) }}
         </div>
         {% else %}
           <div class="word wrong-word">

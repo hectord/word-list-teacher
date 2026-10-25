@@ -210,7 +210,7 @@ def save_words(words: Session):
 
 
 def learn(files: Set[str], vocabulary: Vocabulary):
-    session = Session([], all_words)
+    session = Session([], vocabulary)
 
     try:
 

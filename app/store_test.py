@@ -1838,6 +1838,36 @@ class TestStore(unittest.TestCase):
             if os.path.exists(path):
                 os.remove(path)
 
+    def test_level_and_target_updates_keep_hard_runs(self):
+        self._create_user()
+        self.db.set_user_hard_runs(self.user, 7)
+        # prime the auth cache, then change profile fields through the
+        # same cached-user path the web app uses
+        self.db.get_user(self.user.email, 'abc')
+
+        self.db.set_user_level(self.user, 'B2')
+        self.assertEqual(
+            7, self.db.get_user(self.user.email, 'abc').hard_runs)
+
+        self.db.set_user_hard_runs(
+            self.db.get_user(self.user.email, 'abc'), 9)
+        self.db.set_user_target_language(self.user, Language.FRENCH)
+        self.assertEqual(
+            9, self.db.get_user(self.user.email, 'abc').hard_runs)
+
+    def test_load_session_rejects_unknown_or_foreign_session(self):
+        self._create_vocabulary()
+        self._create_user()
+        voc = self._projection()
+        session = self.db.create_new_session(self.user, voc)
+
+        other = self.db.create_user('other@x.com', 'abc', Language.FRENCH)
+        with self.assertRaises(DbException):
+            self.db.load_session(session.id, other)
+
+        with self.assertRaises(DbException):
+            self.db.load_session(999)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)

@@ -659,10 +659,13 @@ class Vocabulary:
             word_id = flipped_ids.get(id(word))
             if word_id is not None:
                 voc.set_word_id(word, word_id)
-            example = self.example(word.flip())
+            # ``example`` is always in the vocabulary's output language
+            # and ``input_example`` in its input language; after flipping
+            # the two languages are swapped, so the sentences swap too.
+            example = self.input_example(word.flip())
             if example is not None:
                 voc.set_example(word, example)
-            input_example = self.input_example(word.flip())
+            input_example = self.example(word.flip())
             if input_example is not None:
                 voc.set_input_example(word, input_example)
 
@@ -763,8 +766,9 @@ class Vocabulary:
 
     @staticmethod
     def _after_directive(line: str) -> Optional[str]:
-        i = line.index(' ')
-        return line[i:].strip()
+        if ' ' not in line:
+            return ''
+        return line.split(' ', 1)[1].strip()
 
     @staticmethod
     def load(file_input: TextIO):

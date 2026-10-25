@@ -51,6 +51,9 @@ case class Vocabulary(_words: Set[Word] = Set())
         val wordOutput = splitLine(0)
         val wordInput = splitLine(1)
 
+        if (wordOutput.isEmpty)
+          throw new InvalidVocabulary(s"invalid $line")
+
         if(wordOutput(0) == '#') {
           val (directive, newWordOutput) = wordOutput.span(x => !x.isWhitespace)
 

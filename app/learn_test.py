@@ -431,6 +431,22 @@ class LearnTest(unittest.TestCase):
         self.assertEqual('fr', voc.input_language)
         self.assertEqual('de', voc.output_language)
 
+    def test_flip_swaps_examples(self):
+        word = Word(word_output='der Tisch', word_input='la table')
+        voc = Vocabulary(None, [word], 'fr', 'de')
+        voc.set_example(word, 'Der Tisch ist rund.')
+        voc.set_input_example(word, 'La table est ronde.')
+
+        flipped = voc.flip()
+        flipped_word = flipped.words[0]
+
+        # examples stay in their language roles, so a reversed run shows
+        # the answer language first and the prompt language as translation
+        self.assertEqual('La table est ronde.',
+                         flipped.example(flipped_word))
+        self.assertEqual('Der Tisch ist rund.',
+                         flipped.input_example(flipped_word))
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)
