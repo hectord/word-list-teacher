@@ -74,6 +74,9 @@ class WordResult(BaseModel):
     # end-of-run statistics, present when the session just finished
     summary: Optional[dict] = None
 
+    # per-word run progress, one entry per status (done/failed/todo)
+    progress: Optional[dict] = None
+
 
 def get_user(creds: HTTPBasicCredentials = Depends(security)) -> User:
     username = creds.username
@@ -1039,6 +1042,30 @@ def _session_summary(session: Session, user: User) -> Optional[dict]:
     return session.summary(ai_delta)
 
 
+def _progress(session: Session) -> dict:
+    """The three-way progress bar data for a session: words succeeded
+    (done), words tried but not yet succeeded (failed) and words still
+    to be tested (todo)."""
+    statuses = session.word_progress()
+    total = len(statuses)
+    done = statuses.count('done')
+    failed = statuses.count('failed')
+    todo = statuses.count('todo')
+
+    def width(count):
+        return round(100.0 * count / total, 2) if total else 0.0
+
+    return {
+        'total': total,
+        'done': done,
+        'failed': failed,
+        'todo': todo,
+        'done_width': width(done),
+        'failed_width': width(failed),
+        'todo_width': width(todo),
+    }
+
+
 @app.get("/learn")
 async def learn(request: Request,
                 response: Response,
@@ -1086,6 +1113,7 @@ async def learn(request: Request,
             'summary': _session_summary(session, user),
             'variant_notes': variant_notes,
             'direction': direction,
+            'progress': _progress(session),
         },
         headers={'Cache-Control': 'no-store'}
     )
@@ -1141,4 +1169,5 @@ async def post_word(word_output: WordOutput,
                       word_output=word_output,
                       used_other_variant=used_other_variant,
                       next_word=next_word_input,
-                      summary=_session_summary(session, user))
+                      summary=_session_summary(session, user),
+                      progress=_progress(session))

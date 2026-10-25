@@ -957,6 +957,24 @@ class Session:
         """The strategy run behind this session (stats, per-word info)."""
         return self._run
 
+    def word_progress(self) -> List[str]:
+        """One status per run word, aligned with ``run.words``.
+
+        * ``done``   - the word succeeded at least once in this run
+        * ``failed`` - the word was tried but has not succeeded yet
+        * ``todo``   - the word has not been tried yet
+        """
+        completed = self._run.completed_word_ids
+        statuses = []
+        for word in self._run.words:
+            if word.id in completed:
+                statuses.append('done')
+            elif self._run.stats(word.id).failures > 0:
+                statuses.append('failed')
+            else:
+                statuses.append('todo')
+        return statuses
+
     def summary(self, ai_delta: Dict = None) -> Dict:
         """End-of-run summary: how many words are known (no mistake) out
         of the run's words, with a percentage, plus the words to learn

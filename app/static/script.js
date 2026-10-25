@@ -109,6 +109,23 @@ $(document).ready(function() {
     if (node) { embeddedSummary.replaceWith(node); }
   }
 
+  // update the thin three-color progress line at the top of the run
+  function updateProgress(progress) {
+    if (!progress) { return; }
+
+    var total = progress.total;
+    function width(count) {
+      return total ? (count / total * 100) + '%' : '0%';
+    }
+
+    $("#run-progress .run-progress-seg.done").css("width",
+                                                   width(progress.done));
+    $("#run-progress .run-progress-seg.failed").css("width",
+                                                     width(progress.failed));
+    $("#run-progress .run-progress-seg.todo").css("width",
+                                                   width(progress.todo));
+  }
+
   // on touch devices, keep the keyboard/input focused while practicing
   if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     current_output.on("focusout", function() {
@@ -190,6 +207,8 @@ $(document).ready(function() {
 
         // insert the answer right below the pinned current word
         $("#current-word").after(new_node);
+
+        updateProgress(result.progress);
 
         if(result.next_word) {
           current_input.text(result.next_word.word);

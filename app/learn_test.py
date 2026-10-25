@@ -42,6 +42,20 @@ class LearnTest(unittest.TestCase):
         self.assertEqual(50.0, words.accuracy)
         self.assertTrue(words.is_finished)
 
+    def test_word_progress(self):
+        session = Session([], self.voc)
+        self.assertEqual(['todo', 'todo'], session.word_progress())
+
+        first = session.current_word
+        session.guess(first, 'wrong')
+        self.assertEqual(1, session.word_progress().count('failed'))
+        self.assertEqual(1, session.word_progress().count('todo'))
+
+        second = session.current_word
+        session.guess(second, second.word_output)
+        self.assertEqual(1, session.word_progress().count('done'))
+        self.assertEqual(1, session.word_progress().count('failed'))
+
     def test_ai_strategy_session_stats(self):
         # the run stats (accuracy, words learned, words left) must work
         # with the ai strategy too, not only the full strategy
