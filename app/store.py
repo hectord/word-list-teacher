@@ -1508,12 +1508,20 @@ class Database:
 
     @staticmethod
     def _with_variant_siblings(scope_voc: Vocabulary,
-                               full_voc: Vocabulary) -> Vocabulary:
+                               full_voc: Vocabulary,
+                               section_id: Optional[int] = None) -> Vocabulary:
         """Extend ``scope_voc`` so that the sibling translations (same
         input, different output) of every word it contains are included
-        too: the learner may answer with any of them, wherever in the
-        vocabulary they live. Returns ``scope_voc`` unchanged when it is
-        already complete (e.g. a whole-vocabulary run)."""
+        too: the learner may answer with any of them.
+
+        For a section-scoped run (``section_id`` is not None) only the
+        siblings which belong to that same section are added, so a
+        section practice does not pull in words from other sections.
+        For a whole-vocabulary run every sibling is added, wherever in
+        the vocabulary it lives.
+
+        Returns ``scope_voc`` unchanged when it is already complete
+        (e.g. a whole-vocabulary run)."""
         def word_ids(voc):
             return {word_id for word_id in
                     (voc.word_id(word) for word in voc.words)
@@ -1521,18 +1529,28 @@ class Database:
 
         wanted = word_ids(scope_voc)
         by_key = {}
-        for word in full_voc.words:
+        section_of_word = {}
+        section_name = None
+        if section_id is not None:
+            section_name = full_voc.section_name_for_id(section_id)
+
+        for word, section in zip(full_voc.words, full_voc.word_sections):
             word_id = full_voc.word_id(word)
             if word_id is None:
                 continue
+            section_of_word[word_id] = section
             # a word may spell its input several ways (la portefeuille
             # vs la portefeuille / porte-monnaie): register every key
             for key in word.keys:
                 by_key.setdefault(key, set()).add(word_id)
 
         for siblings in by_key.values():
-            if any(sibling in wanted for sibling in siblings):
-                wanted.update(siblings)
+            if not any(sibling in wanted for sibling in siblings):
+                continue
+            for sibling in siblings:
+                if (section_id is None or
+                        section_of_word.get(sibling) == section_name):
+                    wanted.add(sibling)
 
         if wanted == word_ids(scope_voc):
             return scope_voc
@@ -1619,8 +1637,10 @@ class Database:
         # sibling variants of the run words must always be part of the
         # run (they can be dropped by the AI subset or split across
         # sections), otherwise a valid answer would be judged wrong and
-        # the word would be asked over and over
-        scope_voc = self._with_variant_siblings(scope_voc, voc)
+        # the word would be asked over and over. A section run keeps its
+        # sibling expansion inside the section.
+        scope_voc = self._with_variant_siblings(scope_voc, voc,
+                                                section_id=section_id)
 
         new_session = Session([], scope_voc,
                               strategy=make_strategy(strategy_name),
@@ -1827,7 +1847,8 @@ class Database:
 
         # the same variant-group rule as session creation: sibling
         # translations of the run words must be in the run on resume too
-        v = self._with_variant_siblings(v, whole_v)
+        v = self._with_variant_siblings(v, whole_v,
+                                        section_id=db_voc_session.section_id)
 
         attempts = []
         completed = set()

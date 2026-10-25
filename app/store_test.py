@@ -1868,6 +1868,35 @@ class TestStore(unittest.TestCase):
         with self.assertRaises(DbException):
             self.db.load_session(999)
 
+    def test_section_run_does_not_pull_siblings_from_other_sections(self):
+        self._create_user()
+        self.db.set_user_strategy(self.user, 'ai')
+        self.db.set_user_words_per_run(self.user, 0)  # AI unlimited
+
+        a = Word(word_input='la taille', word_output='die Größe (-n)')
+        b = Word(word_input='la taille', word_output='die Taille (-n)')
+        c = Word(word_input='autre', word_output='anders')
+        voc = Vocabulary(Word('t', 't'), [a, b, c], 'fr', 'de',
+                         sections=['A', 'B', 'A'])
+        voc_id = self.db.create_vocabulary(voc)
+
+        user = self.db.get_user(self.user.email, 'abc')
+        v = self.db.get_vocabulary(user, voc_id, Language.GERMAN)
+
+        # a section run keeps its sibling expansion inside the section
+        section_session = self.db.create_new_session(user, v, section='A')
+        section_outputs = {w.word_output
+                           for w in section_session.vocabulary.words}
+        self.assertIn('die Größe (-n)', section_outputs)
+        self.assertIn('anders', section_outputs)
+        self.assertNotIn('die Taille (-n)', section_outputs)
+
+        # a whole-vocabulary run still includes every sibling, even when
+        # it lives in another section
+        whole_session = self.db.create_new_session(user, v)
+        whole_outputs = {w.word_output for w in whole_session.vocabulary.words}
+        self.assertIn('die Taille (-n)', whole_outputs)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=3)
