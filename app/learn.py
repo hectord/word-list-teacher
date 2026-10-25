@@ -280,16 +280,22 @@ def _parenthetical_variants(text: str) -> List[str]:
 def alternatives(text: str) -> List[str]:
     """The alternative writings of a vocabulary entry.
 
-    The vocabulary data separates alternatives with ``/``:
+    The vocabulary data separates alternatives with ``/`` (and ``,``):
 
     * ``aller/convenir``            -> the word or its alternative
-    * ``das Portemonnaie / Portmonee`` -> either spelling
     * ``er/sie hat ... Augen``      -> the first token alternates
     * ``der/die Schneider(in)``     -> the shared suffix stays
 
     Annotations written outside a word ("Die Junggeselle (fam)") are
     ignored, while a parenthetical inside a word ("Ell(ge)bogen") is
     optional, so both "Ellbogen" and "Ellgebogen" are produced.
+
+    Only the alternatives written out in the entry are kept, plus one
+    safe cross-product: when the first alternative is a single token
+    ("er/sie hat ...", "zu/ins Bett gehen") the shared tail of the
+    second alternative is applied to both leading tokens. Guessing
+    articles or shared heads otherwise produced wrong alternatives
+    ("la blazer", "sich auf"), so those are intentionally not done.
 
     Returns the raw candidate strings (the full entry included); each
     is normalized before comparing with what the learner typed.
@@ -318,39 +324,16 @@ def alternatives(text: str) -> List[str]:
         for part in parts:
             add(part)
 
-        if len(parts) < 2:
-            continue
-
-        # "er/sie hat ..." / "der/die Schneider(in)" -> both tokens with
-        # the shared tail, e.g. "er hat ..." and "sie hat ..."
-        first = parts[0].strip()
-        rest = '/'.join(parts[1:]).strip()
-        rest_tokens = rest.split(None, 1)
-        if len(rest_tokens) == 2:
-            tail = rest_tokens[1]
-            add('%s %s' % (first, tail))
-            add('%s %s' % (rest_tokens[0], tail))
-
-        # "das Portemonnaie / Portmonee": the article of the first
-        # alternative is often dropped from the later ones
-        first_words = first.split(None, 1)
-        if len(first_words) == 2 and len(first_words[0]) <= 5:
-            for part in parts[1:]:
-                if part:
-                    add('%s %s' % (first_words[0], part))
-
-        # "sich lehnen gegen/auf": the last word alternates and the
-        # shared head of the first alternative stays
-        first_tokens = first.split()
-        if len(first_tokens) > 1:
-            head = ' '.join(first_tokens[:-1])
-            tails = [first_tokens[-1]]
-            for part in parts[1:]:
-                bare = _strip_outside_parentheticals(part).split()
-                if bare:
-                    tails.append(bare[-1])
-            for tail in tails:
-                add('%s %s' % (head, tail))
+        # "er/sie hat ... Augen" / "der/die Schneider(in)" /
+        # "zu/ins Bett gehen": the first token alternates and the rest
+        # of the second alternative is shared.
+        if len(parts) == 2:
+            first_tokens = parts[0].strip().split()
+            second_tokens = parts[1].strip().split()
+            if len(first_tokens) == 1 and len(second_tokens) >= 2:
+                tail = ' '.join(second_tokens[1:])
+                add('%s %s' % (first_tokens[0], tail))
+                add('%s %s' % (second_tokens[0], tail))
 
     return candidates
 
